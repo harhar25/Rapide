@@ -1,0 +1,55 @@
+{
+  "name": "after-sales-desktop",
+  "version": "1.0.0",
+  "description": "After-Sales Service Management Desktop Application",
+  "main": "src/main.js",
+  "homepage": "./",
+  "scripts": {
+    "start": "electron .",
+    "dev": "concurrently \"npm run electron-dev\" \"npm run react-start\"",
+    "react-start": "react-scripts start",
+    "electron-dev": "wait-on http://localhost:3000 && electron . --dev",
+    "build": "npm run react-build && npm run electron-build",
+    "react-build": "react-scripts build",
+    "electron-build": "electron-builder",
+    "test": "react-scripts test"
+  },
+  "dependencies": {
+    "axios": "^1.4.0",
+    "date-fns": "^2.30.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "concurrently": "^8.0.0",
+    "electron": "^25.9.8",
+    "electron-builder": "^24.0.0",
+    "electron-is-dev": "^3.0.1",
+    "react-scripts": "5.0.1",
+    "wait-on": "^7.0.0"
+  },
+  "build": {
+    "appId": "com.afterpros.desktop",
+    "productName": "After-Sales System",
+    "files": [
+      "src/**/*",
+      "public/**/*",
+      "node_modules/**/*"
+    ],
+    "directories": {
+      "buildResources": "public"
+    }
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}

@@ -1,0 +1,140 @@
+/* CRO Module Styles */
+
+.cro-module {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.module-header {
+    margin-bottom: 30px;
+}
+
+.module-header h2 {
+    font-size: 28px;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.module-header p {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+/* Tabs */
+.tab-container {
+    background: var(--bg-primary);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+}
+
+.tabs {
+    display: flex;
+    border-bottom: 2px solid var(--border);
+    background: var(--bg-tertiary);
+}
+
+.tab-button {
+    flex: 1;
+    padding: 15px 20px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.3s;
+    border-bottom: 3px solid transparent;
+    position: relative;
+    bottom: -2px;
+}
+
+.tab-button:hover {
+    color: var(--primary);
+    background: var(--bg-secondary);
+}
+
+.tab-button.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+.tab-content {
+    padding: 30px;
+}
+
+/* Sections */
+.pms-section,
+.appointment-section,
+.walkin-section {
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid var(--border);
+}
+
+.section-header h3 {
+    font-size: 20px;
+    color: var(--text-primary);
+}
+
+/* Contact Methods */
+.contact-methods {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.btn-contact {
+    width: 100%;
+    justify-content: center;
+}
+
+/* Walk-in Registration */
+.walkin-section h4 {
+    font-size: 16px;
+    color: var(--text-primary);
+    margin-bottom: 15px;
+    margin-top: 20px;
+}
+
+.walkin-section .alert {
+    margin-bottom: 20px;
+}
+
+@media (max-width: 768px) {
+    .tabs {
+        flex-direction: column;
+    }
+
+    .tab-button {
+        border-bottom: none;
+        border-left: 3px solid transparent;
+    }
+
+    .tab-button.active {
+        border-left-color: var(--primary);
+    }
+
+    .contact-methods {
+        grid-template-columns: 1fr;
+    }
+}
