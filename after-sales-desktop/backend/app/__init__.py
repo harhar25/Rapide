@@ -19,8 +19,12 @@ def create_app(config_name='development'):
     
     # Register blueprints
     from app.routes import customer_bp, scheduler_bp
+    from app.routes.auth_routes import auth_bp
+    from app.routes.warehouse_routes import warehouse_bp
     app.register_blueprint(customer_bp)
     app.register_blueprint(scheduler_bp)
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(warehouse_bp)
     
     # Health check endpoint
     @app.route('/api/health', methods=['GET'])

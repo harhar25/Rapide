@@ -2,25 +2,14 @@ import React, { useState } from 'react';
 import '../styles/login.css';
 
 const Login = ({ onLogin }) => {
-  const [selectedRole, setSelectedRole] = useState(null);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const roles = [
-    { id: 'cro', name: 'CRO', icon: '📋', color: '#495057' },
-    { id: 'technician', name: 'Tech', icon: '🔧', color: '#495057' },
-    { id: 'warehouse', name: 'Warehouse', icon: '📦', color: '#495057' },
-    { id: 'manager', name: 'Manager', icon: '👔', color: '#495057' },
-    { id: 'advisor', name: 'Advisor', icon: '💼', color: '#495057' },
-  ];
-
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    if (!selectedRole) {
-      setError('Please select a role');
-      return;
-    }
+    
     if (!username.trim()) {
       setError('Please enter username');
       return;
@@ -30,12 +19,30 @@ const Login = ({ onLogin }) => {
       return;
     }
 
-    // For demo, accept any credentials
-    onLogin({
-      role: selectedRole,
-      username: username,
-      name: username.charAt(0).toUpperCase() + username.slice(1),
-    });
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Add password to user object for admin operations
+        const userData = {...data.user, password};
+        onLogin(userData);
+      } else {
+        setError(data.error || 'Login failed');
+      }
+    } catch (err) {
+      setError('Connection error: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -45,26 +52,6 @@ const Login = ({ onLogin }) => {
         <p className="subtitle">Service Management System</p>
 
         <form onSubmit={handleLogin}>
-          <div className="section">
-            <label>Select Role</label>
-            <div className="role-grid">
-              {roles.map((role) => (
-                <button
-                  key={role.id}
-                  type="button"
-                  className={`role-btn ${selectedRole === role.id ? 'selected' : ''}`}
-                  onClick={() => {
-                    setSelectedRole(role.id);
-                    setError('');
-                  }}
-                >
-                  <span className="role-icon">{role.icon}</span>
-                  <span className="role-name">{role.name}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
           <div className="section">
             <label htmlFor="username">Username</label>
             <input
@@ -76,6 +63,7 @@ const Login = ({ onLogin }) => {
                 setUsername(e.target.value);
                 setError('');
               }}
+              disabled={loading}
             />
           </div>
 
@@ -90,18 +78,21 @@ const Login = ({ onLogin }) => {
                 setPassword(e.target.value);
                 setError('');
               }}
+              disabled={loading}
             />
           </div>
 
           {error && <div className="error-message">{error}</div>}
 
-          <button type="submit" className="login-btn">
-            Sign In
+          <button type="submit" className="login-btn" disabled={loading}>
+            {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
         <div className="demo-info">
-          <p>Demo mode: Any username/password</p>
+          <p><strong>Demo credentials:</strong><br/>
+          Username: <code>admin</code><br/>
+          Password: <code>admin123</code></p>
         </div>
       </div>
     </div>

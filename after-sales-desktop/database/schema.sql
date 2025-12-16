@@ -4,6 +4,22 @@
 CREATE DATABASE IF NOT EXISTS after_sales_db;
 USE after_sales_db;
 
+-- ==================== PERSONNEL TABLE (User Authentication) ====================
+CREATE TABLE IF NOT EXISTS personnel (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    role ENUM('admin', 'cro', 'technician', 'warehouse', 'manager', 'advisor') DEFAULT 'cro',
+    email VARCHAR(100),
+    status ENUM('active', 'inactive') DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_username (username),
+    INDEX idx_role (role),
+    INDEX idx_status (status)
+);
+
 -- ==================== CUSTOMERS TABLE ====================
 CREATE TABLE customers (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -138,6 +154,46 @@ CREATE TABLE audit_logs (
     INDEX idx_timestamp (timestamp)
 );
 
+-- ==================== WAREHOUSE PRODUCTS TABLE ====================
+CREATE TABLE IF NOT EXISTS warehouse_products (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    product_code VARCHAR(50) NOT NULL UNIQUE,
+    product_name VARCHAR(255) NOT NULL,
+    category VARCHAR(100),
+    unit_price DECIMAL(10, 2) NOT NULL,
+    quantity_in_stock INT DEFAULT 0,
+    reorder_level INT DEFAULT 10,
+    supplier VARCHAR(255),
+    description TEXT,
+    status ENUM('active', 'discontinued', 'out-of-stock') DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_by VARCHAR(100),
+    INDEX idx_product_code (product_code),
+    INDEX idx_category (category),
+    INDEX idx_status (status)
+);
+
+-- ==================== WAREHOUSE INVENTORY HISTORY ====================
+CREATE TABLE IF NOT EXISTS warehouse_inventory_history (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    product_id INT NOT NULL,
+    transaction_type ENUM('in', 'out', 'adjustment', 'damaged') DEFAULT 'in',
+    quantity INT NOT NULL,
+    previous_quantity INT,
+    new_quantity INT,
+    reference_no VARCHAR(100),
+    reference_type ENUM('purchase', 'sale', 'repair-job', 'damage', 'adjustment') DEFAULT 'purchase',
+    notes TEXT,
+    created_by VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES warehouse_products(id),
+    INDEX idx_product_id (product_id),
+    INDEX idx_transaction_type (transaction_type),
+    INDEX idx_created_at (created_at),
+    INDEX idx_reference_no (reference_no)
+);
+
 -- ==================== SAMPLE DATA ====================
 
 -- Insert sample service bays
@@ -172,6 +228,26 @@ INSERT INTO contact_attempts (customer_id, contact_type, status, notes, created_
 (1, 'call', 'confirmed', 'Customer confirmed appointment for Monday 10 AM', 'CRO001'),
 (2, 'sms', 'attempted', 'No response yet', 'CRO001'),
 (3, 'call', 'not-available', 'Line busy', 'CRO002');
+
+-- Insert sample warehouse products
+INSERT INTO warehouse_products (product_code, product_name, category, unit_price, quantity_in_stock, reorder_level, supplier, description, created_by) VALUES
+('OIL-5L-001', 'Engine Oil 5L', 'Fluids', 450.00, 45, 20, 'Shell', 'Premium engine oil 5 liters', 'ADMIN'),
+('FILTER-AIR-001', 'Air Filter', 'Filters', 350.00, 8, 15, 'Bosch', 'Standard air filter', 'ADMIN'),
+('BRAKE-PAD-SET', 'Brake Pads Set', 'Brakes', 1200.00, 12, 10, 'Brembo', 'Front brake pads set', 'ADMIN'),
+('SPARK-PLUG-BOX', 'Spark Plugs Box', 'Ignition', 280.00, 3, 10, 'NGK', 'Box of 4 spark plugs', 'ADMIN'),
+('COOLANT-1L', 'Coolant 1L', 'Fluids', 320.00, 28, 15, 'Castrol', 'Engine coolant 1 liter', 'ADMIN'),
+('BATTERY-60AH', 'Car Battery 60Ah', 'Electrical', 3500.00, 6, 5, 'Amaron', '60Ah car battery', 'ADMIN'),
+('WIPER-BLADE-SET', 'Wiper Blade Set', 'Wipers', 450.00, 20, 12, 'Bosch', 'Front wiper blade set', 'ADMIN'),
+('TRANSMISSION-OIL-4L', 'Transmission Oil 4L', 'Fluids', 680.00, 15, 8, 'Shell', 'ATF transmission oil 4L', 'ADMIN');
+
+-- Insert sample inventory history
+INSERT INTO warehouse_inventory_history (product_id, transaction_type, quantity, previous_quantity, new_quantity, reference_no, reference_type, notes, created_by) VALUES
+(1, 'in', 50, 0, 50, 'PO-001', 'purchase', 'Initial stock', 'ADMIN'),
+(1, 'out', 5, 50, 45, 'JOB-001', 'repair-job', 'Used in service', 'WAREHOUSE'),
+(2, 'in', 25, 0, 25, 'PO-002', 'purchase', 'Initial stock', 'ADMIN'),
+(2, 'out', 17, 25, 8, 'JOB-002', 'repair-job', 'Sold 17 units', 'WAREHOUSE'),
+(3, 'in', 20, 0, 20, 'PO-003', 'purchase', 'Initial stock', 'ADMIN'),
+(3, 'out', 8, 20, 12, 'JOB-003', 'repair-job', 'Service jobs', 'WAREHOUSE');
 
 -- Insert sample scheduling orders
 INSERT INTO scheduling_orders (customer_id, scheduled_date, scheduled_time, bay_id, technician_id, advisor_id, service_type, status, priority, created_by) VALUES

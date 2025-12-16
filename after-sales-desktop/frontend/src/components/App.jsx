@@ -3,6 +3,7 @@ import Layout from './Layout';
 import CROModule from '../pages/CROModule';
 import TechnicianDashboard from '../pages/TechnicianDashboard';
 import WarehouseDashboard from '../pages/WarehouseDashboard';
+import AdminDashboard from '../pages/AdminDashboard';
 import Login from '../pages/Login';
 import '../styles/app.css';
 
@@ -21,18 +22,24 @@ export default function App() {
 
   const handleLogin = (userData) => {
     const user = {
-      id: Math.random(),
+      id: userData.id,
+      username: userData.username,
       name: userData.name,
       role: userData.role,
-      username: userData.username
+      email: userData.email
     };
     localStorage.setItem('user', JSON.stringify(user));
+    // Store admin password temporarily if admin login
+    if (user.role === 'admin') {
+      localStorage.setItem('admin_password', userData.password);
+    }
     setUser(user);
   };
 
   const handleLogout = () => {
     setUser(null);
     localStorage.removeItem('user');
+    localStorage.removeItem('admin_password');
   };
 
   if (loading) {
@@ -45,6 +52,8 @@ export default function App() {
 
   // Render different interfaces based on role
   switch (user.role) {
+    case 'admin':
+      return <AdminDashboard user={user} onLogout={handleLogout} />;
     case 'cro':
       return (
         <Layout onLogout={handleLogout} user={user}>
@@ -74,31 +83,4 @@ export default function App() {
     default:
       return <Login onLogin={handleLogin} />;
   }
-}
-
-            <input
-              type="password"
-              className="form-input"
-              value={credentials.password}
-              onChange={(e) => setCredentials({...credentials, password: e.target.value})}
-              placeholder="Enter password"
-            />
-          </div>
-          {error && <div className="alert alert-error">{error}</div>}
-          <button type="submit" className="btn btn-primary" style={{width: '100%'}}>
-            Login
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function Dashboard() {
-  return (
-    <div>
-      <h2>Dashboard</h2>
-      <p>Welcome to After-Sales Service Management System</p>
-    </div>
-  );
 }
