@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import Layout from './Layout';
 import CROModule from '../pages/CROModule';
 import TechnicianDashboard from '../pages/TechnicianDashboard';
+import ServiceAdvisorDashboard from '../pages/ServiceAdvisorDashboard';
+import JobControllerDashboard from '../pages/JobControllerDashboard';
 import WarehouseDashboard from '../pages/WarehouseDashboard';
 import AdminDashboard from '../pages/AdminDashboard';
 import Login from '../pages/Login';
@@ -62,6 +64,10 @@ export default function App() {
       );
     case 'technician':
       return <TechnicianDashboard user={user} onLogout={handleLogout} />;
+    case 'advisor':
+      return <ServiceAdvisorDashboard user={user} onLogout={handleLogout} />;
+    case 'controller':
+      return <JobControllerDashboard user={user} onLogout={handleLogout} />;
     case 'warehouse':
       return <WarehouseDashboard user={user} onLogout={handleLogout} />;
     case 'manager':
@@ -69,14 +75,6 @@ export default function App() {
         <Layout onLogout={handleLogout} user={user}>
           <div style={{ padding: '40px', textAlign: 'center', fontSize: '24px' }}>
             👔 Service Manager Dashboard (Coming Soon)
-          </div>
-        </Layout>
-      );
-    case 'advisor':
-      return (
-        <Layout onLogout={handleLogout} user={user}>
-          <div style={{ padding: '40px', textAlign: 'center', fontSize: '24px' }}>
-            💼 Service Advisor Dashboard (Coming Soon)
           </div>
         </Layout>
       );

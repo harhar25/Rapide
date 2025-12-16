@@ -362,3 +362,25 @@
   margin-top: 12px;
 }
 
+.wh-footer {
+  background-color: white;
+  border-top: 1px solid #e9ecef;
+  padding: 16px 24px;
+  text-align: center;
+  color: #6c757d;
+  font-size: 12px;
+  margin-top: auto;
+}
+
+.wh-footer p {
+  margin: 0;
+  font-weight: 300;
+  letter-spacing: -0.2px;
+}
+
+.wh-footer em {
+  font-style: italic;
+  font-weight: 400;
+  color: #212529;
+}
+

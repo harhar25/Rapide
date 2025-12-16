@@ -108,14 +108,13 @@ def add_stock():
             data.get('created_by', 'SYSTEM')
         )
         
-        if history_id:
-            return jsonify({
-                'success': True,
-                'history_id': history_id,
-                'message': 'Inventory added successfully'
-            }), 201
-        else:
-            return jsonify({'success': False, 'error': 'Failed to add inventory'}), 500
+        return jsonify({
+            'success': True,
+            'history_id': history_id,
+            'message': 'Inventory added successfully'
+        }), 201
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -140,16 +139,16 @@ def remove_stock():
             data.get('created_by', 'SYSTEM')
         )
         
-        if history_id:
-            return jsonify({
-                'success': True,
-                'history_id': history_id,
-                'message': 'Inventory removed successfully'
-            }), 201
-        elif history_id is False:
-            return jsonify({'success': False, 'error': 'Insufficient stock'}), 400
-        else:
-            return jsonify({'success': False, 'error': 'Failed to remove inventory'}), 500
+        return jsonify({
+            'success': True,
+            'history_id': history_id,
+            'message': 'Inventory removed successfully'
+        }), 201
+    except ValueError as e:
+        # Catch specific validation errors (insufficient stock, product not found)
+        error_msg = str(e)
+        status_code = 400 if "Insufficient" in error_msg else 404
+        return jsonify({'success': False, 'error': error_msg}), status_code
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

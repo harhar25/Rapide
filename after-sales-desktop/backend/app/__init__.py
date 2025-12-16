@@ -21,10 +21,14 @@ def create_app(config_name='development'):
     from app.routes import customer_bp, scheduler_bp
     from app.routes.auth_routes import auth_bp
     from app.routes.warehouse_routes import warehouse_bp
+    from app.routes.service_advisor_routes import service_advisor_bp
+    from app.routes.job_controller_routes import job_controller_bp
     app.register_blueprint(customer_bp)
     app.register_blueprint(scheduler_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(warehouse_bp)
+    app.register_blueprint(service_advisor_bp)
+    app.register_blueprint(job_controller_bp)
     
     # Health check endpoint
     @app.route('/api/health', methods=['GET'])

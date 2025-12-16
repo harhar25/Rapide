@@ -44,6 +44,9 @@ export default function Layout({ children, onLogout, user }) {
         <div className="content-area">
           {children}
         </div>
+        <footer className="app-footer">
+          <p>© 2025 <em>Rapide</em> After-Sales Management System. All rights reserved.</p>
+        </footer>
       </div>
     </div>
   );

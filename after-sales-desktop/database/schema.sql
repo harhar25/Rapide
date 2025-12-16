@@ -140,6 +140,139 @@ CREATE TABLE service_orders (
     INDEX idx_status (status)
 );
 
+-- ==================== CUSTOMER INFO SHEETS (CIS) TABLE ====================
+CREATE TABLE IF NOT EXISTS customer_info_sheets (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    customer_id INT NOT NULL,
+    service_order_id INT,
+    name VARCHAR(255) NOT NULL,
+    contact_no VARCHAR(20) NOT NULL,
+    email VARCHAR(100),
+    address TEXT,
+    vehicle_plate_no VARCHAR(20),
+    vehicle_model VARCHAR(100),
+    vehicle_year YEAR,
+    engine_no VARCHAR(50),
+    chassis_no VARCHAR(50),
+    mileage_in INT,
+    service_type VARCHAR(50),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_by VARCHAR(100),
+    FOREIGN KEY (customer_id) REFERENCES customers(id),
+    INDEX idx_customer_id (customer_id),
+    INDEX idx_service_order_id (service_order_id)
+);
+
+-- ==================== VEHICLE REPORT CARDS (VRC) TABLE ====================
+CREATE TABLE IF NOT EXISTS vehicle_report_cards (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    service_order_id INT NOT NULL,
+    customer_id INT NOT NULL,
+    mileage_in INT,
+    mileage_out INT,
+    exterior_condition VARCHAR(500),
+    interior_condition VARCHAR(500),
+    checklist_1_engine_starts ENUM('pass', 'fail', 'na') DEFAULT 'na',
+    checklist_2_idle_smooth ENUM('pass', 'fail', 'na') DEFAULT 'na',
+    checklist_3_acceleration ENUM('pass', 'fail', 'na') DEFAULT 'na',
+    checklist_4_brakes ENUM('pass', 'fail', 'na') DEFAULT 'na',
+    checklist_5_steering ENUM('pass', 'fail', 'na') DEFAULT 'na',
+    checklist_6_lights ENUM('pass', 'fail', 'na') DEFAULT 'na',
+    checklist_7_air_con ENUM('pass', 'fail', 'na') DEFAULT 'na',
+    checklist_8_wipers ENUM('pass', 'fail', 'na') DEFAULT 'na',
+    checklist_9_horn ENUM('pass', 'fail', 'na') DEFAULT 'na',
+    checklist_10_handbrake ENUM('pass', 'fail', 'na') DEFAULT 'na',
+    additional_findings TEXT,
+    settings_restored BOOLEAN DEFAULT FALSE,
+    diagnosis_completed_by VARCHAR(100),
+    diagnosis_date TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (service_order_id) REFERENCES service_orders(id),
+    FOREIGN KEY (customer_id) REFERENCES customers(id),
+    INDEX idx_service_order_id (service_order_id),
+    INDEX idx_customer_id (customer_id)
+);
+
+-- ==================== SERVICE ORDER DOCUMENTS TABLE ====================
+CREATE TABLE IF NOT EXISTS service_order_documents (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    service_order_id INT NOT NULL,
+    document_type ENUM('service-order', 'confirmation', 'picklist', 'vrc', 'cis', 'estimate', 'invoice') NOT NULL,
+    file_name VARCHAR(255),
+    file_path TEXT,
+    document_data JSON,
+    printed_at TIMESTAMP,
+    printed_by VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (service_order_id) REFERENCES service_orders(id),
+    INDEX idx_service_order_id (service_order_id),
+    INDEX idx_document_type (document_type)
+);
+
+-- ==================== JOB CONTROLLER - TECHNICIAN ASSIGNMENTS ====================
+CREATE TABLE IF NOT EXISTS technician_assignments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    service_order_id INT NOT NULL,
+    technician_id INT NOT NULL,
+    assigned_by VARCHAR(100),
+    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    clock_in_time TIMESTAMP,
+    clock_out_time TIMESTAMP,
+    labor_hours DECIMAL(5, 2),
+    status ENUM('assigned', 'in-progress', 'completed', 'paused') DEFAULT 'assigned',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (service_order_id) REFERENCES service_orders(id),
+    FOREIGN KEY (technician_id) REFERENCES technicians(id),
+    INDEX idx_service_order_id (service_order_id),
+    INDEX idx_technician_id (technician_id),
+    INDEX idx_status (status),
+    UNIQUE KEY unique_assignment (service_order_id, technician_id)
+);
+
+-- ==================== JOB CLOCK RECORDS ====================
+CREATE TABLE IF NOT EXISTS job_clock_records (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    assignment_id INT NOT NULL,
+    service_order_id INT NOT NULL,
+    technician_id INT NOT NULL,
+    clock_in_time TIMESTAMP NOT NULL,
+    clock_out_time TIMESTAMP,
+    duration_minutes INT,
+    break_minutes INT DEFAULT 0,
+    actual_work_minutes INT,
+    status ENUM('clocked-in', 'clocked-out', 'on-break') DEFAULT 'clocked-in',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (assignment_id) REFERENCES technician_assignments(id),
+    FOREIGN KEY (service_order_id) REFERENCES service_orders(id),
+    FOREIGN KEY (technician_id) REFERENCES technicians(id),
+    INDEX idx_assignment_id (assignment_id),
+    INDEX idx_technician_id (technician_id),
+    INDEX idx_clock_in_time (clock_in_time)
+);
+
+-- ==================== TECHNICIAN AVAILABILITY/RESOURCES ====================
+CREATE TABLE IF NOT EXISTS technician_resources (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    technician_id INT NOT NULL,
+    resource_type ENUM('skill', 'tool', 'certification') NOT NULL,
+    resource_name VARCHAR(100) NOT NULL,
+    resource_value VARCHAR(255),
+    status ENUM('active', 'inactive', 'expired') DEFAULT 'active',
+    expiry_date DATE,
+    verified_date DATE,
+    verified_by VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (technician_id) REFERENCES technicians(id),
+    INDEX idx_technician_id (technician_id),
+    INDEX idx_resource_type (resource_type)
+);
+
 -- ==================== AUDIT LOG TABLE ====================
 CREATE TABLE audit_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,

@@ -34,6 +34,23 @@ const WarehouseDashboard = ({ user, onLogout }) => {
 
   const API_BASE = 'http://localhost:5000/api/warehouse';
 
+  /**
+   * HELPER: Load product form data from selected product tuple
+   * Tuple structure: (id, code, name, category, price, qty, reorder_level, supplier, description, status)
+   * Indices:        (0,  1,    2,    3,        4,     5,   6,               7,        8,           9)
+   */
+  const loadProductForm = (product) => {
+    setProductForm({
+      product_code: product[1],
+      product_name: product[2],
+      category: product[3],
+      unit_price: product[4],
+      reorder_level: product[6],
+      supplier: product[7],
+      description: product[8]
+    });
+  };
+
   // Load products on mount
   useEffect(() => {
     loadProducts();
@@ -320,34 +337,40 @@ const WarehouseDashboard = ({ user, onLogout }) => {
         {/* I/O History Tab */}
         {activeTab === 'history' && (
           <div className="tab-content">
-            <table className="history-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Product</th>
-                  <th>Type</th>
-                  <th>Quantity</th>
-                  <th>Previous</th>
-                  <th>New</th>
-                  <th>Reference</th>
-                  <th>By</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.map(entry => (
-                  <tr key={entry[0]}>
-                    <td>{new Date(entry[11]).toLocaleDateString()}</td>
-                    <td>{entry[2]}</td>
-                    <td><span className={`badge ${entry[3]}`}>{entry[3].toUpperCase()}</span></td>
-                    <td>{entry[4]}</td>
-                    <td>{entry[5]}</td>
-                    <td><strong>{entry[6]}</strong></td>
-                    <td>{entry[7]}</td>
-                    <td>{entry[9]}</td>
+            {history && history.length > 0 ? (
+              <table className="history-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Product</th>
+                    <th>Type</th>
+                    <th>Quantity</th>
+                    <th>Previous</th>
+                    <th>New</th>
+                    <th>Reference</th>
+                    <th>By</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {history.map(entry => (
+                    <tr key={entry[0]}>
+                      <td>{new Date(entry[11]).toLocaleDateString()}</td>
+                      <td>{entry[2]}</td>
+                      <td><span className={`badge ${entry[3]}`}>{entry[3].toUpperCase()}</span></td>
+                      <td>{entry[4]}</td>
+                      <td>{entry[5]}</td>
+                      <td><strong>{entry[6]}</strong></td>
+                      <td>{entry[7]}</td>
+                      <td>{entry[9]}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="empty-state">
+                <p>No inventory transactions recorded yet</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -515,15 +538,7 @@ const WarehouseDashboard = ({ user, onLogout }) => {
                     className="btn-small"
                     onClick={() => {
                       setSelectedProduct(product);
-                      setProductForm({
-                        product_code: product[1],
-                        product_name: product[2],
-                        category: product[3],
-                        unit_price: product[4],
-                        reorder_level: product[6],
-                        supplier: product[7],
-                        description: product[9] || ''
-                      });
+                      loadProductForm(product);  // Use reusable function instead of duplicating logic
                       setShowEditProduct(true);
                       setShowAddProduct(false);
                     }}
@@ -536,6 +551,10 @@ const WarehouseDashboard = ({ user, onLogout }) => {
           </div>
         )}
       </div>
+
+      <footer className="wh-footer">
+        <p>© 2025 <em>Rapide</em> Warehouse Management System</p>
+      </footer>
     </div>
   );
 };
