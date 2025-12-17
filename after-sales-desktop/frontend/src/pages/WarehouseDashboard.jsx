@@ -12,6 +12,7 @@ const WarehouseDashboard = ({ user, onLogout }) => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showInventoryForm, setShowInventoryForm] = useState(false);
   const [inventoryAction, setInventoryAction] = useState('in');
+  const [errorMessage, setErrorMessage] = useState('');
 
   // Form states
   const [productForm, setProductForm] = useState({
@@ -143,6 +144,7 @@ const WarehouseDashboard = ({ user, onLogout }) => {
 
   const handleInventoryTransaction = async (e) => {
     e.preventDefault();
+    setErrorMessage('');
     const endpoint = inventoryAction === 'in' ? '/inventory/add' : '/inventory/remove';
     try {
       const response = await fetch(`${API_BASE}${endpoint}`, {
@@ -154,6 +156,7 @@ const WarehouseDashboard = ({ user, onLogout }) => {
       if (data.success) {
         loadProducts();
         loadSummary();
+        loadHistory();  // Refresh history to show new transaction
         setInventoryForm({
           product_id: '',
           quantity: '',
@@ -162,9 +165,12 @@ const WarehouseDashboard = ({ user, onLogout }) => {
           notes: ''
         });
         setShowInventoryForm(false);
+      } else {
+        setErrorMessage(data.error || 'Failed to process transaction');
       }
     } catch (error) {
       console.error('Error processing transaction:', error);
+      setErrorMessage('Error: ' + error.message);
     }
   };
 
@@ -238,6 +244,7 @@ const WarehouseDashboard = ({ user, onLogout }) => {
             {showInventoryForm && (
               <form onSubmit={handleInventoryTransaction} className="form-modal">
                 <h3>{inventoryAction === 'in' ? 'Add Stock' : 'Remove Stock'}</h3>
+                {errorMessage && <div className="error-message">{errorMessage}</div>}
                 <div className="form-group">
                   <label>Transaction Type</label>
                   <select value={inventoryAction} onChange={(e) => setInventoryAction(e.target.value)}>

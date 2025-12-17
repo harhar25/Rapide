@@ -4,6 +4,10 @@ import CROModule from '../pages/CROModule';
 import TechnicianDashboard from '../pages/TechnicianDashboard';
 import ServiceAdvisorDashboard from '../pages/ServiceAdvisorDashboard';
 import JobControllerDashboard from '../pages/JobControllerDashboard';
+import ForemanQCDashboard from '../pages/ForemanQCDashboard';
+import JobWrapupDashboard from '../pages/JobWrapupDashboard';
+import CarJockeyDashboard from '../pages/CarJockeyDashboard';
+import BillingDashboard from '../pages/BillingDashboard';
 import WarehouseDashboard from '../pages/WarehouseDashboard';
 import AdminDashboard from '../pages/AdminDashboard';
 import Login from '../pages/Login';
@@ -68,6 +72,14 @@ export default function App() {
       return <ServiceAdvisorDashboard user={user} onLogout={handleLogout} />;
     case 'controller':
       return <JobControllerDashboard user={user} onLogout={handleLogout} />;
+    case 'foreman':
+      return <ForemanQCDashboard user={user} onLogout={handleLogout} />;
+    case 'wrapup':
+      return <JobWrapupDashboard user={user} onLogout={handleLogout} />;
+    case 'jockey':
+      return <CarJockeyDashboard user={user} onLogout={handleLogout} />;
+    case 'billing':
+      return <BillingDashboard user={user} onLogout={handleLogout} />;
     case 'warehouse':
       return <WarehouseDashboard user={user} onLogout={handleLogout} />;
     case 'manager':

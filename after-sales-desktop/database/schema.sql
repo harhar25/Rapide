@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS personnel (
     username VARCHAR(50) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     name VARCHAR(255) NOT NULL,
-    role ENUM('admin', 'cro', 'technician', 'warehouse', 'manager', 'advisor') DEFAULT 'cro',
+    role ENUM('admin', 'cro', 'technician', 'warehouse', 'manager', 'advisor', 'controller', 'foreman', 'wrapup', 'jockey', 'billing', 'cashier') DEFAULT 'cro',
     email VARCHAR(100),
     status ENUM('active', 'inactive') DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -420,3 +420,288 @@ SELECT
     status
 FROM service_advisors
 WHERE status = 'active';
+
+-- ==================== FOREMAN QC INSPECTION TABLE ====================
+CREATE TABLE IF NOT EXISTS qc_inspections (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    service_order_id INT NOT NULL,
+    foreman_id INT,
+    inspection_date DATE,
+    exterior_condition VARCHAR(50),
+    engine_condition VARCHAR(50),
+    interior_cleanliness VARCHAR(50),
+    parts_installed VARCHAR(255),
+    fluid_levels_ok BOOLEAN DEFAULT TRUE,
+    electrical_systems_ok BOOLEAN DEFAULT TRUE,
+    safety_features_ok BOOLEAN DEFAULT TRUE,
+    overall_status ENUM('passed', 'failed', 'pending', 'rework-required') DEFAULT 'pending',
+    failed_items TEXT,
+    inspection_notes TEXT,
+    photos_attached INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (service_order_id) REFERENCES scheduling_orders(id),
+    FOREIGN KEY (foreman_id) REFERENCES service_advisors(id),
+    INDEX idx_service_order_id (service_order_id),
+    INDEX idx_foreman_id (foreman_id),
+    INDEX idx_overall_status (overall_status),
+    INDEX idx_inspection_date (inspection_date)
+);
+
+-- ==================== ROAD TEST TABLE ====================
+CREATE TABLE IF NOT EXISTS road_tests (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    qc_inspection_id INT NOT NULL,
+    service_order_id INT NOT NULL,
+    road_test_date DATE,
+    tested_by INT,
+    test_distance_km INT,
+    engine_sound VARCHAR(100),
+    acceleration_smooth BOOLEAN DEFAULT TRUE,
+    braking_effective BOOLEAN DEFAULT TRUE,
+    steering_responsive BOOLEAN DEFAULT TRUE,
+    electrical_functions_ok BOOLEAN DEFAULT TRUE,
+    air_conditioning_ok BOOLEAN DEFAULT TRUE,
+    overall_performance ENUM('excellent', 'good', 'acceptable', 'needs-rework') DEFAULT 'good',
+    issues_found TEXT,
+    road_test_notes TEXT,
+    test_video_attached INT DEFAULT 0,
+    status ENUM('passed', 'failed', 'pending') DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (qc_inspection_id) REFERENCES qc_inspections(id),
+    FOREIGN KEY (service_order_id) REFERENCES scheduling_orders(id),
+    FOREIGN KEY (tested_by) REFERENCES service_advisors(id),
+    INDEX idx_qc_inspection_id (qc_inspection_id),
+    INDEX idx_service_order_id (service_order_id),
+    INDEX idx_status (status),
+    INDEX idx_test_date (road_test_date)
+);
+
+-- ==================== JOB WRAP-UP TABLE ====================
+CREATE TABLE IF NOT EXISTS job_wrapups (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    service_order_id INT NOT NULL,
+    job_controller_id INT,
+    qc_inspection_id INT,
+    technician_id INT,
+    clock_out_time DATETIME,
+    total_labor_hours DECIMAL(5, 2),
+    final_status ENUM('ready-for-sa', 'returned-to-sa', 'pending', 'completed') DEFAULT 'pending',
+    final_notes TEXT,
+    quality_check_passed BOOLEAN DEFAULT FALSE,
+    job_completion_checklist TEXT,
+    materials_returned INT DEFAULT 0,
+    tools_returned INT DEFAULT 0,
+    vehicle_condition_final VARCHAR(100),
+    handover_status ENUM('pending', 'ready', 'completed') DEFAULT 'pending',
+    returned_to_sa_at DATETIME,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (service_order_id) REFERENCES scheduling_orders(id),
+    FOREIGN KEY (job_controller_id) REFERENCES personnel(id),
+    FOREIGN KEY (qc_inspection_id) REFERENCES qc_inspections(id),
+    FOREIGN KEY (technician_id) REFERENCES technicians(id),
+    INDEX idx_service_order_id (service_order_id),
+    INDEX idx_job_controller_id (job_controller_id),
+    INDEX idx_final_status (final_status),
+    INDEX idx_created_at (created_at)
+);
+
+-- ==================== CAR JOCKEY MODULE ====================
+-- Vehicle movements and parking tracking for valet operations
+
+CREATE TABLE IF NOT EXISTS vehicle_movements (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    service_order_id INT NOT NULL,
+    jockey_id INT NOT NULL,
+    movement_type ENUM('check-in', 'parking', 'retrieval', 'check-out', 'emergency-move') DEFAULT 'check-in',
+    from_location VARCHAR(100),
+    to_location VARCHAR(100),
+    reason TEXT,
+    vehicle_condition_start TEXT,
+    vehicle_condition_end TEXT,
+    fuel_level_start DECIMAL(3, 1),
+    fuel_level_end DECIMAL(3, 1),
+    mileage_start INT,
+    mileage_end INT,
+    started_at DATETIME,
+    completed_at DATETIME,
+    status ENUM('in-progress', 'completed', 'cancelled') DEFAULT 'in-progress',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (service_order_id) REFERENCES scheduling_orders(id),
+    FOREIGN KEY (jockey_id) REFERENCES personnel(id),
+    INDEX idx_service_order_id (service_order_id),
+    INDEX idx_jockey_id (jockey_id),
+    INDEX idx_movement_type (movement_type),
+    INDEX idx_status (status),
+    INDEX idx_started_at (started_at)
+);
+
+CREATE TABLE IF NOT EXISTS parking_records (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    service_order_id INT NOT NULL,
+    vehicle_movement_id INT NOT NULL,
+    parking_slot VARCHAR(50),
+    parking_zone VARCHAR(50),
+    parking_level INT,
+    parked_at DATETIME,
+    retrieved_at DATETIME,
+    duration_hours DECIMAL(5, 2),
+    parking_fee DECIMAL(8, 2) DEFAULT 0,
+    fee_status ENUM('pending', 'paid', 'waived') DEFAULT 'pending',
+    ground_condition TEXT,
+    security_check_passed BOOLEAN DEFAULT TRUE,
+    status ENUM('active', 'completed', 'released') DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (service_order_id) REFERENCES scheduling_orders(id),
+    FOREIGN KEY (vehicle_movement_id) REFERENCES vehicle_movements(id),
+    INDEX idx_service_order_id (service_order_id),
+    INDEX idx_parking_slot (parking_slot),
+    INDEX idx_status (status),
+    INDEX idx_parked_at (parked_at)
+);
+
+-- ==================== BILLING MODULE ====================
+-- Invoice generation and billing management
+
+CREATE TABLE IF NOT EXISTS invoices (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    service_order_id INT NOT NULL,
+    invoice_number VARCHAR(50) UNIQUE NOT NULL,
+    customer_id INT NOT NULL,
+    job_wrapup_id INT,
+    invoice_date DATE DEFAULT CURDATE(),
+    due_date DATE,
+    labor_hours DECIMAL(5, 2),
+    labor_rate DECIMAL(8, 2) DEFAULT 50.00,
+    labor_cost DECIMAL(10, 2),
+    materials_cost DECIMAL(10, 2) DEFAULT 0,
+    parts_cost DECIMAL(10, 2) DEFAULT 0,
+    parking_cost DECIMAL(10, 2) DEFAULT 0,
+    discount_amount DECIMAL(10, 2) DEFAULT 0,
+    tax_amount DECIMAL(10, 2) DEFAULT 0,
+    subtotal DECIMAL(10, 2),
+    total_amount DECIMAL(10, 2),
+    status ENUM('draft', 'issued', 'sent', 'partial-paid', 'paid', 'cancelled') DEFAULT 'draft',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (service_order_id) REFERENCES scheduling_orders(id),
+    FOREIGN KEY (customer_id) REFERENCES customers(id),
+    FOREIGN KEY (job_wrapup_id) REFERENCES job_wrapups(id),
+    INDEX idx_service_order_id (service_order_id),
+    INDEX idx_customer_id (customer_id),
+    INDEX idx_invoice_number (invoice_number),
+    INDEX idx_status (status),
+    INDEX idx_invoice_date (invoice_date),
+    INDEX idx_due_date (due_date)
+);
+
+CREATE TABLE IF NOT EXISTS billing_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    invoice_id INT NOT NULL,
+    item_type ENUM('labor', 'material', 'part', 'parking', 'service', 'other') DEFAULT 'service',
+    item_description VARCHAR(255) NOT NULL,
+    item_code VARCHAR(50),
+    quantity DECIMAL(10, 2) DEFAULT 1,
+    unit_price DECIMAL(10, 2),
+    line_total DECIMAL(10, 2),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE,
+    INDEX idx_invoice_id (invoice_id),
+    INDEX idx_item_type (item_type)
+);
+
+CREATE TABLE IF NOT EXISTS invoice_payments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    invoice_id INT NOT NULL,
+    payment_amount DECIMAL(10, 2),
+    payment_method ENUM('cash', 'card', 'check', 'bank-transfer', 'mobile-money') DEFAULT 'cash',
+    payment_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    reference_number VARCHAR(100),
+    notes TEXT,
+    created_by INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (invoice_id) REFERENCES invoices(id),
+    FOREIGN KEY (created_by) REFERENCES personnel(id),
+    INDEX idx_invoice_id (invoice_id),
+    INDEX idx_payment_date (payment_date),
+    INDEX idx_payment_method (payment_method)
+);
+
+-- ==================== CASHIER MODULE ====================
+-- Payment collection and cash drawer management
+
+CREATE TABLE IF NOT EXISTS payment_transactions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    invoice_id INT,
+    customer_id INT NOT NULL,
+    transaction_type ENUM('payment', 'refund', 'adjustment') DEFAULT 'payment',
+    amount DECIMAL(10, 2),
+    payment_method ENUM('cash', 'card', 'check', 'bank-transfer', 'mobile-money') DEFAULT 'cash',
+    reference_number VARCHAR(100),
+    card_last_four VARCHAR(4),
+    bank_name VARCHAR(100),
+    check_number VARCHAR(50),
+    transaction_status ENUM('pending', 'completed', 'cancelled', 'failed') DEFAULT 'pending',
+    notes TEXT,
+    created_by INT NOT NULL,
+    processed_by INT,
+    transaction_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    processed_date DATETIME,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (invoice_id) REFERENCES invoices(id),
+    FOREIGN KEY (customer_id) REFERENCES customers(id),
+    FOREIGN KEY (created_by) REFERENCES personnel(id),
+    FOREIGN KEY (processed_by) REFERENCES personnel(id),
+    INDEX idx_invoice_id (invoice_id),
+    INDEX idx_customer_id (customer_id),
+    INDEX idx_payment_method (payment_method),
+    INDEX idx_transaction_status (transaction_status),
+    INDEX idx_transaction_date (transaction_date)
+);
+
+CREATE TABLE IF NOT EXISTS cash_drawer (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    cashier_id INT NOT NULL,
+    opening_balance DECIMAL(10, 2) DEFAULT 0,
+    opening_time DATETIME,
+    closing_balance DECIMAL(10, 2),
+    closing_time DATETIME,
+    cash_counted DECIMAL(10, 2),
+    card_total DECIMAL(10, 2) DEFAULT 0,
+    check_total DECIMAL(10, 2) DEFAULT 0,
+    bank_transfer_total DECIMAL(10, 2) DEFAULT 0,
+    mobile_money_total DECIMAL(10, 2) DEFAULT 0,
+    discrepancy DECIMAL(10, 2),
+    drawer_status ENUM('open', 'closed', 'reconciled') DEFAULT 'open',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (cashier_id) REFERENCES personnel(id),
+    INDEX idx_cashier_id (cashier_id),
+    INDEX idx_drawer_status (drawer_status),
+    INDEX idx_opening_time (opening_time),
+    INDEX idx_closing_time (closing_time)
+);
+
+CREATE TABLE IF NOT EXISTS payment_methods_config (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    method_type ENUM('cash', 'card', 'check', 'bank-transfer', 'mobile-money') DEFAULT 'cash',
+    method_name VARCHAR(100),
+    is_enabled BOOLEAN DEFAULT TRUE,
+    requires_verification BOOLEAN DEFAULT FALSE,
+    processing_fee_percent DECIMAL(5, 2) DEFAULT 0,
+    daily_limit DECIMAL(12, 2),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_method_type (method_type),
+    INDEX idx_is_enabled (is_enabled)
+);
