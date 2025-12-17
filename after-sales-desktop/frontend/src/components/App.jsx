@@ -8,8 +8,12 @@ import ForemanQCDashboard from '../pages/ForemanQCDashboard';
 import JobWrapupDashboard from '../pages/JobWrapupDashboard';
 import CarJockeyDashboard from '../pages/CarJockeyDashboard';
 import BillingDashboard from '../pages/BillingDashboard';
+import CashierDashboard from '../pages/CashierDashboard';
 import WarehouseDashboard from '../pages/WarehouseDashboard';
 import AdminDashboard from '../pages/AdminDashboard';
+import SecurityGateDashboard from '../pages/SecurityGateDashboard';
+import VehicleHandoverDashboard from '../pages/VehicleHandoverDashboard';
+import FollowUpDashboard from '../pages/FollowUpDashboard';
 import Login from '../pages/Login';
 import '../styles/app.css';
 
@@ -80,8 +84,16 @@ export default function App() {
       return <CarJockeyDashboard user={user} onLogout={handleLogout} />;
     case 'billing':
       return <BillingDashboard user={user} onLogout={handleLogout} />;
+    case 'cashier':
+      return <CashierDashboard user={user} onLogout={handleLogout} />;
     case 'warehouse':
       return <WarehouseDashboard user={user} onLogout={handleLogout} />;
+    case 'security_gate':
+      return <SecurityGateDashboard user={user} onLogout={handleLogout} />;
+    case 'vehicle_handover':
+      return <VehicleHandoverDashboard user={user} onLogout={handleLogout} />;
+    case 'follow_up':
+      return <FollowUpDashboard user={user} onLogout={handleLogout} />;
     case 'manager':
       return (
         <Layout onLogout={handleLogout} user={user}>

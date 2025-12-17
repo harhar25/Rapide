@@ -1,0 +1,47 @@
+/* Cashier Dashboard */
+.cashier-dashboard { min-height: 100vh; background: #f5f7fa; padding-bottom: 60px; }
+.dashboard-header { background: linear-gradient(135deg, #212529 0%, #343a40 100%); color: white; padding: 30px 40px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.header-left h1 { font-size: 28px; font-weight: 600; margin: 0 0 5px 0; }
+.header-left p { margin: 0; opacity: 0.9; font-size: 14px; }
+.logout-btn { background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 14px; }
+.logout-btn:hover { background: #c82333; }
+.error-message { background: #f8d7da; color: #721c24; padding: 12px 20px; margin: 20px 40px 0 40px; border-radius: 4px; }
+.success-message { background: #d4edda; color: #155724; padding: 12px 20px; margin: 20px 40px 0 40px; border-radius: 4px; }
+.drawer-status { background: white; margin: 20px 40px; padding: 15px 20px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid #28a745; }
+.drawer-status.alert { border-left-color: #ffc107; background: #fffbf0; }
+.drawer-status button { background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
+.summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; padding: 30px 40px; background: white; margin: 20px 40px 0 40px; border-radius: 8px; }
+.card { padding: 20px; border-radius: 8px; text-align: center; border-left: 4px solid #007bff; background: #f8f9fa; }
+.card.total { border-left-color: #28a745; background: #f0fff0; }
+.card.cash { border-left-color: #17a2b8; background: #f0fdff; }
+.card.card-type { border-left-color: #ffc107; background: #fffbf0; }
+.card.check { border-left-color: #e83e8c; background: #fff0f8; }
+.card.transactions { border-left-color: #6f42c1; background: #f8f0ff; }
+.card-value { font-size: 24px; font-weight: 700; color: #212529; margin-bottom: 8px; }
+.card-label { font-size: 12px; color: #6c757d; font-weight: 500; }
+.dashboard-tabs { display: flex; gap: 10px; padding: 20px 40px 0 40px; border-bottom: 1px solid #dee2e6; background: white; margin: 20px 40px 0 40px; border-radius: 8px 8px 0 0; }
+.tab-button { background: none; border: none; padding: 15px 20px; font-size: 14px; font-weight: 500; color: #6c757d; cursor: pointer; border-bottom: 3px solid transparent; }
+.tab-button.active { color: #007bff; border-bottom-color: #007bff; }
+.dashboard-content { background: white; margin: 0 40px 20px 40px; padding: 20px; border-radius: 0 0 8px 8px; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.data-table thead { background: #f8f9fa; border-bottom: 2px solid #dee2e6; }
+.data-table th { padding: 12px; text-align: left; font-weight: 600; color: #212529; }
+.data-table td { padding: 12px; border-bottom: 1px solid #dee2e6; }
+.data-table tbody tr:hover { background: #f8f9fa; }
+.btn-action { background: #007bff; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+.modal-content { background: white; border-radius: 8px; padding: 30px; max-width: 500px; width: 90%; box-shadow: 0 5px 20px rgba(0,0,0,0.3); }
+.modal-content h2 { margin: 0 0 20px 0; color: #212529; }
+.modal-content form { display: flex; flex-direction: column; gap: 15px; }
+.modal-content label { display: flex; flex-direction: column; font-weight: 500; color: #212529; font-size: 13px; }
+.modal-content input, .modal-content select, .modal-content textarea { margin-top: 5px; padding: 8px; border: 1px solid #dee2e6; border-radius: 4px; font-size: 13px; }
+.modal-content input:focus, .modal-content select:focus, .modal-content textarea:focus { outline: none; border-color: #007bff; }
+.modal-buttons { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+.btn-cancel { background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
+.btn-submit { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: 500; }
+.dashboard-footer { background: #f8f9fa; border-top: 1px solid #dee2e6; padding: 20px 40px; text-align: center; color: #6c757d; font-size: 12px; margin-top: 40px; }
+@media (max-width: 768px) {
+  .dashboard-header { flex-direction: column; align-items: flex-start; gap: 15px; }
+  .summary-cards { grid-template-columns: repeat(2, 1fr); padding: 20px; margin: 15px; }
+  .dashboard-content { margin: 0 15px 20px 15px; }
+}

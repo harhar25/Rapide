@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS personnel (
     username VARCHAR(50) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     name VARCHAR(255) NOT NULL,
-    role ENUM('admin', 'cro', 'technician', 'warehouse', 'manager', 'advisor', 'controller', 'foreman', 'wrapup', 'jockey', 'billing', 'cashier') DEFAULT 'cro',
+    role ENUM('admin', 'cro', 'technician', 'warehouse', 'manager', 'advisor', 'controller', 'foreman', 'wrapup', 'jockey', 'billing', 'cashier', 'security_gate', 'vehicle_handover', 'follow_up') DEFAULT 'cro',
     email VARCHAR(100),
     status ENUM('active', 'inactive') DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -704,4 +704,193 @@ CREATE TABLE IF NOT EXISTS payment_methods_config (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY unique_method_type (method_type),
     INDEX idx_is_enabled (is_enabled)
+);
+
+-- ==================== SECURITY GATE MODULE ====================
+-- Vehicle access control and gate logs
+
+CREATE TABLE IF NOT EXISTS gate_access_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    service_order_id INT NOT NULL,
+    vehicle_plate_no VARCHAR(20),
+    customer_name VARCHAR(255),
+    access_type ENUM('entry', 'exit', 'emergency-exit') DEFAULT 'entry',
+    access_time DATETIME,
+    gate_operator_id INT,
+    security_check_status ENUM('passed', 'failed', 'pending') DEFAULT 'pending',
+    reason_if_denied TEXT,
+    mileage_at_access INT,
+    vehicle_condition VARCHAR(100),
+    badge_scanned VARCHAR(50),
+    is_authorized BOOLEAN DEFAULT TRUE,
+    notes TEXT,
+    photo_captured BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (service_order_id) REFERENCES scheduling_orders(id),
+    FOREIGN KEY (gate_operator_id) REFERENCES personnel(id),
+    INDEX idx_service_order_id (service_order_id),
+    INDEX idx_access_type (access_type),
+    INDEX idx_access_time (access_time),
+    INDEX idx_is_authorized (is_authorized),
+    INDEX idx_security_check_status (security_check_status)
+);
+
+CREATE TABLE IF NOT EXISTS vehicle_badges (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    badge_number VARCHAR(50) UNIQUE NOT NULL,
+    service_order_id INT,
+    vehicle_plate_no VARCHAR(20),
+    customer_id INT,
+    issue_date DATE,
+    expiry_date DATE,
+    badge_status ENUM('active', 'inactive', 'expired', 'revoked') DEFAULT 'active',
+    badge_type ENUM('temporary', 'daily', 'weekly') DEFAULT 'temporary',
+    scans_count INT DEFAULT 0,
+    issued_by INT,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (service_order_id) REFERENCES scheduling_orders(id),
+    FOREIGN KEY (customer_id) REFERENCES customers(id),
+    FOREIGN KEY (issued_by) REFERENCES personnel(id),
+    UNIQUE KEY unique_badge (badge_number),
+    INDEX idx_service_order_id (service_order_id),
+    INDEX idx_badge_status (badge_status),
+    INDEX idx_expiry_date (expiry_date)
+);
+
+-- ==================== VEHICLE HANDOVER MODULE ====================
+-- Final vehicle handover and documentation
+
+CREATE TABLE IF NOT EXISTS vehicle_handovers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    service_order_id INT NOT NULL,
+    job_wrapup_id INT,
+    handover_date DATETIME,
+    technician_id INT,
+    customer_id INT NOT NULL,
+    final_inspection_notes TEXT,
+    vehicle_cleanliness VARCHAR(50),
+    fuel_level_final DECIMAL(3, 1),
+    mileage_final INT,
+    overall_condition VARCHAR(100),
+    all_items_returned BOOLEAN DEFAULT TRUE,
+    customer_signature_date DATETIME,
+    customer_signature_captured BOOLEAN DEFAULT FALSE,
+    handover_status ENUM('pending', 'in-progress', 'completed', 'cancelled') DEFAULT 'pending',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (service_order_id) REFERENCES scheduling_orders(id),
+    FOREIGN KEY (job_wrapup_id) REFERENCES job_wrapups(id),
+    FOREIGN KEY (technician_id) REFERENCES technicians(id),
+    FOREIGN KEY (customer_id) REFERENCES customers(id),
+    INDEX idx_service_order_id (service_order_id),
+    INDEX idx_handover_status (handover_status),
+    INDEX idx_handover_date (handover_date)
+);
+
+CREATE TABLE IF NOT EXISTS handover_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    handover_id INT NOT NULL,
+    item_type ENUM('parts', 'tools', 'accessories', 'documents', 'keys', 'other') DEFAULT 'parts',
+    item_description VARCHAR(255),
+    quantity INT DEFAULT 1,
+    condition_before VARCHAR(50),
+    condition_after VARCHAR(50),
+    item_verified BOOLEAN DEFAULT FALSE,
+    verified_by INT,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (handover_id) REFERENCES vehicle_handovers(id) ON DELETE CASCADE,
+    FOREIGN KEY (verified_by) REFERENCES personnel(id),
+    INDEX idx_handover_id (handover_id),
+    INDEX idx_item_type (item_type)
+);
+
+CREATE TABLE IF NOT EXISTS handover_signatures (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    handover_id INT NOT NULL,
+    signatory_type ENUM('customer', 'technician', 'sa', 'manager') DEFAULT 'customer',
+    signatory_name VARCHAR(255),
+    signatory_role VARCHAR(100),
+    signature_image LONGBLOB,
+    signature_timestamp DATETIME,
+    printed_name VARCHAR(255),
+    id_or_reference VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (handover_id) REFERENCES vehicle_handovers(id) ON DELETE CASCADE,
+    INDEX idx_handover_id (handover_id),
+    INDEX idx_signatory_type (signatory_type)
+);
+
+CREATE TABLE follow_ups (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    service_order_id INT NOT NULL,
+    customer_id INT NOT NULL,
+    followup_date DATE NOT NULL,
+    followup_time TIME,
+    contact_method ENUM('phone', 'sms', 'email', 'visit') DEFAULT 'phone',
+    contact_person_name VARCHAR(255),
+    contact_person_phone VARCHAR(20),
+    followup_status ENUM('pending', 'completed', 'rescheduled', 'cancelled') DEFAULT 'pending',
+    feedback_received BOOLEAN DEFAULT FALSE,
+    issue_reported BOOLEAN DEFAULT FALSE,
+    followup_notes LONGTEXT,
+    scheduled_by INT,
+    completed_by INT,
+    completion_date DATETIME,
+    satisfaction_rating INT DEFAULT NULL CHECK (satisfaction_rating >= 1 AND satisfaction_rating <= 5),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (service_order_id) REFERENCES scheduling_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
+    FOREIGN KEY (scheduled_by) REFERENCES personnel(id) ON DELETE SET NULL,
+    FOREIGN KEY (completed_by) REFERENCES personnel(id) ON DELETE SET NULL,
+    INDEX idx_service_order_id (service_order_id),
+    INDEX idx_customer_id (customer_id),
+    INDEX idx_followup_date (followup_date),
+    INDEX idx_followup_status (followup_status)
+);
+
+CREATE TABLE customer_feedback (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    followup_id INT NOT NULL,
+    service_quality_rating INT DEFAULT NULL CHECK (service_quality_rating >= 1 AND service_quality_rating >= 5),
+    work_done_satisfaction INT DEFAULT NULL CHECK (work_done_satisfaction >= 1 AND work_done_satisfaction <= 5),
+    staff_behavior_rating INT DEFAULT NULL CHECK (staff_behavior_rating >= 1 AND staff_behavior_rating <= 5),
+    value_for_money_rating INT DEFAULT NULL CHECK (value_for_money_rating >= 1 AND value_for_money_rating <= 5),
+    overall_experience INT DEFAULT NULL CHECK (overall_experience >= 1 AND overall_experience <= 5),
+    would_recommend ENUM('yes', 'no', 'maybe') DEFAULT NULL,
+    feedback_comments LONGTEXT,
+    improvement_suggestions VARCHAR(500),
+    feedback_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    feedback_channel ENUM('in-person', 'phone', 'sms', 'email', 'form') DEFAULT 'form',
+    FOREIGN KEY (followup_id) REFERENCES follow_ups(id) ON DELETE CASCADE,
+    INDEX idx_followup_id (followup_id),
+    INDEX idx_overall_experience (overall_experience)
+);
+
+CREATE TABLE issue_tracking (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    followup_id INT NOT NULL,
+    issue_category ENUM('quality', 'warranty', 'damage', 'missing-parts', 'delayed', 'other') DEFAULT 'other',
+    issue_description VARCHAR(500),
+    severity ENUM('low', 'medium', 'high', 'critical') DEFAULT 'medium',
+    reported_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    investigation_notes LONGTEXT,
+    resolution_notes LONGTEXT,
+    issue_status ENUM('open', 'under-investigation', 'resolved', 'closed', 'escalated') DEFAULT 'open',
+    assigned_to INT,
+    resolved_date DATETIME,
+    resolution_type ENUM('refund', 'rework', 'replacement', 'compensation', 'explanation', 'other') DEFAULT NULL,
+    follow_up_action VARCHAR(500),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (followup_id) REFERENCES follow_ups(id) ON DELETE CASCADE,
+    FOREIGN KEY (assigned_to) REFERENCES personnel(id) ON DELETE SET NULL,
+    INDEX idx_followup_id (followup_id),
+    INDEX idx_issue_status (issue_status),
+    INDEX idx_severity (severity)
 );
