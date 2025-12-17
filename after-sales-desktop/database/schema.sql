@@ -894,3 +894,121 @@ CREATE TABLE issue_tracking (
     INDEX idx_issue_status (issue_status),
     INDEX idx_severity (severity)
 );
+-- ==================== APPOINTMENT CONFIRMATIONS TABLE ====================
+CREATE TABLE IF NOT EXISTS appointment_confirmations (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    scheduling_order_id INT NOT NULL,
+    method ENUM('sms', 'email', 'whatsapp', 'call') DEFAULT 'sms',
+    contact_info VARCHAR(255),
+    message TEXT,
+    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    delivered_at TIMESTAMP NULL,
+    status ENUM('pending', 'sent', 'delivered', 'failed') DEFAULT 'pending',
+    retry_count INT DEFAULT 0,
+    error_message TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (scheduling_order_id) REFERENCES scheduling_orders(id) ON DELETE CASCADE,
+    INDEX idx_scheduling_order_id (scheduling_order_id),
+    INDEX idx_status (status),
+    INDEX idx_sent_at (sent_at)
+);
+
+-- ==================== APPOINTMENT REMINDERS TABLE ====================
+CREATE TABLE IF NOT EXISTS appointment_reminders (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    scheduling_order_id INT NOT NULL,
+    reminder_type ENUM('24h', '2h', '30m', 'custom') DEFAULT '24h',
+    scheduled_time DATETIME,
+    sent_time TIMESTAMP NULL,
+    reminder_recipients ENUM('customer', 'staff', 'all') DEFAULT 'all',
+    status ENUM('pending', 'sent', 'cancelled') DEFAULT 'pending',
+    sent_to_customer BOOLEAN DEFAULT FALSE,
+    sent_to_technician BOOLEAN DEFAULT FALSE,
+    sent_to_advisor BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (scheduling_order_id) REFERENCES scheduling_orders(id) ON DELETE CASCADE,
+    INDEX idx_scheduling_order_id (scheduling_order_id),
+    INDEX idx_scheduled_time (scheduled_time),
+    INDEX idx_status (status)
+);
+
+-- ==================== APPOINTMENT RESCHEDULES TABLE ====================
+CREATE TABLE IF NOT EXISTS appointment_reschedules (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    scheduling_order_id INT NOT NULL,
+    old_date DATE,
+    old_time TIME,
+    new_date DATE,
+    new_time TIME,
+    reason VARCHAR(255),
+    rescheduled_by VARCHAR(100),
+    rescheduled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (scheduling_order_id) REFERENCES scheduling_orders(id) ON DELETE CASCADE,
+    INDEX idx_scheduling_order_id (scheduling_order_id),
+    INDEX idx_rescheduled_at (rescheduled_at)
+);
+
+-- ==================== NO-SHOW TRACKING TABLE ====================
+CREATE TABLE IF NOT EXISTS no_show_tracking (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    scheduling_order_id INT NOT NULL,
+    customer_id INT NOT NULL,
+    scheduled_date DATE,
+    scheduled_time TIME,
+    reason VARCHAR(255),
+    notified_at TIMESTAMP NULL,
+    follow_up_created BOOLEAN DEFAULT FALSE,
+    tracked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (scheduling_order_id) REFERENCES scheduling_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
+    INDEX idx_scheduling_order_id (scheduling_order_id),
+    INDEX idx_customer_id (customer_id),
+    INDEX idx_tracked_at (tracked_at)
+);
+
+-- ==================== FOLLOW-UP TASKS TABLE ====================
+CREATE TABLE IF NOT EXISTS follow_up_tasks (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    scheduling_order_id INT NOT NULL,
+    customer_id INT NOT NULL,
+    task_type ENUM('no-show', 'reschedule', 'callback', 'escalation', 'warranty', 'quality-issue') DEFAULT 'no-show',
+    priority ENUM('low', 'normal', 'high', 'urgent') DEFAULT 'normal',
+    status ENUM('pending', 'in-progress', 'completed', 'cancelled') DEFAULT 'pending',
+    assigned_to VARCHAR(100),
+    due_date DATE,
+    completed_at TIMESTAMP NULL,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (scheduling_order_id) REFERENCES scheduling_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
+    INDEX idx_scheduling_order_id (scheduling_order_id),
+    INDEX idx_customer_id (customer_id),
+    INDEX idx_status (status),
+    INDEX idx_due_date (due_date)
+);
+
+-- ==================== AUDIT LOGS TABLE (Enhanced) ====================
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    operation_type VARCHAR(100) NOT NULL,
+    entity_type VARCHAR(100) NOT NULL,
+    entity_id INT,
+    user_id INT,
+    user_name VARCHAR(255),
+    ip_address VARCHAR(45),
+    browser_info VARCHAR(255),
+    operation_details TEXT,
+    old_values JSON,
+    new_values JSON,
+    status ENUM('success', 'failure', 'partial') DEFAULT 'success',
+    error_message TEXT,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_operation_type (operation_type),
+    INDEX idx_entity_type (entity_type),
+    INDEX idx_timestamp (timestamp),
+    INDEX idx_user_id (user_id),
+    INDEX idx_entity_id (entity_id)
+);

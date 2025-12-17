@@ -244,3 +244,278 @@ def get_service_order_status(service_order_id):
         return jsonify({'success': False, 'error': 'Service order not found'}), 404
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==================== PROCESS 3.1: TECHNICIAN ASSIGNMENT WITH SKILLS ====================
+
+@job_controller_bp.route('/technicians/available/with-skills', methods=['GET'])
+def get_technicians_availability_with_skills():
+    """Get available technicians with detailed skills and workload (Process 3.1)"""
+    try:
+        technicians = job_controller_service.get_technician_availability_with_skills()
+        return jsonify({
+            'success': True,
+            'data': technicians,
+            'count': len(technicians)
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@job_controller_bp.route('/technicians/match-skills', methods=['POST'])
+def get_technicians_by_skills():
+    """Get technicians filtered by required skills (Process 3.1 - Skill Matching)"""
+    try:
+        data = request.json
+        required_skills = data.get('required_skills', [])
+        
+        technicians = job_controller_service.get_technician_with_skill_match(required_skills)
+        return jsonify({
+            'success': True,
+            'data': technicians,
+            'count': len(technicians)
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@job_controller_bp.route('/assign-with-confirmation', methods=['POST'])
+def assign_technician_with_confirmation():
+    """Assign technician with timestamp confirmation (Process 3.1 - Enhanced)"""
+    try:
+        data = request.json
+        service_order_id = data.get('service_order_id')
+        technician_id = data.get('technician_id')
+        assigned_by = data.get('assigned_by')
+        assignment_notes = data.get('assignment_notes')
+        
+        if not all([service_order_id, technician_id, assigned_by]):
+            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+        
+        result = job_controller_service.assign_technician_with_confirmation(
+            service_order_id, technician_id, assigned_by, assignment_notes
+        )
+        
+        if result['success']:
+            return jsonify(result), 200
+        return jsonify(result), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==================== PROCESS 4.1: PARTS REQUEST ====================
+
+@job_controller_bp.route('/service-orders/<int:service_order_id>/picklist', methods=['GET'])
+def get_digital_service_picklist(service_order_id):
+    """Get digital service picklist for technician (Process 4.1)"""
+    try:
+        picklist = job_controller_service.get_digital_service_picklist(service_order_id)
+        if picklist:
+            return jsonify({'success': True, 'data': picklist}), 200
+        return jsonify({'success': False, 'error': 'Picklist not found'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@job_controller_bp.route('/service-orders/<int:service_order_id>/parts-request', methods=['POST'])
+def request_parts_from_warehouse(service_order_id):
+    """Technician requests parts from warehouse (Process 4.1)"""
+    try:
+        data = request.json
+        technician_id = data.get('technician_id')
+        requested_parts = data.get('requested_parts', [])
+        notes = data.get('notes')
+        
+        if not technician_id or not requested_parts:
+            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+        
+        result = job_controller_service.request_parts_from_warehouse(
+            service_order_id, technician_id, requested_parts, notes
+        )
+        
+        if result['success']:
+            return jsonify(result), 200
+        return jsonify(result), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@job_controller_bp.route('/service-orders/<int:service_order_id>/parts-request/status', methods=['GET'])
+def get_parts_request_status(service_order_id):
+    """Get status of parts request (Process 4.1 - Tracking)"""
+    try:
+        status = job_controller_service.get_parts_request_status(service_order_id)
+        if status:
+            return jsonify({'success': True, 'data': status}), 200
+        return jsonify({'success': False, 'error': 'No parts request found'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==================== PROCESS 4.2: PARTS WAREHOUSE ISSUANCE ====================
+
+@job_controller_bp.route('/service-orders/<int:service_order_id>/parts-prepare', methods=['POST'])
+def prepare_parts_for_issuance(service_order_id):
+    """Warehouse prepares parts for issuance (Process 4.2)"""
+    try:
+        data = request.json
+        parts_list = data.get('parts_list', [])
+        prepared_by = data.get('prepared_by')
+        
+        if not prepared_by or not parts_list:
+            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+        
+        result = job_controller_service.prepare_parts_for_issuance(
+            service_order_id, parts_list, prepared_by
+        )
+        
+        if result['success']:
+            return jsonify(result), 200
+        return jsonify(result), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@job_controller_bp.route('/service-orders/<int:service_order_id>/parts-issue', methods=['POST'])
+def issue_parts_with_signature(service_order_id):
+    """Issue parts with digital signature capture (Process 4.2)"""
+    try:
+        data = request.json
+        technician_id = data.get('technician_id')
+        parts_issued = data.get('parts_issued', [])
+        signature_data = data.get('signature_data')
+        issued_by = data.get('issued_by')
+        
+        if not all([technician_id, parts_issued, signature_data, issued_by]):
+            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+        
+        result = job_controller_service.issue_parts_with_signature(
+            service_order_id, technician_id, parts_issued, signature_data, issued_by
+        )
+        
+        if result['success']:
+            return jsonify(result), 200
+        return jsonify(result), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@job_controller_bp.route('/service-orders/<int:service_order_id>/parts-issued/confirmation', methods=['GET'])
+def get_parts_issued_confirmation(service_order_id):
+    """Get parts issuance confirmation details (Process 4.2)"""
+    try:
+        confirmation = job_controller_service.get_parts_issued_confirmation(service_order_id)
+        if confirmation:
+            return jsonify({'success': True, 'data': confirmation}), 200
+        return jsonify({'success': False, 'error': 'No parts issuance found'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==================== PROCESS 4.3: SERVICE EXECUTION ====================
+
+@job_controller_bp.route('/service-orders/<int:service_order_id>/additional-repair', methods=['POST'])
+def request_additional_repair_approval(service_order_id):
+    """Technician requests additional repair approval from SA (Process 4.3)"""
+    try:
+        data = request.json
+        technician_id = data.get('technician_id')
+        repair_description = data.get('repair_description')
+        estimated_cost = data.get('estimated_cost')
+        urgent = data.get('urgent', False)
+        
+        if not all([technician_id, repair_description, estimated_cost]):
+            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+        
+        result = job_controller_service.request_additional_repair_approval(
+            service_order_id, technician_id, repair_description, estimated_cost, urgent
+        )
+        
+        if result['success']:
+            return jsonify(result), 200
+        return jsonify(result), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@job_controller_bp.route('/service-orders/<int:service_order_id>/repair-approvals/pending', methods=['GET'])
+def get_pending_repair_approvals(service_order_id):
+    """Get pending repair approval requests (Process 4.3)"""
+    try:
+        approvals = job_controller_service.get_pending_repair_approvals(service_order_id)
+        return jsonify({
+            'success': True,
+            'data': approvals,
+            'count': len(approvals)
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@job_controller_bp.route('/service-orders/<int:service_order_id>/repair-approve', methods=['POST'])
+def approve_additional_repair(service_order_id):
+    """SA approves additional repair (Process 4.3)"""
+    try:
+        data = request.json
+        repair_request_id = data.get('repair_request_id')
+        approved_by = data.get('approved_by')
+        approval_notes = data.get('approval_notes')
+        
+        if not all([repair_request_id, approved_by]):
+            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+        
+        result = job_controller_service.approve_additional_repair(
+            service_order_id, repair_request_id, approved_by, approval_notes
+        )
+        
+        if result['success']:
+            return jsonify(result), 200
+        return jsonify(result), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@job_controller_bp.route('/service-orders/<int:service_order_id>/request-qc', methods=['POST'])
+def request_foreman_qc(service_order_id):
+    """Technician requests Foreman QC (Process 4.3)"""
+    try:
+        data = request.json
+        technician_id = data.get('technician_id')
+        service_notes = data.get('service_notes')
+        
+        if not technician_id:
+            return jsonify({'success': False, 'error': 'Missing technician_id'}), 400
+        
+        result = job_controller_service.request_foreman_qc(
+            service_order_id, technician_id, service_notes
+        )
+        
+        if result['success']:
+            return jsonify(result), 200
+        return jsonify(result), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@job_controller_bp.route('/service-orders/<int:service_order_id>/qc-status', methods=['GET'])
+def get_qc_request_status(service_order_id):
+    """Get QC request status (Process 4.3)"""
+    try:
+        status = job_controller_service.get_qc_request_status(service_order_id)
+        if status:
+            return jsonify({'success': True, 'data': status}), 200
+        return jsonify({'success': False, 'error': 'No QC request found'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@job_controller_bp.route('/service-orders/<int:service_order_id>/execution-summary', methods=['GET'])
+def get_service_execution_summary(service_order_id):
+    """Get complete service execution summary (Process 4.3)"""
+    try:
+        summary = job_controller_service.get_service_execution_summary(service_order_id)
+        if summary:
+            return jsonify({'success': True, 'data': summary}), 200
+        return jsonify({'success': False, 'error': 'Service order not found'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500

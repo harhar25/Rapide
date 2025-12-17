@@ -189,3 +189,133 @@ def get_service_order_documents(service_order_id):
         }), 200
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==================== WARRANTY CHECK ====================
+
+@service_advisor_bp.route('/warranty/check', methods=['POST'])
+def check_warranty():
+    """Check warranty status for customer"""
+    try:
+        data = request.json
+        customer_id = data.get('customer_id')
+        service_type = data.get('service_type', 'general')
+        
+        if not customer_id:
+            return jsonify({'success': False, 'error': 'Missing customer_id'}), 400
+        
+        warranty_info = service_advisor_service.check_warranty_status(customer_id, service_type)
+        
+        return jsonify({
+            'success': True,
+            'warranty_info': warranty_info
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==================== PARTS AVAILABILITY CHECK ====================
+
+@service_advisor_bp.route('/parts/availability-check', methods=['POST'])
+def check_parts_availability():
+    """Check parts availability based on VRC findings"""
+    try:
+        data = request.json
+        vrc_findings = data.get('vrc_findings', {})
+        
+        availability = service_advisor_service.check_parts_availability(vrc_findings)
+        
+        return jsonify({
+            'success': True,
+            'parts_availability': availability
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@service_advisor_bp.route('/parts/forecast/<int:service_order_id>', methods=['POST'])
+def forecast_parts(service_order_id):
+    """Forecast parts needed based on VRC data"""
+    try:
+        data = request.json
+        vrc_data = data.get('vrc_data', {})
+        
+        forecast = service_advisor_service.forecast_parts(service_order_id, vrc_data)
+        
+        return jsonify({
+            'success': True,
+            'forecast': forecast
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==================== DOCUMENT GENERATION ====================
+
+@service_advisor_bp.route('/documents/generate/service-order/<int:service_order_id>', methods=['GET'])
+def generate_service_order(service_order_id):
+    """Generate Service Order document"""
+    try:
+        document = service_advisor_service.generate_service_order_document(service_order_id)
+        
+        if document:
+            return jsonify({
+                'success': True,
+                'document': document
+            }), 200
+        else:
+            return jsonify({'success': False, 'error': 'Service order not found'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@service_advisor_bp.route('/documents/generate/confirmation/<int:service_order_id>', methods=['GET'])
+def generate_confirmation(service_order_id):
+    """Generate Service Order Confirmation document"""
+    try:
+        document = service_advisor_service.generate_service_order_confirmation(service_order_id)
+        
+        if document:
+            return jsonify({
+                'success': True,
+                'document': document
+            }), 200
+        else:
+            return jsonify({'success': False, 'error': 'Service order not found'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@service_advisor_bp.route('/documents/generate/picklist/<int:service_order_id>', methods=['POST'])
+def generate_picklist(service_order_id):
+    """Generate Service Picklist document"""
+    try:
+        data = request.json
+        parts_list = data.get('parts_list', [])
+        
+        document = service_advisor_service.generate_service_picklist(service_order_id, parts_list)
+        
+        return jsonify({
+            'success': True,
+            'document': document
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@service_advisor_bp.route('/documents/print/<int:service_order_id>', methods=['POST'])
+def print_documents(service_order_id):
+    """Print all required service documents"""
+    try:
+        data = request.json
+        document_types = data.get('document_types', ['service-order', 'confirmation', 'picklist', 'vrc', 'cis'])
+        printed_by = data.get('printed_by', 'SYSTEM')
+        
+        result = service_advisor_service.print_service_documents(service_order_id, document_types, printed_by)
+        
+        return jsonify({
+            'success': True,
+            'print_result': result
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500

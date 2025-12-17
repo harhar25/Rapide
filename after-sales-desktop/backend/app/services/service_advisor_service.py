@@ -284,3 +284,232 @@ class ServiceAdvisorService:
         """
         results = db.execute_query(query, (service_order_id,)) or []
         return [tuple(r.values()) for r in results]
+    
+    # ==================== WARRANTY CHECK ====================
+    
+    def check_warranty_status(self, customer_id, service_type):
+        """Check if service falls under warranty"""
+        query = """
+        SELECT c.id, c.name, c.last_service_date, c.registration_date,
+               DATEDIFF(NOW(), c.registration_date) as days_from_registration,
+               YEAR(c.registration_date) as registration_year,
+               YEAR(NOW()) as current_year
+        FROM customers c
+        WHERE c.id = %s
+        """
+        result = db.execute_query(query, (customer_id,))
+        
+        if not result:
+            return {'warranty': False, 'reason': 'Customer not found'}
+        
+        customer = result[0]
+        days_from_reg = customer.get('days_from_registration', 0) or 0
+        
+        # Warranty rules:
+        # - Vehicles within 1 year (365 days) of registration are under manufacturer warranty
+        # - Vehicles with scheduled maintenance (PMS) service are covered
+        # - Breakdown services are checked separately
+        
+        is_manufacturer_warranty = days_from_reg <= 365
+        is_scheduled_service = service_type == 'PMS'
+        is_warranty_service = service_type == 'warranty'
+        
+        warranty_info = {
+            'is_manufacturer_warranty': is_manufacturer_warranty,
+            'is_scheduled_service': is_scheduled_service,
+            'is_warranty_service': is_warranty_service,
+            'warranty': is_manufacturer_warranty or is_warranty_service,
+            'warranty_type': 'manufacturer' if is_manufacturer_warranty else ('warranty_claim' if is_warranty_service else 'standard'),
+            'registration_date': str(customer.get('registration_date')),
+            'days_from_registration': days_from_reg
+        }
+        
+        return warranty_info
+    
+    # ==================== PARTS AVAILABILITY CHECK ====================
+    
+    def check_parts_availability(self, vrc_findings):
+        """Check parts availability based on VRC findings"""
+        # Common parts needed based on VRC checklist failures
+        parts_map = {
+            'checklist_1_engine_starts': ['Spark Plugs', 'Battery'],
+            'checklist_2_idle_smooth': ['Engine Oil', 'Air Filter', 'Fuel Filter'],
+            'checklist_3_acceleration': ['Fuel Injector Cleaner', 'Engine Oil'],
+            'checklist_4_brakes': ['Brake Pads', 'Brake Fluid'],
+            'checklist_5_steering': ['Power Steering Fluid'],
+            'checklist_6_lights': ['Light Bulbs', 'Fuses'],
+            'checklist_7_air_con': ['AC Refrigerant', 'AC Filter'],
+            'checklist_8_wipers': ['Wiper Blades'],
+            'checklist_9_horn': ['Horn Assembly'],
+            'checklist_10_handbrake': ['Brake Fluid', 'Brake Cables']
+        }
+        
+        required_parts = []
+        low_stock_parts = []
+        
+        # Determine which parts are needed
+        for check_item, parts in parts_map.items():
+            if vrc_findings.get(check_item) == 'fail':
+                required_parts.extend(parts)
+        
+        # Check warehouse inventory for required parts
+        if required_parts:
+            unique_parts = list(set(required_parts))
+            placeholders = ','.join(['%s'] * len(unique_parts))
+            query = f"""
+            SELECT id, product_code, product_name, quantity_in_stock, reorder_level, unit_price, status
+            FROM warehouse_products
+            WHERE product_name IN ({placeholders})
+            AND status = 'active'
+            """
+            
+            results = db.execute_query(query, tuple(unique_parts)) or []
+            
+            parts_availability = []
+            for part in results:
+                is_in_stock = part.get('quantity_in_stock', 0) > 0
+                is_low_stock = part.get('quantity_in_stock', 0) <= part.get('reorder_level', 10)
+                
+                parts_availability.append({
+                    'product_id': part.get('id'),
+                    'product_code': part.get('product_code'),
+                    'product_name': part.get('product_name'),
+                    'quantity_in_stock': part.get('quantity_in_stock', 0),
+                    'reorder_level': part.get('reorder_level', 10),
+                    'unit_price': part.get('unit_price'),
+                    'in_stock': is_in_stock,
+                    'low_stock': is_low_stock,
+                    'status': part.get('status')
+                })
+                
+                if is_low_stock:
+                    low_stock_parts.append(part.get('product_name'))
+            
+            return {
+                'required_parts': unique_parts,
+                'parts_availability': parts_availability,
+                'all_parts_available': all(p['in_stock'] for p in parts_availability),
+                'low_stock_parts': low_stock_parts,
+                'needs_special_order': len(low_stock_parts) > 0
+            }
+        
+        return {
+            'required_parts': [],
+            'parts_availability': [],
+            'all_parts_available': True,
+            'low_stock_parts': [],
+            'needs_special_order': False
+        }
+    
+    def forecast_parts(self, service_order_id, vrc_data):
+        """Forecast parts needed based on VRC and service type"""
+        vrc_findings = {
+            'checklist_1_engine_starts': vrc_data.get('checklist_1_engine_starts', 'na'),
+            'checklist_2_idle_smooth': vrc_data.get('checklist_2_idle_smooth', 'na'),
+            'checklist_3_acceleration': vrc_data.get('checklist_3_acceleration', 'na'),
+            'checklist_4_brakes': vrc_data.get('checklist_4_brakes', 'na'),
+            'checklist_5_steering': vrc_data.get('checklist_5_steering', 'na'),
+            'checklist_6_lights': vrc_data.get('checklist_6_lights', 'na'),
+            'checklist_7_air_con': vrc_data.get('checklist_7_air_con', 'na'),
+            'checklist_8_wipers': vrc_data.get('checklist_8_wipers', 'na'),
+            'checklist_9_horn': vrc_data.get('checklist_9_horn', 'na'),
+            'checklist_10_handbrake': vrc_data.get('checklist_10_handbrake', 'na')
+        }
+        
+        availability = self.check_parts_availability(vrc_findings)
+        return availability
+    
+    # ==================== GENERATE DOCUMENTS ====================
+    
+    def generate_service_order_document(self, service_order_id):
+        """Generate Service Order document (SO)"""
+        query = """
+        SELECT so.id, c.name, c.contact_no, c.plate_no, c.vehicle_model, 
+               so.vehicle_plate_no, so.service_type, so.check_in_time, 
+               vrc.mileage_in, sa.name as advisor_name
+        FROM service_orders so
+        JOIN customers c ON so.customer_id = c.id
+        LEFT JOIN vehicle_report_cards vrc ON so.id = vrc.service_order_id
+        LEFT JOIN service_advisors sa ON so.advisor_id = sa.id
+        WHERE so.id = %s
+        """
+        result = db.execute_query(query, (service_order_id,))
+        
+        if result:
+            so_data = result[0]
+            document = {
+                'document_type': 'service-order',
+                'so_number': f"SO-{service_order_id}",
+                'customer_name': so_data.get('name'),
+                'customer_contact': so_data.get('contact_no'),
+                'vehicle_plate': so_data.get('plate_no'),
+                'vehicle_model': so_data.get('vehicle_model'),
+                'service_type': so_data.get('service_type'),
+                'check_in_time': so_data.get('check_in_time'),
+                'mileage_in': so_data.get('mileage_in'),
+                'advisor_name': so_data.get('advisor_name'),
+                'generated_at': datetime.now().isoformat()
+            }
+            return document
+        return None
+    
+    def generate_service_order_confirmation(self, service_order_id):
+        """Generate Service Order Confirmation document"""
+        query = """
+        SELECT so.id, c.name, c.contact_no, so.vehicle_plate_no, 
+               so.service_type, so.check_in_time, b.bay_name, t.name as technician_name
+        FROM service_orders so
+        JOIN customers c ON so.customer_id = c.id
+        LEFT JOIN service_bays b ON so.id = b.id
+        LEFT JOIN technicians t ON so.id = t.id
+        WHERE so.id = %s
+        """
+        result = db.execute_query(query, (service_order_id,))
+        
+        if result:
+            so_data = result[0]
+            document = {
+                'document_type': 'confirmation',
+                'confirmation_number': f"CONF-{service_order_id}",
+                'customer_name': so_data.get('name'),
+                'service_type': so_data.get('service_type'),
+                'bay_assignment': so_data.get('bay_name', 'TBD'),
+                'technician_assignment': so_data.get('technician_name', 'TBD'),
+                'estimated_completion': 'To be determined',
+                'generated_at': datetime.now().isoformat()
+            }
+            return document
+        return None
+    
+    def generate_service_picklist(self, service_order_id, parts_list):
+        """Generate Service Picklist (parts and materials needed)"""
+        document = {
+            'document_type': 'picklist',
+            'picklist_number': f"PL-{service_order_id}",
+            'service_order_id': service_order_id,
+            'parts_and_materials': parts_list,
+            'total_items': len(parts_list),
+            'warehouse_instructions': 'Please pick all items on this list and prepare for service order',
+            'generated_at': datetime.now().isoformat()
+        }
+        return document
+    
+    def print_service_documents(self, service_order_id, document_types, printed_by):
+        """Print all required service documents"""
+        printed_documents = []
+        
+        for doc_type in document_types:
+            success = self.log_document_print(service_order_id, doc_type, printed_by)
+            if success:
+                printed_documents.append({
+                    'document_type': doc_type,
+                    'status': 'printed',
+                    'printed_by': printed_by,
+                    'printed_at': datetime.now().isoformat()
+                })
+        
+        return {
+            'service_order_id': service_order_id,
+            'documents_printed': printed_documents,
+            'total_count': len(printed_documents)
+        }

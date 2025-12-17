@@ -201,3 +201,80 @@ def get_summary():
         }), 200
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==================== PROCESS 4.1 & 4.2: PARTS REQUEST & ISSUANCE ====================
+
+@warehouse_bp.route('/parts-requests/pending', methods=['GET'])
+def get_pending_parts_requests():
+    """Get all pending parts requests from technicians (Process 4.1 - Warehouse View)"""
+    try:
+        requests = warehouse_service.get_pending_parts_requests()
+        return jsonify({
+            'success': True,
+            'data': requests,
+            'count': len(requests)
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@warehouse_bp.route('/parts-availability/check', methods=['POST'])
+def check_parts_availability():
+    """Check if all parts in list are available in stock (Process 4.2 - Validation)"""
+    try:
+        data = request.json
+        parts_list = data.get('parts_list', [])
+        
+        if not parts_list:
+            return jsonify({'success': False, 'error': 'parts_list is required'}), 400
+        
+        availability = warehouse_service.check_parts_availability(parts_list)
+        
+        return jsonify({
+            'success': True,
+            'data': availability
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@warehouse_bp.route('/parts-requests/<int:service_order_id>/for-approval', methods=['GET'])
+def get_parts_request_for_approval(service_order_id):
+    """Get parts request details ready for warehouse approval (Process 4.2)"""
+    try:
+        request_data = warehouse_service.get_parts_request_for_approval(service_order_id)
+        if request_data:
+            return jsonify({'success': True, 'data': request_data}), 200
+        return jsonify({'success': False, 'error': 'No parts request found'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@warehouse_bp.route('/parts/ready-for-release', methods=['GET'])
+def get_parts_ready_for_release():
+    """Get all parts prepared and ready for technician pickup (Process 4.2 - Ready to Release)"""
+    try:
+        parts = warehouse_service.get_parts_ready_for_release()
+        return jsonify({
+            'success': True,
+            'data': parts,
+            'count': len(parts)
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@warehouse_bp.route('/parts-issuance/history', methods=['GET'])
+def get_parts_issuance_history():
+    """Get history of parts issued to technicians (Process 4.2 - Audit)"""
+    try:
+        limit = request.args.get('limit', 50, type=int)
+        history = warehouse_service.get_parts_issuance_history(limit)
+        return jsonify({
+            'success': True,
+            'data': history,
+            'count': len(history)
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500

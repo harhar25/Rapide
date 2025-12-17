@@ -199,3 +199,107 @@ class WarehouseService:
                 data.get('low_stock_count', 0) or 0
             )
         return (0, 0, 0, 0)
+    
+    # ==================== PROCESS 4.1 & 4.2: PARTS REQUEST & ISSUANCE ====================
+    
+    def get_pending_parts_requests(self):
+        """Get all pending parts requests from technicians (Process 4.1 - Warehouse View)"""
+        query = """
+        SELECT sod.id, sod.service_order_id, sod.document_data, sod.created_at,
+               so.vehicle_plate_no, so.service_type, c.name as customer_name,
+               ta.technician_id, t.name as technician_name
+        FROM service_order_documents sod
+        JOIN service_orders so ON sod.service_order_id = so.id
+        LEFT JOIN customers c ON so.customer_id = c.id
+        LEFT JOIN technician_assignments ta ON so.id = ta.service_order_id
+        LEFT JOIN technicians t ON ta.technician_id = t.id
+        WHERE sod.document_type = 'parts-request'
+        ORDER BY sod.created_at DESC
+        """
+        results = db.execute_query(query) or []
+        return results
+    
+    def check_parts_availability(self, parts_list):
+        """Check if all parts in list are available in stock (Process 4.2 - Validation)"""
+        availability = []
+        total_cost = 0
+        all_available = True
+        
+        for part in parts_list:
+            product_id = part.get('product_id')
+            quantity_needed = part.get('quantity', 1)
+            
+            # Check inventory
+            query = "SELECT quantity_in_stock, unit_price FROM warehouse_products WHERE id = %s"
+            result = db.execute_query(query, (product_id,))
+            
+            if result and len(result) > 0:
+                product = result[0]
+                quantity_available = product.get('quantity_in_stock', 0)
+                unit_price = product.get('unit_price', 0)
+                
+                is_available = quantity_available >= quantity_needed
+                part_cost = unit_price * quantity_needed
+                total_cost += part_cost
+                
+                availability.append({
+                    'product_id': product_id,
+                    'quantity_needed': quantity_needed,
+                    'quantity_available': quantity_available,
+                    'is_available': is_available,
+                    'part_cost': part_cost
+                })
+                
+                if not is_available:
+                    all_available = False
+            else:
+                availability.append({
+                    'product_id': product_id,
+                    'quantity_needed': quantity_needed,
+                    'is_available': False,
+                    'error': 'Product not found'
+                })
+                all_available = False
+        
+        return {
+            'all_available': all_available,
+            'parts_availability': availability,
+            'total_cost': total_cost
+        }
+    
+    def get_parts_request_for_approval(self, service_order_id):
+        """Get parts request details ready for warehouse approval (Process 4.2)"""
+        query = """
+        SELECT id, service_order_id, document_data, created_at
+        FROM service_order_documents
+        WHERE service_order_id = %s AND document_type = 'parts-request'
+        ORDER BY created_at DESC
+        LIMIT 1
+        """
+        result = db.execute_query(query, (service_order_id,))
+        if result:
+            return result[0]
+        return None
+    
+    def get_parts_ready_for_release(self):
+        """Get all parts prepared and ready for technician pickup (Process 4.2 - Ready to Release)"""
+        query = """
+        SELECT id, service_order_id, document_data, printed_by, created_at
+        FROM service_order_documents
+        WHERE document_type = 'parts-ready'
+        ORDER BY created_at DESC
+        """
+        results = db.execute_query(query) or []
+        return results
+    
+    def get_parts_issuance_history(self, limit=50):
+        """Get history of parts issued to technicians (Process 4.2 - Audit)"""
+        query = """
+        SELECT id, service_order_id, document_data, printed_by, created_at
+        FROM service_order_documents
+        WHERE document_type = 'parts-issued'
+        ORDER BY created_at DESC
+        LIMIT %s
+        """
+        results = db.execute_query(query, (limit,)) or []
+        return results
