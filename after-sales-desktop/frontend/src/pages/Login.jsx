@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import '../styles/login.css';
+import { fetchJson } from '../utils/fetchJson';
 
 const Login = ({ onLogin }) => {
   const [username, setUsername] = useState('');
@@ -23,13 +24,11 @@ const Login = ({ onLogin }) => {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const data = await fetchJson('http://localhost:5000/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
       });
-
-      const data = await response.json();
 
       if (data.success) {
         // Add password to user object for admin operations

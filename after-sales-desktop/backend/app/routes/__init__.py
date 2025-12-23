@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 from app.services.customer_service import CustomerService, SchedulingService
 from app.services.validation_service import ValidationService
+from app.services.audit_service import AuditService
 
 customer_bp = Blueprint('customer', __name__, url_prefix='/api/customer')
 scheduler_bp = Blueprint('scheduler', __name__, url_prefix='/api/scheduler')
@@ -8,6 +9,7 @@ scheduler_bp = Blueprint('scheduler', __name__, url_prefix='/api/scheduler')
 customer_service = CustomerService()
 scheduling_service = SchedulingService()
 validation_service = ValidationService()
+audit_service = AuditService()
 
 # ==================== CUSTOMER ROUTES ====================
 
@@ -59,6 +61,8 @@ def register_walk_in():
         
         if result.get('success'):
             return jsonify(result), 201
+        elif result.get('status') == 'warning':
+            return jsonify(result), 409
         else:
             return jsonify(result), 400
     except Exception as e:
@@ -113,12 +117,45 @@ def create_scheduling_order():
             }), 400
         
         result = scheduling_service.create_scheduling_order(data)
-        
+
         if result.get('success'):
+            audit_service.log(
+                operation_type='SCHEDULING_ORDER_CREATED',
+                entity_type='scheduling_orders',
+                entity_id=result.get('order_id'),
+                user_name=data.get('created_by'),
+                ip_address=request.remote_addr,
+                browser_info=str(request.user_agent),
+                new_values=data,
+            )
             return jsonify(result), 201
         else:
+            audit_service.log(
+                operation_type='SCHEDULING_ORDER_CREATE_FAILED',
+                entity_type='scheduling_orders',
+                entity_id=None,
+                user_name=data.get('created_by'),
+                ip_address=request.remote_addr,
+                browser_info=str(request.user_agent),
+                new_values=data,
+                status='failure',
+                error_message=str(result),
+            )
             return jsonify(result), 400
     except Exception as e:
+        try:
+            audit_service.log(
+                operation_type='SCHEDULING_ORDER_CREATE_EXCEPTION',
+                entity_type='scheduling_orders',
+                entity_id=None,
+                user_name=(request.json or {}).get('created_by') if request.is_json else None,
+                ip_address=request.remote_addr,
+                browser_info=str(request.user_agent),
+                status='failure',
+                error_message=str(e),
+            )
+        except Exception:
+            pass
         return jsonify({
             'success': False,
             'error': str(e),
@@ -131,12 +168,36 @@ def log_contact_attempt():
     try:
         data = request.json
         result = scheduling_service.log_contact_attempt(data)
+
+        audit_service.log(
+            operation_type='CONTACT_ATTEMPT_LOGGED',
+            entity_type='contact_attempts',
+            entity_id=result.get('attempt_id') if isinstance(result, dict) else None,
+            user_name=data.get('created_by'),
+            ip_address=request.remote_addr,
+            browser_info=str(request.user_agent),
+            new_values=data,
+        )
         return jsonify({
             'success': True,
             'data': result
         }), 200
     except Exception as e:
+        try:
+            audit_service.log(
+                operation_type='CONTACT_ATTEMPT_LOG_FAILED',
+                entity_type='contact_attempts',
+                entity_id=None,
+                user_name=(request.json or {}).get('created_by') if request.is_json else None,
+                ip_address=request.remote_addr,
+                browser_info=str(request.user_agent),
+                status='failure',
+                error_message=str(e),
+            )
+        except Exception:
+            pass
         return jsonify({'success': False, 'error': str(e)}), 500
+
 # ==================== NEW PRODUCTION-GRADE ENDPOINTS ====================
 
 @customer_bp.route('/search-duplicate', methods=['POST'])

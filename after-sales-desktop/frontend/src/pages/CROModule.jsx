@@ -3,6 +3,7 @@ import PMSDueList from '../components/PMSDueList';
 import AppointmentSetting from '../components/AppointmentSetting';
 import WalkInRegistration from '../components/WalkInRegistration';
 import '../styles/cro-module.css';
+import { fetchJson } from '../utils/fetchJson';
 
 const API_BASE = 'http://localhost:5000/api';
 
@@ -20,8 +21,7 @@ export default function CROModule() {
   const fetchPmsDueList = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/customer/pms-due-list`);
-      const data = await response.json();
+      const data = await fetchJson(`${API_BASE}/customer/pms-due-list`);
       if (data.success) {
         setPmsDueCustomers(data.data);
       }

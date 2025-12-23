@@ -1012,3 +1012,30 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     INDEX idx_user_id (user_id),
     INDEX idx_entity_id (entity_id)
 );
+
+-- ==================== SMS OUTBOX TABLE (One-way Automation) ====================
+CREATE TABLE IF NOT EXISTS sms_outbox (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    customer_id INT NULL,
+    scheduling_order_id INT NULL,
+    purpose ENUM('APPT_CONFIRM', 'APPT_REMINDER', 'FOLLOW_UP', 'PMS_OUTREACH') DEFAULT 'PMS_OUTREACH',
+    phone VARCHAR(30) NOT NULL,
+    message TEXT NOT NULL,
+    scheduled_at DATETIME NOT NULL,
+    sent_at TIMESTAMP NULL,
+    delivered_at TIMESTAMP NULL,
+    status ENUM('queued', 'sending', 'sent', 'delivered', 'failed', 'cancelled') DEFAULT 'queued',
+    provider_message_id VARCHAR(100) NULL,
+    retry_count INT DEFAULT 0,
+    error_message TEXT,
+    created_by VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL,
+    FOREIGN KEY (scheduling_order_id) REFERENCES scheduling_orders(id) ON DELETE SET NULL,
+    INDEX idx_status (status),
+    INDEX idx_scheduled_at (scheduled_at),
+    INDEX idx_customer_id (customer_id),
+    INDEX idx_scheduling_order_id (scheduling_order_id),
+    INDEX idx_provider_message_id (provider_message_id)
+);

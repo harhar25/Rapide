@@ -1,10 +1,22 @@
 import React, { useState } from 'react';
+import { fetchJson } from '../utils/fetchJson';
 
 const API_BASE = 'http://localhost:5000/api';
 
 export default function PMSDueList({ customers, loading, onRefresh }) {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [contactModal, setContactModal] = useState(false);
+
+  const getCreatedBy = () => {
+    try {
+      const raw = localStorage.getItem('user');
+      if (!raw) return 'SYSTEM';
+      const user = JSON.parse(raw);
+      return user?.username || user?.name || 'SYSTEM';
+    } catch {
+      return 'SYSTEM';
+    }
+  };
 
   const handleContactCustomer = (customer) => {
     setSelectedCustomer(customer);
@@ -13,18 +25,55 @@ export default function PMSDueList({ customers, loading, onRefresh }) {
 
   const handleContactSubmit = async (method) => {
     try {
-      const response = await fetch(`${API_BASE}/scheduler/log-contact-attempt`, {
+      const createdBy = getCreatedBy();
+
+      if (method === 'sms') {
+        const queueData = await fetchJson(`${API_BASE}/sms/queue-pms-batch`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer_ids: [selectedCustomer.id],
+            created_by: createdBy
+          })
+        });
+
+        if (!queueData || !queueData.success) {
+          alert(`Failed to queue SMS for ${selectedCustomer.name}`);
+          return;
+        }
+
+        const outboxIds = queueData.outbox_ids || [];
+
+        await fetchJson(`${API_BASE}/scheduler/log-contact-attempt`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer_id: selectedCustomer.id,
+            contact_type: 'sms',
+            status: 'attempted',
+            notes: `Queued SMS outbox_ids: ${outboxIds.join(', ')}`,
+            created_by: createdBy
+          })
+        });
+
+        alert(`SMS queued for ${selectedCustomer.name}`);
+        setContactModal(false);
+        setSelectedCustomer(null);
+        return;
+      }
+
+      const responseData = await fetchJson(`${API_BASE}/scheduler/log-contact-attempt`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           customer_id: selectedCustomer.id,
           contact_type: method,
           status: 'attempted',
-          created_by: 'CRO001'
+          created_by: createdBy
         })
       });
 
-      if (response.ok) {
+      if (responseData && responseData.success) {
         alert(`${method} attempt logged for ${selectedCustomer.name}`);
         setContactModal(false);
         setSelectedCustomer(null);
@@ -104,7 +153,7 @@ export default function PMSDueList({ customers, loading, onRefresh }) {
                   className="btn btn-secondary btn-contact"
                   onClick={() => handleContactSubmit('sms')}
                 >
-                  📱 SMS
+                  📱 Queue SMS
                 </button>
                 <button
                   className="btn btn-secondary btn-contact"

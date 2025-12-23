@@ -3,53 +3,56 @@
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+  background: radial-gradient(1200px 600px at 20% 10%, rgba(0, 0, 0, 0.035), transparent 60%),
+              radial-gradient(900px 500px at 90% 30%, rgba(0, 0, 0, 0.025), transparent 60%),
+              #fbfbfa;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
 }
 
 .login-box {
-  background: white;
-  border-radius: 8px;
-  padding: 48px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 52px 52px 44px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.08);
   width: 100%;
   max-width: 480px;
-  border: 1px solid #e9ecef;
+  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .login-box h1 {
-  color: #212529;
+  color: #111;
   margin-bottom: 4px;
-  font-size: 2.2em;
+  font-size: 2.35em;
   text-align: center;
-  font-weight: 300;
-  letter-spacing: -0.5px;
+  font-weight: 350;
+  letter-spacing: -0.8px;
 }
 
 .login-box h1 em {
   font-style: italic;
-  font-weight: 400;
+  font-weight: 450;
 }
 
 .subtitle {
   text-align: center;
-  color: #6c757d;
-  margin-bottom: 32px;
-  font-size: 0.9em;
-  letter-spacing: 0.3px;
+  color: rgba(0, 0, 0, 0.55);
+  margin-bottom: 34px;
+  font-size: 0.92em;
+  letter-spacing: 0.35px;
 }
 
 .section {
-  margin-bottom: 28px;
+  margin-bottom: 22px;
 }
 
 .section label {
   display: block;
   margin-bottom: 10px;
-  font-weight: 500;
-  color: #212529;
-  font-size: 0.85em;
-  letter-spacing: 0.3px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.72);
+  font-size: 0.78em;
+  letter-spacing: 0.55px;
   text-transform: uppercase;
 }
 
@@ -99,59 +102,63 @@
 
 .section input {
   width: 100%;
-  padding: 11px 12px;
-  border: 1px solid #dee2e6;
-  border-radius: 6px;
+  padding: 12px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
   font-size: 0.95em;
   transition: all 0.2s;
   font-family: inherit;
-  background: #f8f9fa;
-  color: #212529;
+  background: rgba(255, 255, 255, 0.75);
+  color: #111;
 }
 
 .section input:focus {
   outline: none;
-  border-color: #212529;
-  box-shadow: 0 0 0 2px rgba(33, 37, 41, 0.08);
-  background: white;
+  border-color: rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.95);
 }
 
 .error-message {
-  background: #f8d7da;
-  color: #721c24;
-  padding: 11px 12px;
-  border-radius: 6px;
+  background: rgba(185, 28, 28, 0.08);
+  color: rgba(120, 20, 20, 0.95);
+  padding: 12px 12px;
+  border-radius: 10px;
   margin-bottom: 16px;
   font-size: 0.85em;
-  border-left: 3px solid #f5c6cb;
+  border: 1px solid rgba(185, 28, 28, 0.12);
 }
 
 .login-btn {
   width: 100%;
-  padding: 11px;
-  background: #212529;
+  padding: 12px;
+  background: #111;
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: 10px;
   font-size: 0.9em;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
   margin-top: 16px;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.35px;
 }
 
 .login-btn:hover {
-  background: #0d0e0f;
+  background: #000;
+}
+
+.login-btn:active {
+  transform: translateY(1px);
 }
 
 .demo-info {
   text-align: center;
   margin-top: 28px;
-  padding-top: 28px;
-  border-top: 1px solid #e9ecef;
-  color: #868e96;
-  font-size: 0.8em;
-  letter-spacing: 0.2px;
+  padding-top: 22px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  color: rgba(0, 0, 0, 0.55);
+  font-size: 0.82em;
+  letter-spacing: 0.25px;
 }
 

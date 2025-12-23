@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { fetchJson } from '../utils/fetchJson';
 
 const API_BASE = 'http://localhost:5000/api';
 
@@ -30,7 +31,7 @@ export default function WalkInRegistration({ onSuccess }) {
     }
 
     try {
-      const response = await fetch(`${API_BASE}/customer/search`, {
+      const data = await fetchJson(`${API_BASE}/customer/search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -38,10 +39,10 @@ export default function WalkInRegistration({ onSuccess }) {
           search_value: searchValue
         })
       });
-
-      const data = await response.json();
       if (data.success) {
         setSearchResults(data.data);
+      } else {
+        alert(data.error || 'Search failed');
       }
     } catch (error) {
       console.error('Error searching customer:', error);
@@ -56,20 +57,22 @@ export default function WalkInRegistration({ onSuccess }) {
   const handleRegisterWalkIn = async (e) => {
     e.preventDefault();
 
-    if (!customerData.name || !customerData.contact_no || !customerData.plate_no) {
-      alert('Please fill in required fields (Name, Contact, Plate No.)');
+    if (!customerData.name || !customerData.contact_no || !customerData.plate_no || !customerData.vehicle_model) {
+      alert('Please fill in required fields (Name, Contact, Plate No., Vehicle Model)');
       return;
     }
 
     try {
-      const response = await fetch(`${API_BASE}/customer/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(customerData)
-      });
+      const attemptRegister = async (payload) => {
+        return fetchJson(`${API_BASE}/customer/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      };
 
-      const data = await response.json();
-      if (data.success) {
+      const data = await attemptRegister(customerData);
+      if (data && data.success) {
         alert(`✓ Walk-in customer #${data.customer_id} registered successfully`);
         setCustomerData({
           name: '',
@@ -84,7 +87,48 @@ export default function WalkInRegistration({ onSuccess }) {
         });
         setSearchMode('search');
         onSuccess();
+        return;
       }
+
+      if (data && data.status === 'warning') {
+        const duplicates = data.duplicates || [];
+        const preview = duplicates
+          .slice(0, 3)
+          .map((d) => `${d.name} (${d.contact_no || 'no contact'})`)
+          .join('\n');
+
+        const confirmCreate = window.confirm(
+          `Similar customer found.\n\n${preview}${duplicates.length > 3 ? '\n...' : ''}\n\nDo you want to FORCE CREATE anyway?`
+        );
+
+        if (!confirmCreate) {
+          return;
+        }
+
+        const forced = await attemptRegister({ ...customerData, force_create: true });
+        if (forced && forced.success) {
+          alert(`✓ Walk-in customer #${forced.customer_id} registered successfully`);
+          setCustomerData({
+            name: '',
+            contact_no: '',
+            plate_no: '',
+            vehicle_model: '',
+            vehicle_year: new Date().getFullYear(),
+            engine_no: '',
+            chassis_no: '',
+            address: '',
+            city: ''
+          });
+          setSearchMode('search');
+          onSuccess();
+          return;
+        }
+
+        alert(forced?.message || forced?.error || 'Force create failed');
+        return;
+      }
+
+      alert(data?.message || data?.error || 'Registration failed');
     } catch (error) {
       console.error('Error registering customer:', error);
     }
@@ -243,6 +287,7 @@ export default function WalkInRegistration({ onSuccess }) {
                   value={customerData.vehicle_model}
                   onChange={(e) => setCustomerData({...customerData, vehicle_model: e.target.value})}
                   placeholder="e.g., Toyota Camry"
+                  required
                 />
               </div>
             </div>

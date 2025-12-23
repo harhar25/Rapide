@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { fetchJson } from '../utils/fetchJson';
 
 const API_BASE = 'http://localhost:5000/api';
 
@@ -28,15 +29,24 @@ export default function AppointmentSetting() {
     }
   };
 
+  const getCreatedBy = () => {
+    try {
+      const raw = localStorage.getItem('user');
+      if (!raw) return 'SYSTEM';
+      const user = JSON.parse(raw);
+      return user?.username || user?.name || 'SYSTEM';
+    } catch {
+      return 'SYSTEM';
+    }
+  };
+
   const checkAvailability = async (date, time) => {
     try {
-      const response = await fetch(`${API_BASE}/scheduler/check-availability`, {
+      const data = await fetchJson(`${API_BASE}/scheduler/check-availability`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date, time })
       });
-
-      const data = await response.json();
       if (data.success) {
         setAvailability(data.data);
       }
@@ -54,17 +64,16 @@ export default function AppointmentSetting() {
     }
 
     try {
-      const response = await fetch(`${API_BASE}/scheduler/create-order`, {
+      const createdBy = getCreatedBy();
+      const data = await fetchJson(`${API_BASE}/scheduler/create-order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
           service_type: 'PMS',
-          created_by: 'CRO001'
+          created_by: createdBy
         })
       });
-
-      const data = await response.json();
       if (data.success) {
         alert(`✓ Scheduling Order #${data.order_id} created successfully`);
         setFormData({

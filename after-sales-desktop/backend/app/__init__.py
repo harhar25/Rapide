@@ -31,6 +31,7 @@ def create_app(config_name='development'):
     from app.routes.security_gate_routes import security_gate_bp
     from app.routes.vehicle_handover_routes import vehicle_handover_bp
     from app.routes.follow_up_routes import follow_up_bp
+    from app.routes.sms_routes import sms_bp
     app.register_blueprint(customer_bp)
     app.register_blueprint(scheduler_bp)
     app.register_blueprint(auth_bp)
@@ -45,6 +46,7 @@ def create_app(config_name='development'):
     app.register_blueprint(security_gate_bp)
     app.register_blueprint(vehicle_handover_bp)
     app.register_blueprint(follow_up_bp)
+    app.register_blueprint(sms_bp)
     
     # Health check endpoint
     @app.route('/api/health', methods=['GET'])

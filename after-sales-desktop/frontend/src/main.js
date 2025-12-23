@@ -1,6 +1,6 @@
 const { app, BrowserWindow, Menu, ipcMain } = require('electron');
 const path = require('path');
-const isDev = require('electron-is-dev');
+const isDev = process.argv.includes('--dev');
 
 let mainWindow;
 
@@ -12,7 +12,7 @@ function createWindow() {
     minWidth: 1200,
     minHeight: 800,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, '../preload.js'),
       contextIsolation: true,
       enableRemoteModule: false,
       nodeIntegration: false

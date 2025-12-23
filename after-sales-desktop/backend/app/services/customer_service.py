@@ -1,8 +1,13 @@
 from database import db
 from datetime import datetime, timedelta
 import logging
+import os
+
+from app.services.sms_service import SmsService
 
 logger = logging.getLogger(__name__)
+
+sms_service = SmsService()
 
 class CustomerService:
     """Customer management service - Enhanced with production-grade features"""
@@ -88,9 +93,10 @@ class CustomerService:
         try:
             # Check for duplicates first
             duplicate_check = self.search_similar_customers(customer_data)
-            if duplicate_check.get('found') and duplicate_check.get('confidence', 0) >= 100:
+            if duplicate_check.get('found') and duplicate_check.get('confidence', 0) >= 100 and not customer_data.get('force_create'):
                 logger.warning(f"Potential duplicate customer detected")
                 return {
+                    'success': False,
                     'status': 'warning',
                     'code': 'CRO-004',
                     'message': 'Similar customer found',
@@ -102,8 +108,8 @@ class CustomerService:
             INSERT INTO customers
             (name, contact_no, plate_no, vehicle_model, vehicle_year, engine_no, 
              chassis_no, customer_type, address, city, email, 
-             service_interval_days, last_service_date, status, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), 'active', NOW())
+             service_interval_days, last_service_date, status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURDATE(), 'active')
             """
             
             params = (
@@ -128,10 +134,21 @@ class CustomerService:
                 return {'success': True, 'customer_id': customer_id}
             else:
                 logger.error(f"Failed to create customer: {result.get('error')}")
-                return {'status': 'error', 'code': 'CRO-005', 'message': 'Failed to register customer'}
+                err = str(result.get('error') or '')
+                if '1062' in err or 'Duplicate entry' in err:
+                    duplicate_check = self.search_similar_customers(customer_data)
+                    return {
+                        'success': False,
+                        'status': 'warning',
+                        'code': 'CRO-004',
+                        'message': 'Duplicate entry (contact number or plate) already exists',
+                        'duplicates': duplicate_check.get('records') if isinstance(duplicate_check, dict) else []
+                    }
+
+                return {'success': False, 'status': 'error', 'code': 'CRO-005', 'message': 'Failed to register customer'}
         except Exception as e:
             logger.error(f"Error creating customer: {str(e)}", exc_info=True)
-            return {'status': 'error', 'code': 'CRO-006', 'message': 'Customer registration failed'}
+            return {'success': False, 'status': 'error', 'code': 'CRO-006', 'message': 'Customer registration failed'}
     
     def get_customer(self, customer_id):
         """Get customer details"""
@@ -410,6 +427,7 @@ class SchedulingService:
     def send_appointment_confirmation(self, scheduling_order_id, confirmation_method='sms'):
         """Send appointment confirmation to customer via SMS or Email"""
         try:
+            branch_name = os.environ.get('BRANCH_NAME', 'Rapide')
             # Get scheduling order details
             order_query = """
             SELECT so.*, c.name, c.contact_no, c.email, c.phone,
@@ -429,21 +447,17 @@ class SchedulingService:
             order = order_result[0]
             
             # Format message
-            message = f"""
-            Your appointment confirmed!
-            Date: {order.get('scheduled_date')}
-            Time: {order.get('scheduled_time')}
-            Bay: {order.get('bay_name', 'TBD')}
-            Technician: {order.get('technician_name', 'Assigned')}
-            Service: {order.get('service_type')}
-            Thank you!
-            """
+            message = (
+                f"{branch_name}: Appointment confirmed. "
+                f"Date {order.get('scheduled_date')} {order.get('scheduled_time')}. "
+                f"Service {order.get('service_type')}."
+            )
             
             # Log confirmation
             log_query = """
             INSERT INTO appointment_confirmations
             (scheduling_order_id, method, contact_info, message, sent_at, status)
-            VALUES (%s, %s, %s, %s, NOW(), 'sent')
+            VALUES (%s, %s, %s, %s, NULL, 'pending')
             """
             log_params = (scheduling_order_id, confirmation_method, 
                          order.get('contact_no') if confirmation_method == 'sms' else order.get('email'),
@@ -451,8 +465,22 @@ class SchedulingService:
             
             log_result = db.execute_update(log_query, log_params)
             if log_result['success']:
-                logger.info(f"Appointment confirmation sent via {confirmation_method}: Order={scheduling_order_id}")
-                return {'success': True, 'confirmation_id': log_result.get('last_id')}
+                confirmation_id = log_result.get('last_id')
+
+                outbox_id = None
+                if confirmation_method == 'sms':
+                    outbox_id = sms_service.queue_sms(
+                        phone=order.get('contact_no'),
+                        message=message,
+                        purpose='APPT_CONFIRM',
+                        scheduled_at=datetime.now(),
+                        created_by='system',
+                        customer_id=order.get('customer_id'),
+                        scheduling_order_id=scheduling_order_id,
+                    )
+
+                logger.info(f"Appointment confirmation queued via {confirmation_method}: Order={scheduling_order_id}")
+                return {'success': True, 'confirmation_id': confirmation_id, 'outbox_id': outbox_id}
             else:
                 logger.error(f"Failed to log appointment confirmation: {log_result.get('error')}")
                 return {'status': 'error', 'code': 'CRO-020', 'message': 'Failed to log confirmation'}
@@ -463,6 +491,7 @@ class SchedulingService:
     def schedule_appointment_reminder(self, scheduling_order_id, reminder_hours_before=24):
         """Schedule automated reminders before appointment"""
         try:
+            branch_name = os.environ.get('BRANCH_NAME', 'Rapide')
             order = db.execute_query(
                 "SELECT scheduled_date, scheduled_time FROM scheduling_orders WHERE id = %s",
                 (scheduling_order_id,)
@@ -472,6 +501,15 @@ class SchedulingService:
             
             order_dt = datetime.combine(order[0]['scheduled_date'], order[0]['scheduled_time'])
             reminder_time = order_dt - timedelta(hours=reminder_hours_before)
+
+            if reminder_hours_before == 24:
+                reminder_type = '24h'
+            elif reminder_hours_before == 2:
+                reminder_type = '2h'
+            elif reminder_hours_before == 0.5:
+                reminder_type = '30m'
+            else:
+                reminder_type = 'custom'
             
             # Insert reminder
             reminder_query = """
@@ -481,9 +519,30 @@ class SchedulingService:
             """
             
             result = db.execute_update(reminder_query, 
-                                     (scheduling_order_id, f'{reminder_hours_before}h', reminder_time))
+                                     (scheduling_order_id, reminder_type, reminder_time))
             
             if result['success']:
+                cust = db.execute_query(
+                    "SELECT c.id as customer_id, c.name, c.contact_no, so.service_type, so.scheduled_date, so.scheduled_time "
+                    "FROM scheduling_orders so JOIN customers c ON so.customer_id = c.id WHERE so.id = %s",
+                    (scheduling_order_id,),
+                )
+                if cust:
+                    customer = cust[0]
+                    message = (
+                        f"{branch_name}: Reminder. Your appointment is on "
+                        f"{customer.get('scheduled_date')} {customer.get('scheduled_time')}."
+                    )
+                    sms_service.queue_sms(
+                        phone=customer.get('contact_no'),
+                        message=message,
+                        purpose='APPT_REMINDER',
+                        scheduled_at=reminder_time,
+                        created_by='system',
+                        customer_id=customer.get('customer_id'),
+                        scheduling_order_id=scheduling_order_id,
+                    )
+
                 logger.info(f"Reminder scheduled for order {scheduling_order_id}: {reminder_hours_before}h before")
                 return {'success': True, 'reminder_id': result.get('last_id')}
             return {'status': 'error', 'code': 'CRO-023', 'message': 'Failed to schedule reminder'}
