@@ -7,7 +7,7 @@ class CarJockeyService:
     def get_pending_movements(self):
         """Get vehicles waiting for movement/parking"""
         query = """
-        SELECT so.id, so.service_order_no, c.name, c.plate_no, 
+        SELECT so.id, CONCAT('SO-', LPAD(so.id, 6, '0')) as service_order_no, c.name, c.plate_no, 
                c.vehicle_model, c.vehicle_year, so.status, so.created_at
         FROM scheduling_orders so
         JOIN customers c ON so.customer_id = c.id
@@ -24,7 +24,7 @@ class CarJockeyService:
     def get_active_movements(self):
         """Get vehicles currently being moved or parked"""
         query = """
-        SELECT vm.id, vm.service_order_id, so.service_order_no, c.name, c.plate_no,
+        SELECT vm.id, vm.service_order_id, CONCAT('SO-', LPAD(so.id, 6, '0')) as service_order_no, c.name, c.plate_no,
                vm.movement_type, vm.from_location, vm.to_location, vm.status, 
                vm.fuel_level_start, vm.fuel_level_end, vm.mileage_start, vm.mileage_end,
                vm.started_at, vm.completed_at
@@ -40,7 +40,7 @@ class CarJockeyService:
     def get_parked_vehicles(self):
         """Get all currently parked vehicles"""
         query = """
-        SELECT pr.id, pr.service_order_id, so.service_order_no, c.name, c.plate_no,
+        SELECT pr.id, pr.service_order_id, CONCAT('SO-', LPAD(so.id, 6, '0')) as service_order_no, c.name, c.plate_no,
                pr.parking_slot, pr.parking_zone, pr.parking_level, pr.parked_at,
                pr.duration_hours, pr.parking_fee, pr.fee_status, pr.status
         FROM parking_records pr
@@ -148,7 +148,7 @@ class CarJockeyService:
         query = """
         SELECT vm.*, 
                CONCAT(p.name, ' (', p.role, ')') as jockey_name,
-               so.service_order_no, c.name as customer_name, c.plate_no,
+               CONCAT('SO-', LPAD(so.id, 6, '0')) as service_order_no, c.name as customer_name, c.plate_no,
                pr.parking_slot, pr.parking_zone, pr.parking_level, pr.fee_status
         FROM vehicle_movements vm
         LEFT JOIN personnel p ON vm.jockey_id = p.id

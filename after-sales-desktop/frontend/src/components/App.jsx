@@ -16,6 +16,7 @@ import VehicleHandoverDashboard from '../pages/VehicleHandoverDashboard';
 import FollowUpDashboard from '../pages/FollowUpDashboard';
 import Login from '../pages/Login';
 import '../styles/app.css';
+import { ADMIN_MODULES } from '../utils/roles';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -62,22 +63,7 @@ export default function App() {
   }
 
   if (user.role === 'admin') {
-    const modules = [
-      { key: 'admin', label: 'Admin' },
-      { key: 'cro', label: 'CRO' },
-      { key: 'advisor', label: 'Service Advisor' },
-      { key: 'controller', label: 'Job Controller' },
-      { key: 'foreman', label: 'Foreman QC' },
-      { key: 'wrapup', label: 'Job Wrap-up' },
-      { key: 'jockey', label: 'Car Jockey' },
-      { key: 'warehouse', label: 'Warehouse' },
-      { key: 'billing', label: 'Billing' },
-      { key: 'cashier', label: 'Cashier' },
-      { key: 'security_gate', label: 'Security Gate' },
-      { key: 'vehicle_handover', label: 'Vehicle Handover' },
-      { key: 'follow_up', label: 'Follow Up' },
-      { key: 'manager', label: 'Service Manager' }
-    ];
+    const modules = ADMIN_MODULES;
 
     const onAdminModuleChange = (e) => {
       const next = e.target.value;

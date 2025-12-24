@@ -57,7 +57,7 @@ class CashierService:
     def get_pending_invoices_for_payment(self):
         """Get invoices ready for payment"""
         query = """
-        SELECT i.id, i.invoice_number, c.name, c.plate_no, so.service_order_no,
+        SELECT i.id, i.invoice_number, c.name, c.plate_no, CONCAT('SO-', LPAD(so.id, 6, '0')) as service_order_no,
                i.total_amount, COALESCE(SUM(pt.amount), 0) as paid_amount,
                i.total_amount - COALESCE(SUM(pt.amount), 0) as remaining_balance,
                i.due_date

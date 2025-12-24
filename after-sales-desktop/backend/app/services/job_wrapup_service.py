@@ -7,7 +7,7 @@ class JobWrapupService:
     def get_jobs_ready_for_wrapup(self):
         """Get jobs that completed QC and are ready for wrap-up"""
         query = """
-        SELECT so.id, so.service_order_no, c.name, c.plate_no, 
+        SELECT so.id, CONCAT('SO-', LPAD(so.id, 6, '0')) as service_order_no, c.name, c.plate_no, 
                ta.technician_id, t.name as tech_name, qi.overall_status, so.created_at
         FROM scheduling_orders so
         JOIN customers c ON so.customer_id = c.id
@@ -25,7 +25,7 @@ class JobWrapupService:
     def get_active_wrapups(self):
         """Get active job wrap-ups in progress"""
         query = """
-        SELECT jw.id, jw.service_order_id, so.service_order_no, c.name, 
+        SELECT jw.id, jw.service_order_id, CONCAT('SO-', LPAD(so.id, 6, '0')) as service_order_no, c.name, 
                jw.final_status, jw.total_labor_hours, jw.created_at
         FROM job_wrapups jw
         JOIN scheduling_orders so ON jw.service_order_id = so.id

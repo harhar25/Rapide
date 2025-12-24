@@ -7,7 +7,7 @@ class ForemanQCService:
     def get_pending_qc_jobs(self):
         """Get service orders pending quality inspection"""
         query = """
-        SELECT so.id, so.service_order_no, c.name, c.plate_no, so.created_at
+        SELECT so.id, CONCAT('SO-', LPAD(so.id, 6, '0')) as service_order_no, c.name, c.plate_no, so.created_at
         FROM scheduling_orders so
         JOIN customers c ON so.customer_id = c.id
         WHERE so.status = 'job-completed' AND so.id NOT IN (
@@ -21,7 +21,7 @@ class ForemanQCService:
     def get_active_qc_inspections(self):
         """Get active QC inspections in progress"""
         query = """
-        SELECT qi.id, qi.service_order_id, so.service_order_no, c.name, qi.overall_status, 
+        SELECT qi.id, qi.service_order_id, CONCAT('SO-', LPAD(so.id, 6, '0')) as service_order_no, c.name, qi.overall_status, 
                qi.inspection_date, qi.created_at
         FROM qc_inspections qi
         JOIN scheduling_orders so ON qi.service_order_id = so.id

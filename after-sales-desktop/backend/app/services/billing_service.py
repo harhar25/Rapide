@@ -154,7 +154,7 @@ class BillingService:
     def get_pending_invoices(self):
         """Get all pending/draft invoices"""
         query = """
-        SELECT i.id, i.invoice_number, c.name, c.plate_no, so.service_order_no,
+        SELECT i.id, i.invoice_number, c.name, c.plate_no, CONCAT('SO-', LPAD(so.id, 6, '0')) as service_order_no,
                i.total_amount, i.status, i.invoice_date, i.due_date
         FROM invoices i
         JOIN customers c ON i.customer_id = c.id
@@ -168,7 +168,7 @@ class BillingService:
     def get_paid_invoices(self):
         """Get all paid invoices"""
         query = """
-        SELECT i.id, i.invoice_number, c.name, c.plate_no, so.service_order_no,
+        SELECT i.id, i.invoice_number, c.name, c.plate_no, CONCAT('SO-', LPAD(so.id, 6, '0')) as service_order_no,
                i.total_amount, i.status, i.invoice_date
         FROM invoices i
         JOIN customers c ON i.customer_id = c.id

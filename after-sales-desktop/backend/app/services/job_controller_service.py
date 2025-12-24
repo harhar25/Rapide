@@ -21,6 +21,30 @@ class JobControllerService:
             )
             """
         )
+
+    def _ensure_technicians_from_personnel(self):
+        db.execute_update(
+            """
+            INSERT INTO technicians (name, employee_id, email, status, hire_date, created_at)
+            SELECT p.name, p.username, p.email, 'active', NULL, NOW()
+            FROM personnel p
+            WHERE p.role = 'technician' AND p.status = 'active'
+              AND NOT EXISTS (
+                SELECT 1 FROM technicians t WHERE t.employee_id = p.username
+              )
+            """
+        )
+
+        db.execute_update(
+            """
+            UPDATE technicians t
+            JOIN personnel p ON p.username = t.employee_id
+            SET t.status = CASE WHEN p.status = 'active' THEN 'active' ELSE 'inactive' END,
+                t.name = p.name,
+                t.email = COALESCE(p.email, t.email)
+            WHERE p.role = 'technician'
+            """
+        )
     
     # ==================== VIEW SERVICE ORDERS ====================
     
@@ -169,6 +193,7 @@ class JobControllerService:
     
     def get_available_technicians(self):
         """Get list of available technicians"""
+        self._ensure_technicians_from_personnel()
         query = """
         SELECT t.id, t.name, t.specialization, t.status,
                COUNT(DISTINCT ta.service_order_id) as current_jobs,

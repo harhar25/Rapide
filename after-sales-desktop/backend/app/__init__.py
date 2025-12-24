@@ -16,6 +16,7 @@ def create_app(config_name='development'):
     
     # Initialize database connection
     db.connect()
+    db.ensure_core_tables()
     
     # Register blueprints
     from app.routes import customer_bp, scheduler_bp

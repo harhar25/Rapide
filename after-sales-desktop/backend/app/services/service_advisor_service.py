@@ -461,8 +461,9 @@ class ServiceAdvisorService:
                so.service_type, so.check_in_time, b.bay_name, t.name as technician_name
         FROM service_orders so
         JOIN customers c ON so.customer_id = c.id
-        LEFT JOIN service_bays b ON so.id = b.id
-        LEFT JOIN technicians t ON so.id = t.id
+        LEFT JOIN scheduling_orders sch ON so.scheduling_order_id = sch.id
+        LEFT JOIN service_bays b ON sch.bay_id = b.id
+        LEFT JOIN technicians t ON sch.technician_id = t.id
         WHERE so.id = %s
         """
         result = db.execute_query(query, (service_order_id,))

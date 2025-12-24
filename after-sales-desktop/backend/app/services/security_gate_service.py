@@ -44,7 +44,7 @@ class SecurityGateService:
             date = datetime.now().date()
         
         query = """
-        SELECT gal.id, gal.service_order_id, so.service_order_no, gal.vehicle_plate_no,
+        SELECT gal.id, gal.service_order_id, CONCAT('SO-', LPAD(so.id, 6, '0')) as service_order_no, gal.vehicle_plate_no,
                gal.customer_name, gal.access_time, CONCAT(p.name, ' (', p.role, ')') as operator,
                gal.vehicle_condition, gal.mileage_at_access, gal.is_authorized
         FROM gate_access_logs gal
@@ -62,7 +62,7 @@ class SecurityGateService:
             date = datetime.now().date()
         
         query = """
-        SELECT gal.id, gal.service_order_id, so.service_order_no, gal.vehicle_plate_no,
+        SELECT gal.id, gal.service_order_id, CONCAT('SO-', LPAD(so.id, 6, '0')) as service_order_no, gal.vehicle_plate_no,
                gal.customer_name, gal.access_time, CONCAT(p.name, ' (', p.role, ')') as operator,
                gal.mileage_at_access, gal.vehicle_condition
         FROM gate_access_logs gal

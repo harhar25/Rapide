@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/admin-dashboard.css';
 import { fetchJson } from '../utils/fetchJson';
+import { PERSONNEL_ROLES, getRoleLabel } from '../utils/roles';
 
 const AdminDashboard = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -16,7 +17,7 @@ const AdminDashboard = ({ user, onLogout }) => {
   });
   const [message, setMessage] = useState('');
 
-  const roles = ['cro', 'technician', 'warehouse', 'manager', 'advisor'];
+  const roles = PERSONNEL_ROLES;
 
   useEffect(() => {
     if (activeTab === 'personnel') {
@@ -79,7 +80,16 @@ const AdminDashboard = ({ user, onLogout }) => {
     technician: '#ef4444',
     warehouse: '#f59e0b',
     manager: '#8b5cf6',
-    advisor: '#10b981'
+    advisor: '#10b981',
+    controller: '#2563eb',
+    foreman: '#0ea5e9',
+    wrapup: '#22c55e',
+    jockey: '#eab308',
+    billing: '#a855f7',
+    cashier: '#f97316',
+    security_gate: '#14b8a6',
+    vehicle_handover: '#64748b',
+    follow_up: '#ec4899'
   };
 
   return (
@@ -206,7 +216,7 @@ const AdminDashboard = ({ user, onLogout }) => {
                     >
                       {roles.map(role => (
                         <option key={role} value={role}>
-                          {role.charAt(0).toUpperCase() + role.slice(1)}
+                          {getRoleLabel(role)}
                         </option>
                       ))}
                     </select>
