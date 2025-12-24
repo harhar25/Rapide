@@ -3,6 +3,17 @@ from datetime import datetime
 
 class WarehouseService:
     """Warehouse product and inventory management service"""
+
+    def _to_int(self, value, field_name, *, min_value=None):
+        if value is None or value == '':
+            raise ValueError(f"{field_name} is required")
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            raise ValueError(f"{field_name} must be an integer")
+        if min_value is not None and parsed < min_value:
+            raise ValueError(f"{field_name} must be at least {min_value}")
+        return parsed
     
     def get_all_products(self):
         """Get all warehouse products - returns consistent 10-column tuple: (id, code, name, category, price, qty, reorder_level, supplier, description, status)"""
@@ -35,8 +46,8 @@ class WarehouseService:
         """Create new warehouse product"""
         query = """
         INSERT INTO warehouse_products 
-        (product_code, product_name, category, unit_price, reorder_level, supplier, description)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        (product_code, product_name, category, unit_price, quantity_in_stock, reorder_level, supplier, description, created_by)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         
         params = (
@@ -44,9 +55,11 @@ class WarehouseService:
             product_data.get('product_name'),
             product_data.get('category'),
             product_data.get('unit_price'),
+            self._to_int(product_data.get('quantity_in_stock'), 'quantity_in_stock', min_value=0),
             product_data.get('reorder_level', 10),
             product_data.get('supplier', ''),
-            product_data.get('description', '')
+            product_data.get('description', ''),
+            product_data.get('created_by', 'SYSTEM')
         )
         
         result = db.execute_update(query, params)
@@ -83,6 +96,8 @@ class WarehouseService:
     
     def add_inventory(self, product_id, quantity, reference_no, reference_type, notes, created_by):
         """Add inventory (stock in) - returns history_id or raises error"""
+        product_id = self._to_int(product_id, 'product_id', min_value=1)
+        quantity = self._to_int(quantity, 'quantity', min_value=1)
         # Get current quantity
         current = self.get_product_by_id(product_id)
         if not current:
@@ -109,6 +124,8 @@ class WarehouseService:
     
     def remove_inventory(self, product_id, quantity, reference_no, reference_type, notes, created_by):
         """Remove inventory (stock out) - returns history_id or raises error"""
+        product_id = self._to_int(product_id, 'product_id', min_value=1)
+        quantity = self._to_int(quantity, 'quantity', min_value=1)
         # Get current quantity
         current = self.get_product_by_id(product_id)
         if not current:

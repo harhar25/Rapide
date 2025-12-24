@@ -14,6 +14,7 @@ export default function WalkInRegistration({ onSuccess }) {
     plate_no: '',
     vehicle_model: '',
     vehicle_year: new Date().getFullYear(),
+    email: '',
     engine_no: '',
     chassis_no: '',
     address: '',
@@ -80,6 +81,7 @@ export default function WalkInRegistration({ onSuccess }) {
           plate_no: '',
           vehicle_model: '',
           vehicle_year: new Date().getFullYear(),
+          email: '',
           engine_no: '',
           chassis_no: '',
           address: '',
@@ -114,6 +116,7 @@ export default function WalkInRegistration({ onSuccess }) {
             plate_no: '',
             vehicle_model: '',
             vehicle_year: new Date().getFullYear(),
+            email: '',
             engine_no: '',
             chassis_no: '',
             address: '',
@@ -299,7 +302,7 @@ export default function WalkInRegistration({ onSuccess }) {
                   type="number"
                   className="form-input"
                   value={customerData.vehicle_year}
-                  onChange={(e) => setCustomerData({...customerData, vehicle_year: e.target.value})}
+                  onChange={(e) => setCustomerData({ ...customerData, vehicle_year: Number(e.target.value) })}
                   min="1990"
                   max={new Date().getFullYear() + 1}
                 />
@@ -311,7 +314,7 @@ export default function WalkInRegistration({ onSuccess }) {
                   type="email"
                   className="form-input"
                   value={customerData.email}
-                  onChange={(e) => setCustomerData({...customerData, email: e.target.value})}
+                  onChange={(e) => setCustomerData({ ...customerData, email: e.target.value })}
                   placeholder="email@example.com"
                 />
               </div>

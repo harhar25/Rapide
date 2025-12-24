@@ -1,6 +1,30 @@
 from flask import Blueprint, jsonify, request
 from app.services.warehouse_service import WarehouseService
 
+
+def _parse_int(value, field_name, *, min_value=None):
+    if value is None or value == '':
+        raise ValueError(f"{field_name} is required")
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"{field_name} must be an integer")
+    if min_value is not None and parsed < min_value:
+        raise ValueError(f"{field_name} must be at least {min_value}")
+    return parsed
+
+
+def _parse_float(value, field_name, *, min_value=None):
+    if value is None or value == '':
+        raise ValueError(f"{field_name} is required")
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"{field_name} must be a number")
+    if min_value is not None and parsed < min_value:
+        raise ValueError(f"{field_name} must be at least {min_value}")
+    return parsed
+
 warehouse_bp = Blueprint('warehouse', __name__, url_prefix='/api/warehouse')
 warehouse_service = WarehouseService()
 
@@ -38,10 +62,15 @@ def create_product():
     try:
         data = request.json
         
-        required_fields = ['product_code', 'product_name', 'category', 'unit_price']
+        required_fields = ['product_code', 'product_name', 'category', 'unit_price', 'quantity_in_stock']
         for field in required_fields:
             if not data.get(field):
                 return jsonify({'success': False, 'error': f'{field} is required'}), 400
+
+        data['unit_price'] = _parse_float(data.get('unit_price'), 'unit_price', min_value=0)
+        data['quantity_in_stock'] = _parse_int(data.get('quantity_in_stock'), 'quantity_in_stock', min_value=0)
+        if data.get('reorder_level') is not None and data.get('reorder_level') != '':
+            data['reorder_level'] = _parse_int(data.get('reorder_level'), 'reorder_level', min_value=0)
         
         product_id = warehouse_service.create_product(data)
         
@@ -98,10 +127,13 @@ def add_stock():
         for field in required_fields:
             if not data.get(field):
                 return jsonify({'success': False, 'error': f'{field} is required'}), 400
+
+        product_id = _parse_int(data.get('product_id'), 'product_id', min_value=1)
+        quantity = _parse_int(data.get('quantity'), 'quantity', min_value=1)
         
         history_id = warehouse_service.add_inventory(
-            data.get('product_id'),
-            data.get('quantity'),
+            product_id,
+            quantity,
             data.get('reference_no'),
             data.get('reference_type'),
             data.get('notes', ''),
@@ -129,10 +161,13 @@ def remove_stock():
         for field in required_fields:
             if not data.get(field):
                 return jsonify({'success': False, 'error': f'{field} is required'}), 400
+
+        product_id = _parse_int(data.get('product_id'), 'product_id', min_value=1)
+        quantity = _parse_int(data.get('quantity'), 'quantity', min_value=1)
         
         history_id = warehouse_service.remove_inventory(
-            data.get('product_id'),
-            data.get('quantity'),
+            product_id,
+            quantity,
             data.get('reference_no'),
             data.get('reference_type'),
             data.get('notes', ''),

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/warehouse-dashboard.css';
+import { fetchJson } from '../utils/fetchJson';
 
 const WarehouseDashboard = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = React.useState('inventory');
@@ -20,6 +21,7 @@ const WarehouseDashboard = ({ user, onLogout }) => {
     product_name: '',
     category: '',
     unit_price: '',
+    quantity_in_stock: '',
     reorder_level: 10,
     supplier: '',
     description: ''
@@ -33,7 +35,7 @@ const WarehouseDashboard = ({ user, onLogout }) => {
     notes: ''
   });
 
-  const API_BASE = 'http://localhost:5000/api/warehouse';
+  const API_BASE = '/api/warehouse';
 
   /**
    * HELPER: Load product form data from selected product tuple
@@ -46,6 +48,7 @@ const WarehouseDashboard = ({ user, onLogout }) => {
       product_name: product[2],
       category: product[3],
       unit_price: product[4],
+      quantity_in_stock: product[5],
       reorder_level: product[6],
       supplier: product[7],
       description: product[8]
@@ -61,8 +64,7 @@ const WarehouseDashboard = ({ user, onLogout }) => {
   const loadProducts = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/products`);
-      const data = await response.json();
+      const data = await fetchJson(`${API_BASE}/products`);
       if (data.success) {
         setProducts(data.data || []);
       }
@@ -74,8 +76,7 @@ const WarehouseDashboard = ({ user, onLogout }) => {
 
   const loadSummary = async () => {
     try {
-      const response = await fetch(`${API_BASE}/summary`);
-      const data = await response.json();
+      const data = await fetchJson(`${API_BASE}/summary`);
       if (data.success) {
         setSummary(data.data);
       }
@@ -86,8 +87,7 @@ const WarehouseDashboard = ({ user, onLogout }) => {
 
   const loadHistory = async () => {
     try {
-      const response = await fetch(`${API_BASE}/inventory/history?limit=50`);
-      const data = await response.json();
+      const data = await fetchJson(`${API_BASE}/inventory/history?limit=50`);
       if (data.success) {
         setHistory(data.data || []);
       }
@@ -99,12 +99,17 @@ const WarehouseDashboard = ({ user, onLogout }) => {
   const handleAddProduct = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`${API_BASE}/products`, {
+      const data = await fetchJson(`${API_BASE}/products`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...productForm, created_by: user.name })
+        body: JSON.stringify({
+          ...productForm,
+          unit_price: productForm.unit_price === '' ? '' : parseFloat(productForm.unit_price),
+          quantity_in_stock: productForm.quantity_in_stock === '' ? '' : parseInt(productForm.quantity_in_stock, 10),
+          reorder_level: productForm.reorder_level === '' ? '' : parseInt(productForm.reorder_level, 10),
+          created_by: user.name
+        })
       });
-      const data = await response.json();
       if (data.success) {
         loadProducts();
         setProductForm({
@@ -112,6 +117,7 @@ const WarehouseDashboard = ({ user, onLogout }) => {
           product_name: '',
           category: '',
           unit_price: '',
+          quantity_in_stock: '',
           reorder_level: 10,
           supplier: '',
           description: ''
@@ -126,12 +132,11 @@ const WarehouseDashboard = ({ user, onLogout }) => {
   const handleUpdateProduct = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`${API_BASE}/products/${selectedProduct[0]}`, {
+      const data = await fetchJson(`${API_BASE}/products/${selectedProduct[0]}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(productForm)
       });
-      const data = await response.json();
       if (data.success) {
         loadProducts();
         setShowEditProduct(false);
@@ -147,12 +152,20 @@ const WarehouseDashboard = ({ user, onLogout }) => {
     setErrorMessage('');
     const endpoint = inventoryAction === 'in' ? '/inventory/add' : '/inventory/remove';
     try {
-      const response = await fetch(`${API_BASE}${endpoint}`, {
+      if (!inventoryForm.quantity || parseInt(inventoryForm.quantity, 10) <= 0) {
+        setErrorMessage('Quantity is required and must be greater than 0');
+        return;
+      }
+      const data = await fetchJson(`${API_BASE}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...inventoryForm, created_by: user.name })
+        body: JSON.stringify({
+          ...inventoryForm,
+          product_id: inventoryForm.product_id === '' ? '' : parseInt(inventoryForm.product_id, 10),
+          quantity: inventoryForm.quantity === '' ? '' : parseInt(inventoryForm.quantity, 10),
+          created_by: user.name
+        })
       });
-      const data = await response.json();
       if (data.success) {
         loadProducts();
         loadSummary();
@@ -246,15 +259,17 @@ const WarehouseDashboard = ({ user, onLogout }) => {
                 <h3>{inventoryAction === 'in' ? 'Add Stock' : 'Remove Stock'}</h3>
                 {errorMessage && <div className="error-message">{errorMessage}</div>}
                 <div className="form-group">
-                  <label>Transaction Type</label>
-                  <select value={inventoryAction} onChange={(e) => setInventoryAction(e.target.value)}>
+                  <label htmlFor="wh_inventory_action">Transaction Type</label>
+                  <select id="wh_inventory_action" name="inventory_action" value={inventoryAction} onChange={(e) => setInventoryAction(e.target.value)}>
                     <option value="in">Stock In</option>
                     <option value="out">Stock Out</option>
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Product</label>
+                  <label htmlFor="wh_inventory_product_id">Product</label>
                   <select 
+                    id="wh_inventory_product_id"
+                    name="product_id"
                     value={inventoryForm.product_id}
                     onChange={(e) => setInventoryForm({...inventoryForm, product_id: e.target.value})}
                     required
@@ -266,8 +281,10 @@ const WarehouseDashboard = ({ user, onLogout }) => {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Quantity</label>
+                  <label htmlFor="wh_inventory_quantity">Quantity</label>
                   <input 
+                    id="wh_inventory_quantity"
+                    name="quantity"
                     type="number" 
                     value={inventoryForm.quantity}
                     onChange={(e) => setInventoryForm({...inventoryForm, quantity: e.target.value})}
@@ -275,8 +292,10 @@ const WarehouseDashboard = ({ user, onLogout }) => {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Reference No</label>
+                  <label htmlFor="wh_inventory_reference_no">Reference No</label>
                   <input 
+                    id="wh_inventory_reference_no"
+                    name="reference_no"
                     type="text" 
                     value={inventoryForm.reference_no}
                     onChange={(e) => setInventoryForm({...inventoryForm, reference_no: e.target.value})}
@@ -284,8 +303,10 @@ const WarehouseDashboard = ({ user, onLogout }) => {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Reference Type</label>
+                  <label htmlFor="wh_inventory_reference_type">Reference Type</label>
                   <select 
+                    id="wh_inventory_reference_type"
+                    name="reference_type"
                     value={inventoryForm.reference_type}
                     onChange={(e) => setInventoryForm({...inventoryForm, reference_type: e.target.value})}
                   >
@@ -297,8 +318,10 @@ const WarehouseDashboard = ({ user, onLogout }) => {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Notes</label>
+                  <label htmlFor="wh_inventory_notes">Notes</label>
                   <textarea 
+                    id="wh_inventory_notes"
+                    name="notes"
                     value={inventoryForm.notes}
                     onChange={(e) => setInventoryForm({...inventoryForm, notes: e.target.value})}
                   />
@@ -397,8 +420,10 @@ const WarehouseDashboard = ({ user, onLogout }) => {
               <form onSubmit={handleAddProduct} className="form-modal">
                 <h3>Add New Product</h3>
                 <div className="form-group">
-                  <label>Product Code</label>
+                  <label htmlFor="wh_product_code">Product Code</label>
                   <input 
+                    id="wh_product_code"
+                    name="product_code"
                     type="text" 
                     value={productForm.product_code}
                     onChange={(e) => setProductForm({...productForm, product_code: e.target.value})}
@@ -406,8 +431,10 @@ const WarehouseDashboard = ({ user, onLogout }) => {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Product Name</label>
+                  <label htmlFor="wh_product_name">Product Name</label>
                   <input 
+                    id="wh_product_name"
+                    name="product_name"
                     type="text" 
                     value={productForm.product_name}
                     onChange={(e) => setProductForm({...productForm, product_name: e.target.value})}
@@ -415,8 +442,10 @@ const WarehouseDashboard = ({ user, onLogout }) => {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Category</label>
+                  <label htmlFor="wh_category">Category</label>
                   <input 
+                    id="wh_category"
+                    name="category"
                     type="text" 
                     value={productForm.category}
                     onChange={(e) => setProductForm({...productForm, category: e.target.value})}
@@ -424,8 +453,10 @@ const WarehouseDashboard = ({ user, onLogout }) => {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Unit Price</label>
+                  <label htmlFor="wh_unit_price">Unit Price</label>
                   <input 
+                    id="wh_unit_price"
+                    name="unit_price"
                     type="number" 
                     step="0.01"
                     value={productForm.unit_price}
@@ -434,24 +465,42 @@ const WarehouseDashboard = ({ user, onLogout }) => {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Reorder Level</label>
+                  <label htmlFor="wh_quantity_in_stock">Quantity</label>
+                  <input
+                    id="wh_quantity_in_stock"
+                    name="quantity_in_stock"
+                    type="number"
+                    min="0"
+                    value={productForm.quantity_in_stock}
+                    onChange={(e) => setProductForm({ ...productForm, quantity_in_stock: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="wh_reorder_level">Reorder Level</label>
                   <input 
+                    id="wh_reorder_level"
+                    name="reorder_level"
                     type="number" 
                     value={productForm.reorder_level}
                     onChange={(e) => setProductForm({...productForm, reorder_level: e.target.value})}
                   />
                 </div>
                 <div className="form-group">
-                  <label>Supplier</label>
+                  <label htmlFor="wh_supplier">Supplier</label>
                   <input 
+                    id="wh_supplier"
+                    name="supplier"
                     type="text" 
                     value={productForm.supplier}
                     onChange={(e) => setProductForm({...productForm, supplier: e.target.value})}
                   />
                 </div>
                 <div className="form-group">
-                  <label>Description</label>
+                  <label htmlFor="wh_description">Description</label>
                   <textarea 
+                    id="wh_description"
+                    name="description"
                     value={productForm.description}
                     onChange={(e) => setProductForm({...productForm, description: e.target.value})}
                   />
@@ -467,8 +516,10 @@ const WarehouseDashboard = ({ user, onLogout }) => {
               <form onSubmit={handleUpdateProduct} className="form-modal">
                 <h3>Edit Product</h3>
                 <div className="form-group">
-                  <label>Product Code</label>
+                  <label htmlFor="wh_edit_product_code">Product Code</label>
                   <input 
+                    id="wh_edit_product_code"
+                    name="product_code"
                     type="text" 
                     value={productForm.product_code}
                     onChange={(e) => setProductForm({...productForm, product_code: e.target.value})}
@@ -476,8 +527,10 @@ const WarehouseDashboard = ({ user, onLogout }) => {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Product Name</label>
+                  <label htmlFor="wh_edit_product_name">Product Name</label>
                   <input 
+                    id="wh_edit_product_name"
+                    name="product_name"
                     type="text" 
                     value={productForm.product_name}
                     onChange={(e) => setProductForm({...productForm, product_name: e.target.value})}
@@ -485,8 +538,10 @@ const WarehouseDashboard = ({ user, onLogout }) => {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Category</label>
+                  <label htmlFor="wh_edit_category">Category</label>
                   <input 
+                    id="wh_edit_category"
+                    name="category"
                     type="text" 
                     value={productForm.category}
                     onChange={(e) => setProductForm({...productForm, category: e.target.value})}
@@ -494,8 +549,10 @@ const WarehouseDashboard = ({ user, onLogout }) => {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Unit Price</label>
+                  <label htmlFor="wh_edit_unit_price">Unit Price</label>
                   <input 
+                    id="wh_edit_unit_price"
+                    name="unit_price"
                     type="number" 
                     step="0.01"
                     value={productForm.unit_price}
@@ -504,24 +561,30 @@ const WarehouseDashboard = ({ user, onLogout }) => {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Reorder Level</label>
+                  <label htmlFor="wh_edit_reorder_level">Reorder Level</label>
                   <input 
+                    id="wh_edit_reorder_level"
+                    name="reorder_level"
                     type="number" 
                     value={productForm.reorder_level}
                     onChange={(e) => setProductForm({...productForm, reorder_level: e.target.value})}
                   />
                 </div>
                 <div className="form-group">
-                  <label>Supplier</label>
+                  <label htmlFor="wh_edit_supplier">Supplier</label>
                   <input 
+                    id="wh_edit_supplier"
+                    name="supplier"
                     type="text" 
                     value={productForm.supplier}
                     onChange={(e) => setProductForm({...productForm, supplier: e.target.value})}
                   />
                 </div>
                 <div className="form-group">
-                  <label>Description</label>
+                  <label htmlFor="wh_edit_description">Description</label>
                   <textarea 
+                    id="wh_edit_description"
+                    name="description"
                     value={productForm.description}
                     onChange={(e) => setProductForm({...productForm, description: e.target.value})}
                   />

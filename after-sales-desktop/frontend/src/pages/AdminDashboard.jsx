@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/admin-dashboard.css';
+import { fetchJson } from '../utils/fetchJson';
 
 const AdminDashboard = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -25,14 +26,12 @@ const AdminDashboard = ({ user, onLogout }) => {
 
   const loadPersonnel = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/auth/admin/personnel-list', {
+      const data = await fetchJson('/api/auth/admin/personnel-list', {
         headers: {
           'X-Admin-Username': user.username,
           'X-Admin-Password': localStorage.getItem('admin_password')
         }
       });
-
-      const data = await response.json();
       if (data.success) {
         setPersonnel(data.personnel || []);
       }
@@ -53,7 +52,7 @@ const AdminDashboard = ({ user, onLogout }) => {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/admin/register-personnel', {
+      const data = await fetchJson('/api/auth/admin/register-personnel', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -62,8 +61,6 @@ const AdminDashboard = ({ user, onLogout }) => {
         },
         body: JSON.stringify(formData)
       });
-
-      const data = await response.json();
       if (data.success) {
         setMessage('✓ Personnel registered successfully');
         setFormData({ username: '', password: '', name: '', role: 'cro', email: '' });

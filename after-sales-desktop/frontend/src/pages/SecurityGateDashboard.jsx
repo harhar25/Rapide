@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/security-gate-dashboard.css';
+import { fetchJson } from '../utils/fetchJson';
 
 export default function SecurityGateDashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('entries');
   const [entryLogs, setEntryLogs] = useState([]);
   const [exitLogs, setExitLogs] = useState([]);
   const [activeBadges, setActiveBadges] = useState([]);
-  const [newBadge, setNewBadge] = useState({ service_order_id: '', vehicle_plate: '', customer_name: '', badge_days: 1 });
+  const [newBadge, setNewBadge] = useState({ service_order_id: '', vehicle_plate: '', customer_name: '', customer_id: '', badge_days: 1 });
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState(null);
 
@@ -21,24 +22,20 @@ export default function SecurityGateDashboard({ user, onLogout }) {
       setLoading(true);
       
       // Fetch entry logs
-      const entryRes = await fetch('/api/security-gate/logs/entries?date_from=' + new Date().toISOString().split('T')[0]);
-      const entryData = await entryRes.json();
-      if (entryData.status === 'success') setEntryLogs(entryData.logs || []);
+      const entryData = await fetchJson('/api/security-gate/logs/entries?date=' + new Date().toISOString().split('T')[0]);
+      if (entryData.success) setEntryLogs(entryData.data || []);
       
       // Fetch exit logs
-      const exitRes = await fetch('/api/security-gate/logs/exits?date_from=' + new Date().toISOString().split('T')[0]);
-      const exitData = await exitRes.json();
-      if (exitData.status === 'success') setExitLogs(exitData.logs || []);
+      const exitData = await fetchJson('/api/security-gate/logs/exits?date=' + new Date().toISOString().split('T')[0]);
+      if (exitData.success) setExitLogs(exitData.data || []);
       
       // Fetch active badges
-      const badgeRes = await fetch('/api/security-gate/badges/active');
-      const badgeData = await badgeRes.json();
-      if (badgeData.status === 'success') setActiveBadges(badgeData.badges || []);
+      const badgeData = await fetchJson('/api/security-gate/badges/active');
+      if (badgeData.success) setActiveBadges(badgeData.data || badgeData.badges || []);
       
       // Fetch summary
-      const summaryRes = await fetch('/api/security-gate/summary');
-      const summaryData = await summaryRes.json();
-      if (summaryData.status === 'success') setSummary(summaryData.summary || {});
+      const summaryData = await fetchJson('/api/security-gate/summary');
+      if (summaryData.success) setSummary(summaryData.data || summaryData.summary || {});
       
       setLoading(false);
     } catch (error) {
@@ -54,20 +51,22 @@ export default function SecurityGateDashboard({ user, onLogout }) {
     }
 
     try {
-      const res = await fetch('/api/security-gate/badges/issue', {
+      const res = await fetchJson('/api/security-gate/badges/issue', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           service_order_id: newBadge.service_order_id,
           vehicle_plate_no: newBadge.vehicle_plate,
           customer_name: newBadge.customer_name,
-          badge_days: newBadge.badge_days
+          customer_id: newBadge.customer_id,
+          issued_by: user.id,
+          expiry_days: newBadge.badge_days
         })
       });
 
-      if (res.ok) {
+      if (res.success) {
         alert('Badge issued successfully');
-        setNewBadge({ service_order_id: '', vehicle_plate: '', customer_name: '', badge_days: 1 });
+        setNewBadge({ service_order_id: '', vehicle_plate: '', customer_name: '', customer_id: '', badge_days: 1 });
         fetchData();
       } else {
         alert('Error issuing badge');
@@ -81,8 +80,8 @@ export default function SecurityGateDashboard({ user, onLogout }) {
   const handleRevokeBadge = async (badgeId) => {
     if (window.confirm('Revoke this badge?')) {
       try {
-        const res = await fetch(`/api/security-gate/badges/${badgeId}/revoke`, { method: 'POST' });
-        if (res.ok) {
+        const res = await fetchJson(`/api/security-gate/badges/${badgeId}/revoke`, { method: 'POST' });
+        if (res.success) {
           alert('Badge revoked successfully');
           fetchData();
         }
@@ -97,17 +96,19 @@ export default function SecurityGateDashboard({ user, onLogout }) {
     if (!vehiclePlate) return;
 
     try {
-      const res = await fetch('/api/security-gate/access/log', {
+      const res = await fetchJson('/api/security-gate/access/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          service_order_id: null,
           vehicle_plate_no: vehiclePlate,
+          customer_name: null,
           access_type: accessType,
           gate_operator_id: user.id
         })
       });
 
-      if (res.ok) {
+      if (res.success) {
         alert(`${accessType} logged successfully`);
         fetchData();
       }
@@ -273,8 +274,10 @@ export default function SecurityGateDashboard({ user, onLogout }) {
             <h2>Issue New Vehicle Badge</h2>
             <form className="form-container">
               <div className="form-group">
-                <label>Service Order ID *</label>
+                <label htmlFor="sg_service_order_id">Service Order ID *</label>
                 <input 
+                  id="sg_service_order_id"
+                  name="service_order_id"
                   type="text" 
                   value={newBadge.service_order_id}
                   onChange={(e) => setNewBadge({ ...newBadge, service_order_id: e.target.value })}
@@ -282,8 +285,10 @@ export default function SecurityGateDashboard({ user, onLogout }) {
                 />
               </div>
               <div className="form-group">
-                <label>Vehicle Plate Number *</label>
+                <label htmlFor="sg_vehicle_plate">Vehicle Plate Number *</label>
                 <input 
+                  id="sg_vehicle_plate"
+                  name="vehicle_plate"
                   type="text" 
                   value={newBadge.vehicle_plate}
                   onChange={(e) => setNewBadge({ ...newBadge, vehicle_plate: e.target.value })}
@@ -291,8 +296,10 @@ export default function SecurityGateDashboard({ user, onLogout }) {
                 />
               </div>
               <div className="form-group">
-                <label>Customer Name</label>
+                <label htmlFor="sg_customer_name">Customer Name</label>
                 <input 
+                  id="sg_customer_name"
+                  name="customer_name"
                   type="text" 
                   value={newBadge.customer_name}
                   onChange={(e) => setNewBadge({ ...newBadge, customer_name: e.target.value })}
@@ -300,8 +307,21 @@ export default function SecurityGateDashboard({ user, onLogout }) {
                 />
               </div>
               <div className="form-group">
-                <label>Valid for (days)</label>
+                <label htmlFor="sg_customer_id">Customer ID</label>
+                <input
+                  id="sg_customer_id"
+                  name="customer_id"
+                  type="text"
+                  value={newBadge.customer_id || ''}
+                  onChange={(e) => setNewBadge({ ...newBadge, customer_id: e.target.value })}
+                  placeholder="Customer ID"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="sg_badge_days">Valid for (days)</label>
                 <input 
+                  id="sg_badge_days"
+                  name="badge_days"
                   type="number" 
                   value={newBadge.badge_days}
                   onChange={(e) => setNewBadge({ ...newBadge, badge_days: parseInt(e.target.value) })}

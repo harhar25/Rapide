@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/car-jockey-dashboard.css';
+import { fetchJson } from '../utils/fetchJson';
 
 export default function CarJockeyDashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('pending');
@@ -69,8 +70,7 @@ export default function CarJockeyDashboard({ user, onLogout }) {
 
   const loadPendingVehicles = async () => {
     try {
-      const response = await fetch('/api/car-jockey/vehicles/pending');
-      const result = await response.json();
+      const result = await fetchJson('/api/car-jockey/vehicles/pending');
       if (result.success) {
         setPendingVehicles(result.data);
       }
@@ -81,8 +81,7 @@ export default function CarJockeyDashboard({ user, onLogout }) {
 
   const loadActiveMovements = async () => {
     try {
-      const response = await fetch('/api/car-jockey/movements/active');
-      const result = await response.json();
+      const result = await fetchJson('/api/car-jockey/movements/active');
       if (result.success) {
         setActiveMovements(result.data);
       }
@@ -93,8 +92,7 @@ export default function CarJockeyDashboard({ user, onLogout }) {
 
   const loadParkedVehicles = async () => {
     try {
-      const response = await fetch('/api/car-jockey/parking/active');
-      const result = await response.json();
+      const result = await fetchJson('/api/car-jockey/parking/active');
       if (result.success) {
         setParkedVehicles(result.data);
       }
@@ -105,8 +103,7 @@ export default function CarJockeyDashboard({ user, onLogout }) {
 
   const loadSummary = async () => {
     try {
-      const response = await fetch('/api/car-jockey/summary');
-      const result = await response.json();
+      const result = await fetchJson('/api/car-jockey/summary');
       if (result.success) {
         setSummary(result.data);
       }
@@ -131,7 +128,7 @@ export default function CarJockeyDashboard({ user, onLogout }) {
 
   const handleSubmitMovement = async () => {
     try {
-      const response = await fetch('/api/car-jockey/movements', {
+      const result = await fetchJson('/api/car-jockey/movements', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -140,8 +137,7 @@ export default function CarJockeyDashboard({ user, onLogout }) {
           ...movementForm
         })
       });
-      
-      const result = await response.json();
+
       if (result.success) {
         setSuccessMessage('Vehicle movement started');
         setShowMovementModal(false);
@@ -170,13 +166,12 @@ export default function CarJockeyDashboard({ user, onLogout }) {
 
   const handleSubmitComplete = async () => {
     try {
-      const response = await fetch(`/api/car-jockey/movements/${selectedVehicle.id}/complete`, {
+      const result = await fetchJson(`/api/car-jockey/movements/${selectedVehicle.id}/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(completeForm)
       });
-      
-      const result = await response.json();
+
       if (result.success) {
         setSuccessMessage('Vehicle movement completed');
         setShowCompleteModal(false);
@@ -206,7 +201,7 @@ export default function CarJockeyDashboard({ user, onLogout }) {
 
   const handleSubmitParking = async () => {
     try {
-      const response = await fetch('/api/car-jockey/parking', {
+      const result = await fetchJson('/api/car-jockey/parking', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -215,8 +210,7 @@ export default function CarJockeyDashboard({ user, onLogout }) {
           ...parkingForm
         })
       });
-      
-      const result = await response.json();
+
       if (result.success) {
         setSuccessMessage('Vehicle parked successfully');
         setShowParkingModal(false);
@@ -239,13 +233,12 @@ export default function CarJockeyDashboard({ user, onLogout }) {
 
   const handleSubmitRelease = async () => {
     try {
-      const response = await fetch(`/api/car-jockey/parking/${selectedVehicle.id}/release`, {
+      const result = await fetchJson(`/api/car-jockey/parking/${selectedVehicle.id}/release`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ notes: '' })
       });
-      
-      const result = await response.json();
+
       if (result.success) {
         setSuccessMessage('Vehicle released from parking');
         setShowReleaseModal(false);

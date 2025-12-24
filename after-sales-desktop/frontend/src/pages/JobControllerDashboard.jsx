@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/job-controller-dashboard.css';
+import { fetchJson } from '../utils/fetchJson';
 
 const JobControllerDashboard = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState('pending-orders');
@@ -13,7 +14,7 @@ const JobControllerDashboard = ({ user, onLogout }) => {
   const [laborSummary, setLaborSummary] = useState(null);
   const [clockRecords, setClockRecords] = useState([]);
 
-  const API_BASE = 'http://localhost:5000/api/job-controller';
+  const API_BASE = '/api/job-controller';
 
   // Load data on mount
   useEffect(() => {
@@ -25,8 +26,7 @@ const JobControllerDashboard = ({ user, onLogout }) => {
   const loadPendingOrders = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/service-orders/pending`);
-      const data = await response.json();
+      const data = await fetchJson(`${API_BASE}/service-orders/pending`);
       if (data.success) {
         setPendingOrders(data.data || []);
       }
@@ -38,8 +38,7 @@ const JobControllerDashboard = ({ user, onLogout }) => {
 
   const loadActiveOrders = async () => {
     try {
-      const response = await fetch(`${API_BASE}/service-orders/active`);
-      const data = await response.json();
+      const data = await fetchJson(`${API_BASE}/service-orders/active`);
       if (data.success) {
         setActiveOrders(data.data || []);
       }
@@ -50,8 +49,7 @@ const JobControllerDashboard = ({ user, onLogout }) => {
 
   const loadAvailableTechs = async () => {
     try {
-      const response = await fetch(`${API_BASE}/technicians/available`);
-      const data = await response.json();
+      const data = await fetchJson(`${API_BASE}/technicians/available`);
       if (data.success) {
         setAvailableTechs(data.data || []);
       }
@@ -67,7 +65,7 @@ const JobControllerDashboard = ({ user, onLogout }) => {
     }
 
     try {
-      const response = await fetch(`${API_BASE}/assign`, {
+      const data = await fetchJson(`${API_BASE}/assign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -76,7 +74,6 @@ const JobControllerDashboard = ({ user, onLogout }) => {
           assigned_by: user?.name
         })
       });
-      const data = await response.json();
       if (data.success) {
         alert('Technician assigned successfully');
         loadPendingOrders();
@@ -92,12 +89,11 @@ const JobControllerDashboard = ({ user, onLogout }) => {
 
   const handleClockIn = async (assignmentId) => {
     try {
-      const response = await fetch(`${API_BASE}/clock-in`, {
+      const data = await fetchJson(`${API_BASE}/clock-in`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ assignment_id: assignmentId })
       });
-      const data = await response.json();
       if (data.success) {
         alert('Technician clocked in');
         loadActiveOrders();
@@ -109,12 +105,11 @@ const JobControllerDashboard = ({ user, onLogout }) => {
 
   const handleClockOut = async (assignmentId) => {
     try {
-      const response = await fetch(`${API_BASE}/clock-out`, {
+      const data = await fetchJson(`${API_BASE}/clock-out`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ assignment_id: assignmentId })
       });
-      const data = await response.json();
       if (data.success) {
         alert('Technician clocked out');
         loadActiveOrders();
@@ -126,8 +121,7 @@ const JobControllerDashboard = ({ user, onLogout }) => {
 
   const loadLaborSummary = async (techId) => {
     try {
-      const response = await fetch(`${API_BASE}/labor-summary/${techId}`);
-      const data = await response.json();
+      const data = await fetchJson(`${API_BASE}/labor-summary/${techId}`);
       if (data.success) {
         setLaborSummary(data.data);
       }
@@ -138,8 +132,7 @@ const JobControllerDashboard = ({ user, onLogout }) => {
 
   const loadClockRecords = async (techId) => {
     try {
-      const response = await fetch(`${API_BASE}/clock-records/${techId}?days=7`);
-      const data = await response.json();
+      const data = await fetchJson(`${API_BASE}/clock-records/${techId}?days=7`);
       if (data.success) {
         setClockRecords(data.data || []);
       }
@@ -257,13 +250,18 @@ const JobControllerDashboard = ({ user, onLogout }) => {
                       <td>{order[6] ? new Date(order[6]).toLocaleTimeString() : 'N/A'}</td>
                       <td>{order[7] || 0}</td>
                       <td>
-                        {order[5] === 'assigned' ? (
-                          <button className="btn-clock-in" onClick={() => handleClockIn(1)}>Clock In</button>
-                        ) : order[5] === 'in-progress' ? (
-                          <button className="btn-clock-out" onClick={() => handleClockOut(1)}>Clock Out</button>
-                        ) : (
-                          <span>Done</span>
-                        )}
+                        {(() => {
+                          const assignmentId = order?.[9];
+                          if (!assignmentId) return <span>Unavailable</span>;
+
+                          if (order[5] === 'assigned') {
+                            return <button className="btn-clock-in" onClick={() => handleClockIn(assignmentId)}>Clock In</button>;
+                          }
+                          if (order[5] === 'in-progress') {
+                            return <button className="btn-clock-out" onClick={() => handleClockOut(assignmentId)}>Clock Out</button>;
+                          }
+                          return <span>Done</span>;
+                        })()}
                       </td>
                     </tr>
                   ))}

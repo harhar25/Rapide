@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from database import db
 import os
@@ -52,6 +52,29 @@ def create_app(config_name='development'):
     @app.route('/api/health', methods=['GET'])
     def health_check():
         return {'status': 'ok', 'message': 'After-Sales API running'}, 200
+
+    @app.before_request
+    def handle_api_preflight():
+        if request.method == 'OPTIONS' and request.path.startswith('/api/'):
+            return ('', 204)
+
+    @app.errorhandler(404)
+    def handle_404(e):
+        if request.path.startswith('/api/'):
+            return jsonify({'success': False, 'error': 'Not found', 'code': 'HTTP-404'}), 404
+        return e
+
+    @app.errorhandler(405)
+    def handle_405(e):
+        if request.path.startswith('/api/'):
+            return jsonify({'success': False, 'error': 'Method not allowed', 'code': 'HTTP-405'}), 405
+        return e
+
+    @app.errorhandler(500)
+    def handle_500(e):
+        if request.path.startswith('/api/'):
+            return jsonify({'success': False, 'error': 'Internal server error', 'code': 'HTTP-500'}), 500
+        return e
     
     # Dashboard visualization
     @app.route('/', methods=['GET'])

@@ -30,10 +30,21 @@ class Database:
         if self.connection and self.connection.is_connected():
             self.connection.close()
             print("✓ MySQL connection closed")
+
+    def ensure_connected(self):
+        """Ensure an active MySQL connection is available."""
+        try:
+            if self.connection and self.connection.is_connected():
+                return True
+        except Exception:
+            pass
+        return self.connect()
     
     def execute_query(self, query, params=None):
         """Execute a query (SELECT)"""
         try:
+            if not self.ensure_connected():
+                return None
             cursor = self.connection.cursor(dictionary=True)
             cursor.execute(query, params or ())
             result = cursor.fetchall()
@@ -46,6 +57,8 @@ class Database:
     def execute_update(self, query, params=None):
         """Execute an update/insert/delete query"""
         try:
+            if not self.ensure_connected():
+                return {'success': False, 'error': 'Database connection unavailable'}
             cursor = self.connection.cursor()
             cursor.execute(query, params or ())
             self.connection.commit()

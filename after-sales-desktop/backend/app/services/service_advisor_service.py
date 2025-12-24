@@ -52,9 +52,10 @@ class ServiceAdvisorService:
     def get_scheduling_order_details(self, scheduling_order_id):
         """Get scheduling order details"""
         query = """
-        SELECT customer_id, id, vehicle_plate_no, service_type
-        FROM scheduling_orders
-        WHERE id = %s
+        SELECT so.customer_id, so.id, c.plate_no as vehicle_plate_no, so.service_type
+        FROM scheduling_orders so
+        JOIN customers c ON so.customer_id = c.id
+        WHERE so.id = %s
         """
         result = db.execute_query(query, (scheduling_order_id,))
         if result:

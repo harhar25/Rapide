@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/foreman-qc-dashboard.css';
+import { fetchJson } from '../utils/fetchJson';
 
 const ForemanQCDashboard = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState('pending');
@@ -15,7 +16,7 @@ const ForemanQCDashboard = ({ user, onLogout }) => {
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  const API_BASE = 'http://localhost:5000/api/foreman-qc';
+  const API_BASE = '/api/foreman-qc';
 
   // Load data on mount
   useEffect(() => {
@@ -32,8 +33,7 @@ const ForemanQCDashboard = ({ user, onLogout }) => {
 
   const loadPendingJobs = async () => {
     try {
-      const response = await fetch(`${API_BASE}/jobs/pending`);
-      const data = await response.json();
+      const data = await fetchJson(`${API_BASE}/jobs/pending`);
       if (data.success) {
         setPendingJobs(data.data || []);
       }
@@ -44,8 +44,7 @@ const ForemanQCDashboard = ({ user, onLogout }) => {
 
   const loadActiveInspections = async () => {
     try {
-      const response = await fetch(`${API_BASE}/inspections/active`);
-      const data = await response.json();
+      const data = await fetchJson(`${API_BASE}/inspections/active`);
       if (data.success) {
         setActiveInspections(data.data || []);
       }
@@ -56,8 +55,7 @@ const ForemanQCDashboard = ({ user, onLogout }) => {
 
   const loadSummary = async () => {
     try {
-      const response = await fetch(`${API_BASE}/summary`);
-      const data = await response.json();
+      const data = await fetchJson(`${API_BASE}/summary`);
       if (data.success) {
         setSummary(data.data);
       }
@@ -77,7 +75,7 @@ const ForemanQCDashboard = ({ user, onLogout }) => {
     }
 
     try {
-      const response = await fetch(`${API_BASE}/inspections`, {
+      const data = await fetchJson(`${API_BASE}/inspections`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -94,8 +92,6 @@ const ForemanQCDashboard = ({ user, onLogout }) => {
           inspection_notes: document.getElementById('notes')?.value
         })
       });
-
-      const data = await response.json();
       if (data.success) {
         setSuccessMessage('QC Inspection started successfully');
         setShowInspectionForm(false);
@@ -110,12 +106,10 @@ const ForemanQCDashboard = ({ user, onLogout }) => {
 
   const handlePassInspection = async (inspectionId) => {
     try {
-      const response = await fetch(`${API_BASE}/inspections/${inspectionId}/pass`, {
+      const data = await fetchJson(`${API_BASE}/inspections/${inspectionId}/pass`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
-
-      const data = await response.json();
       if (data.success) {
         setSuccessMessage('Inspection passed successfully');
         loadAllData();
@@ -132,13 +126,11 @@ const ForemanQCDashboard = ({ user, onLogout }) => {
     if (!failedItems) return;
 
     try {
-      const response = await fetch(`${API_BASE}/inspections/${inspectionId}/fail`, {
+      const data = await fetchJson(`${API_BASE}/inspections/${inspectionId}/fail`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ failed_items: failedItems })
       });
-
-      const data = await response.json();
       if (data.success) {
         setSuccessMessage('Inspection marked as failed - rework required');
         loadAllData();
@@ -161,7 +153,7 @@ const ForemanQCDashboard = ({ user, onLogout }) => {
     }
 
     try {
-      const response = await fetch(`${API_BASE}/road-tests`, {
+      const data = await fetchJson(`${API_BASE}/road-tests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -180,8 +172,6 @@ const ForemanQCDashboard = ({ user, onLogout }) => {
           road_test_notes: document.getElementById('rtNotes')?.value
         })
       });
-
-      const data = await response.json();
       if (data.success) {
         setSuccessMessage('Road test recorded successfully');
         setShowRoadTestForm(false);
@@ -264,8 +254,10 @@ const ForemanQCDashboard = ({ user, onLogout }) => {
               <form onSubmit={handleStartInspection} className="form-modal">
                 <h3>Start QC Inspection</h3>
                 <div className="form-group">
-                  <label>Select Job</label>
+                  <label htmlFor="qc_selected_job">Select Job</label>
                   <select 
+                    id="qc_selected_job"
+                    name="service_order_id"
                     value={selectedJob ? selectedJob[0] : ''}
                     onChange={(e) => {
                       const job = pendingJobs.find(j => j[0] == e.target.value);
@@ -285,8 +277,8 @@ const ForemanQCDashboard = ({ user, onLogout }) => {
                 <div className="form-section">
                   <h4>Exterior Inspection</h4>
                   <div className="form-group">
-                    <label>Exterior Condition</label>
-                    <select id="exterior" defaultValue="good">
+                    <label htmlFor="exterior">Exterior Condition</label>
+                    <select id="exterior" name="exterior_condition" defaultValue="good">
                       <option value="excellent">Excellent</option>
                       <option value="good">Good</option>
                       <option value="fair">Fair</option>
@@ -298,16 +290,16 @@ const ForemanQCDashboard = ({ user, onLogout }) => {
                 <div className="form-section">
                   <h4>Engine & Mechanical</h4>
                   <div className="form-group">
-                    <label>Engine Condition</label>
-                    <select id="engine" defaultValue="good">
+                    <label htmlFor="engine">Engine Condition</label>
+                    <select id="engine" name="engine_condition" defaultValue="good">
                       <option value="excellent">Excellent</option>
                       <option value="good">Good</option>
                       <option value="fair">Fair</option>
                     </select>
                   </div>
                   <div className="form-group">
-                    <label>Interior Cleanliness</label>
-                    <select id="interior" defaultValue="good">
+                    <label htmlFor="interior">Interior Cleanliness</label>
+                    <select id="interior" name="interior_cleanliness" defaultValue="good">
                       <option value="excellent">Excellent</option>
                       <option value="good">Good</option>
                       <option value="fair">Fair</option>
@@ -318,8 +310,8 @@ const ForemanQCDashboard = ({ user, onLogout }) => {
                 <div className="form-section">
                   <h4>Parts & Systems</h4>
                   <div className="form-group">
-                    <label>Parts Installed</label>
-                    <textarea id="parts" placeholder="List installed parts"></textarea>
+                    <label htmlFor="parts">Parts Installed</label>
+                    <textarea id="parts" name="parts_installed" placeholder="List installed parts"></textarea>
                   </div>
                   <div className="form-group">
                     <label>
@@ -339,8 +331,8 @@ const ForemanQCDashboard = ({ user, onLogout }) => {
                 </div>
 
                 <div className="form-group">
-                  <label>Inspection Notes</label>
-                  <textarea id="notes" placeholder="Additional notes..."></textarea>
+                  <label htmlFor="notes">Inspection Notes</label>
+                  <textarea id="notes" name="inspection_notes" placeholder="Additional notes..."></textarea>
                 </div>
 
                 <div className="form-actions">
@@ -437,8 +429,10 @@ const ForemanQCDashboard = ({ user, onLogout }) => {
               <form onSubmit={handleStartRoadTest} className="form-modal">
                 <h3>Record Road Test</h3>
                 <div className="form-group">
-                  <label>Select Inspection</label>
+                  <label htmlFor="qc_selected_inspection">Select Inspection</label>
                   <select 
+                    id="qc_selected_inspection"
+                    name="qc_inspection_id"
                     value={selectedInspection ? selectedInspection[0] : ''}
                     onChange={(e) => {
                       const insp = activeInspections.find(i => i[0] == e.target.value);
@@ -458,12 +452,12 @@ const ForemanQCDashboard = ({ user, onLogout }) => {
                 <div className="form-section">
                   <h4>Test Details</h4>
                   <div className="form-group">
-                    <label>Test Distance (km)</label>
-                    <input type="number" id="distance" min="0" defaultValue="5" />
+                    <label htmlFor="distance">Test Distance (km)</label>
+                    <input type="number" id="distance" name="test_distance_km" min="0" defaultValue="5" />
                   </div>
                   <div className="form-group">
-                    <label>Engine Sound</label>
-                    <input type="text" id="engineSound" placeholder="Normal, knocking, etc." />
+                    <label htmlFor="engineSound">Engine Sound</label>
+                    <input type="text" id="engineSound" name="engine_sound" placeholder="Normal, knocking, etc." />
                   </div>
                 </div>
 
@@ -487,8 +481,8 @@ const ForemanQCDashboard = ({ user, onLogout }) => {
                 </div>
 
                 <div className="form-group">
-                  <label>Overall Performance</label>
-                  <select id="performance" defaultValue="good">
+                  <label htmlFor="performance">Overall Performance</label>
+                  <select id="performance" name="overall_performance" defaultValue="good">
                     <option value="excellent">Excellent</option>
                     <option value="good">Good</option>
                     <option value="acceptable">Acceptable</option>
@@ -497,8 +491,8 @@ const ForemanQCDashboard = ({ user, onLogout }) => {
                 </div>
 
                 <div className="form-group">
-                  <label>Road Test Notes</label>
-                  <textarea id="rtNotes" placeholder="Any issues or observations..."></textarea>
+                  <label htmlFor="rtNotes">Road Test Notes</label>
+                  <textarea id="rtNotes" name="road_test_notes" placeholder="Any issues or observations..."></textarea>
                 </div>
 
                 <div className="form-actions">

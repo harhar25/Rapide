@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/cashier-dashboard.css';
+import { fetchJson } from '../utils/fetchJson';
 
 export default function CashierDashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('invoices');
@@ -42,8 +43,7 @@ export default function CashierDashboard({ user, onLogout }) {
 
   const loadPendingInvoices = async () => {
     try {
-      const response = await fetch('/api/cashier/invoices/pending');
-      const result = await response.json();
+      const result = await fetchJson('/api/cashier/invoices/pending');
       if (result.success) setPendingInvoices(result.data);
     } catch (error) {
       console.error('Error:', error);
@@ -52,8 +52,7 @@ export default function CashierDashboard({ user, onLogout }) {
 
   const loadDailyTransactions = async () => {
     try {
-      const response = await fetch('/api/cashier/transactions/daily');
-      const result = await response.json();
+      const result = await fetchJson('/api/cashier/transactions/daily');
       if (result.success) setDailyTransactions(result.data);
     } catch (error) {
       console.error('Error:', error);
@@ -62,8 +61,7 @@ export default function CashierDashboard({ user, onLogout }) {
 
   const loadDailySummary = async () => {
     try {
-      const response = await fetch('/api/cashier/summary/daily');
-      const result = await response.json();
+      const result = await fetchJson('/api/cashier/summary/daily');
       if (result.success) setDailySummary(result.data);
     } catch (error) {
       console.error('Error:', error);
@@ -72,8 +70,7 @@ export default function CashierDashboard({ user, onLogout }) {
 
   const loadActiveDrawer = async () => {
     try {
-      const response = await fetch(`/api/cashier/drawer/active?cashier_id=${user.id}`);
-      const result = await response.json();
+      const result = await fetchJson(`/api/cashier/drawer/active?cashier_id=${user.id}`);
       if (result.success) setActiveDrawer(result.data);
     } catch (error) {
       setActiveDrawer(null);
@@ -88,20 +85,20 @@ export default function CashierDashboard({ user, onLogout }) {
 
   const handleSubmitPayment = async () => {
     try {
-      const response = await fetch('/api/cashier/payments', {
+      const customerId = selectedInvoice?.customer_id ?? selectedInvoice?.customerId;
+      const result = await fetchJson('/api/cashier/payments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           invoice_id: selectedInvoice.id,
-          customer_id: selectedInvoice.id,
+          customer_id: customerId,
           amount: paymentForm.amount,
           payment_method: paymentForm.payment_method,
           reference_number: paymentForm.reference_number,
           created_by: user.id
         })
       });
-      
-      const result = await response.json();
+
       if (result.success) {
         setSuccessMessage('Payment recorded');
         setShowPaymentModal(false);
@@ -119,7 +116,7 @@ export default function CashierDashboard({ user, onLogout }) {
 
   const handleOpenDrawer = async () => {
     try {
-      const response = await fetch('/api/cashier/drawer/open', {
+      const result = await fetchJson('/api/cashier/drawer/open', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -127,8 +124,7 @@ export default function CashierDashboard({ user, onLogout }) {
           opening_balance: drawerForm.opening_balance
         })
       });
-      
-      const result = await response.json();
+
       if (result.success) {
         setSuccessMessage('Drawer opened');
         setShowDrawerModal(false);
@@ -145,7 +141,7 @@ export default function CashierDashboard({ user, onLogout }) {
   const handleCloseDrawer = async () => {
     if (!activeDrawer) return;
     try {
-      const response = await fetch(`/api/cashier/drawer/${activeDrawer.id}/close`, {
+      const result = await fetchJson(`/api/cashier/drawer/${activeDrawer.id}/close`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -153,8 +149,7 @@ export default function CashierDashboard({ user, onLogout }) {
           notes: drawerForm.notes
         })
       });
-      
-      const result = await response.json();
+
       if (result.success) {
         setSuccessMessage('Drawer closed');
         setShowDrawerModal(false);

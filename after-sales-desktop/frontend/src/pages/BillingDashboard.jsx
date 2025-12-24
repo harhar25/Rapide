@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/billing-dashboard.css';
+import { fetchJson } from '../utils/fetchJson';
 
 export default function BillingDashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('pending');
@@ -61,8 +62,7 @@ export default function BillingDashboard({ user, onLogout }) {
 
   const loadPendingInvoices = async () => {
     try {
-      const response = await fetch('/api/billing/invoices/pending');
-      const result = await response.json();
+      const result = await fetchJson('/api/billing/invoices/pending');
       if (result.success) {
         setPendingInvoices(result.data);
       }
@@ -73,8 +73,7 @@ export default function BillingDashboard({ user, onLogout }) {
 
   const loadPaidInvoices = async () => {
     try {
-      const response = await fetch('/api/billing/invoices/paid');
-      const result = await response.json();
+      const result = await fetchJson('/api/billing/invoices/paid');
       if (result.success) {
         setPaidInvoices(result.data);
       }
@@ -85,8 +84,7 @@ export default function BillingDashboard({ user, onLogout }) {
 
   const loadOverdueInvoices = async () => {
     try {
-      const response = await fetch('/api/billing/invoices/overdue');
-      const result = await response.json();
+      const result = await fetchJson('/api/billing/invoices/overdue');
       if (result.success) {
         setOverdueInvoices(result.data);
       }
@@ -97,8 +95,7 @@ export default function BillingDashboard({ user, onLogout }) {
 
   const loadSummary = async () => {
     try {
-      const response = await fetch('/api/billing/summary');
-      const result = await response.json();
+      const result = await fetchJson('/api/billing/summary');
       if (result.success) {
         setSummary(result.data);
       }
@@ -109,8 +106,7 @@ export default function BillingDashboard({ user, onLogout }) {
 
   const loadInvoiceDetails = async (invoiceId) => {
     try {
-      const response = await fetch(`/api/billing/invoices/${invoiceId}`);
-      const result = await response.json();
+      const result = await fetchJson(`/api/billing/invoices/${invoiceId}`);
       if (result.success) {
         setInvoiceDetails(result.data);
       }
@@ -137,7 +133,7 @@ export default function BillingDashboard({ user, onLogout }) {
 
   const handleSubmitPayment = async () => {
     try {
-      const response = await fetch(`/api/billing/invoices/${selectedInvoice.id}/payments`, {
+      const result = await fetchJson(`/api/billing/invoices/${selectedInvoice.id}/payments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -145,8 +141,7 @@ export default function BillingDashboard({ user, onLogout }) {
           created_by: user.id
         })
       });
-      
-      const result = await response.json();
+
       if (result.success) {
         setSuccessMessage('Payment recorded successfully');
         setShowPaymentModal(false);
@@ -164,12 +159,11 @@ export default function BillingDashboard({ user, onLogout }) {
 
   const handleIssueInvoice = async (invoiceId) => {
     try {
-      const response = await fetch(`/api/billing/invoices/${invoiceId}/issue`, {
+      const result = await fetchJson(`/api/billing/invoices/${invoiceId}/issue`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
-      
-      const result = await response.json();
+
       if (result.success) {
         setSuccessMessage('Invoice issued');
         setTimeout(() => {
@@ -187,13 +181,12 @@ export default function BillingDashboard({ user, onLogout }) {
 
   const handleCreateInvoice = async () => {
     try {
-      const response = await fetch('/api/billing/invoices', {
+      const result = await fetchJson('/api/billing/invoices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(createForm)
       });
-      
-      const result = await response.json();
+
       if (result.success) {
         setSuccessMessage('Invoice created');
         setShowCreateModal(false);

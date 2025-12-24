@@ -55,7 +55,9 @@ const Login = ({ onLogin }) => {
             <label htmlFor="username">Username</label>
             <input
               id="username"
+              name="username"
               type="text"
+              autoComplete="username"
               placeholder="john"
               value={username}
               onChange={(e) => {
@@ -70,7 +72,9 @@ const Login = ({ onLogin }) => {
             <label htmlFor="password">Password</label>
             <input
               id="password"
+              name="password"
               type="password"
+              autoComplete="current-password"
               placeholder="••••••••"
               value={password}
               onChange={(e) => {

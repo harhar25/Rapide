@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/service-advisor-dashboard.css';
+import { fetchJson } from '../utils/fetchJson';
 
 const ServiceAdvisorDashboard = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState('appointments');
@@ -44,7 +45,7 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
     diagnosis_completed_by: user?.name || ''
   });
 
-  const API_BASE = 'http://localhost:5000/api/service-advisor';
+  const API_BASE = '/api/service-advisor';
 
   // Load appointments on mount
   useEffect(() => {
@@ -55,8 +56,7 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
   const loadAppointments = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/appointments/pending`);
-      const data = await response.json();
+      const data = await fetchJson(`${API_BASE}/appointments/pending`);
       if (data.success) {
         setAppointments(data.data || []);
       }
@@ -68,8 +68,7 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
 
   const loadServiceOrders = async () => {
     try {
-      const response = await fetch(`${API_BASE}/service-orders/pending`);
-      const data = await response.json();
+      const data = await fetchJson(`${API_BASE}/service-orders/pending`);
       if (data.success) {
         setServiceOrders(data.data || []);
       }
@@ -80,7 +79,7 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
 
   const handleCheckIn = async (appointmentId) => {
     try {
-      const response = await fetch(`${API_BASE}/check-in`, {
+      const data = await fetchJson(`${API_BASE}/check-in`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -88,7 +87,6 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
           advisor_id: user?.id || 1
         })
       });
-      const data = await response.json();
       if (data.success) {
         setSelectedOrder(data.service_order_id);
         setActiveTab('check-in');
@@ -103,7 +101,7 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
   const handleSaveCIS = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`${API_BASE}/cis`, {
+      const data = await fetchJson(`${API_BASE}/cis`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -113,7 +111,6 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
           created_by: user?.name
         })
       });
-      const data = await response.json();
       if (data.success) {
         setActiveTab('diagnosis');
       }
@@ -125,7 +122,7 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
   const handleSaveVRC = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`${API_BASE}/vrc`, {
+      const data = await fetchJson(`${API_BASE}/vrc`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -134,7 +131,6 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
           customer_id: 1, // Will come from selectedOrder details
         })
       });
-      const data = await response.json();
       if (data.success) {
         setActiveTab('service-order');
       }
@@ -145,7 +141,11 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
 
   const handlePrintDocument = async (documentType) => {
     try {
-      const response = await fetch(`${API_BASE}/documents/${selectedOrder}/print`, {
+      if (!selectedOrder) {
+        alert('Please select a service order first.');
+        return;
+      }
+      const data = await fetchJson(`${API_BASE}/documents/${selectedOrder}/print`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -153,7 +153,6 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
           printed_by: user?.name
         })
       });
-      const data = await response.json();
       if (data.success) {
         alert(`${documentType} printed successfully`);
       }
@@ -268,8 +267,10 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
                 <h3>Customer Details</h3>
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Name *</label>
+                    <label htmlFor="cis_name">Name *</label>
                     <input 
+                      id="cis_name"
+                      name="name"
                       type="text" 
                       value={cisForm.name}
                       onChange={(e) => setCisForm({...cisForm, name: e.target.value})}
@@ -277,8 +278,10 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
                     />
                   </div>
                   <div className="form-group">
-                    <label>Contact Number *</label>
+                    <label htmlFor="cis_contact_no">Contact Number *</label>
                     <input 
+                      id="cis_contact_no"
+                      name="contact_no"
                       type="tel" 
                       value={cisForm.contact_no}
                       onChange={(e) => setCisForm({...cisForm, contact_no: e.target.value})}
@@ -286,8 +289,10 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
                     />
                   </div>
                   <div className="form-group">
-                    <label>Email</label>
+                    <label htmlFor="cis_email">Email</label>
                     <input 
+                      id="cis_email"
+                      name="email"
                       type="email" 
                       value={cisForm.email}
                       onChange={(e) => setCisForm({...cisForm, email: e.target.value})}
@@ -295,8 +300,10 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
                   </div>
                 </div>
                 <div className="form-group">
-                  <label>Address</label>
+                  <label htmlFor="cis_address">Address</label>
                   <textarea 
+                    id="cis_address"
+                    name="address"
                     value={cisForm.address}
                     onChange={(e) => setCisForm({...cisForm, address: e.target.value})}
                   />
@@ -307,8 +314,10 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
                 <h3>Vehicle Details</h3>
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Plate Number *</label>
+                    <label htmlFor="cis_vehicle_plate_no">Plate Number *</label>
                     <input 
+                      id="cis_vehicle_plate_no"
+                      name="vehicle_plate_no"
                       type="text" 
                       value={cisForm.vehicle_plate_no}
                       onChange={(e) => setCisForm({...cisForm, vehicle_plate_no: e.target.value})}
@@ -316,8 +325,10 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
                     />
                   </div>
                   <div className="form-group">
-                    <label>Model *</label>
+                    <label htmlFor="cis_vehicle_model">Model *</label>
                     <input 
+                      id="cis_vehicle_model"
+                      name="vehicle_model"
                       type="text" 
                       value={cisForm.vehicle_model}
                       onChange={(e) => setCisForm({...cisForm, vehicle_model: e.target.value})}
@@ -325,8 +336,10 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
                     />
                   </div>
                   <div className="form-group">
-                    <label>Year</label>
+                    <label htmlFor="cis_vehicle_year">Year</label>
                     <input 
+                      id="cis_vehicle_year"
+                      name="vehicle_year"
                       type="number" 
                       value={cisForm.vehicle_year}
                       onChange={(e) => setCisForm({...cisForm, vehicle_year: e.target.value})}
@@ -335,24 +348,30 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
                 </div>
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Engine No.</label>
+                    <label htmlFor="cis_engine_no">Engine No.</label>
                     <input 
+                      id="cis_engine_no"
+                      name="engine_no"
                       type="text" 
                       value={cisForm.engine_no}
                       onChange={(e) => setCisForm({...cisForm, engine_no: e.target.value})}
                     />
                   </div>
                   <div className="form-group">
-                    <label>Chassis No.</label>
+                    <label htmlFor="cis_chassis_no">Chassis No.</label>
                     <input 
+                      id="cis_chassis_no"
+                      name="chassis_no"
                       type="text" 
                       value={cisForm.chassis_no}
                       onChange={(e) => setCisForm({...cisForm, chassis_no: e.target.value})}
                     />
                   </div>
                   <div className="form-group">
-                    <label>Mileage In</label>
+                    <label htmlFor="cis_mileage_in">Mileage In</label>
                     <input 
+                      id="cis_mileage_in"
+                      name="mileage_in"
                       type="number" 
                       value={cisForm.mileage_in}
                       onChange={(e) => setCisForm({...cisForm, mileage_in: e.target.value})}
@@ -365,8 +384,10 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
                 <h3>Service Details</h3>
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Service Type</label>
+                    <label htmlFor="cis_service_type">Service Type</label>
                     <select 
+                      id="cis_service_type"
+                      name="service_type"
                       value={cisForm.service_type}
                       onChange={(e) => setCisForm({...cisForm, service_type: e.target.value})}
                     >
@@ -379,8 +400,10 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
                   </div>
                 </div>
                 <div className="form-group">
-                  <label>Notes</label>
+                  <label htmlFor="cis_notes">Notes</label>
                   <textarea 
+                    id="cis_notes"
+                    name="notes"
                     value={cisForm.notes}
                     onChange={(e) => setCisForm({...cisForm, notes: e.target.value})}
                   />
@@ -401,16 +424,20 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
                 <h3>Mileage & Condition</h3>
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Mileage In</label>
+                    <label htmlFor="vrc_mileage_in">Mileage In</label>
                     <input 
+                      id="vrc_mileage_in"
+                      name="mileage_in"
                       type="number" 
                       value={vrcForm.mileage_in}
                       onChange={(e) => setVrcForm({...vrcForm, mileage_in: e.target.value})}
                     />
                   </div>
                   <div className="form-group">
-                    <label>Mileage Out</label>
+                    <label htmlFor="vrc_mileage_out">Mileage Out</label>
                     <input 
+                      id="vrc_mileage_out"
+                      name="mileage_out"
                       type="number" 
                       value={vrcForm.mileage_out}
                       onChange={(e) => setVrcForm({...vrcForm, mileage_out: e.target.value})}
@@ -418,15 +445,19 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
                   </div>
                 </div>
                 <div className="form-group">
-                  <label>Exterior Condition</label>
+                  <label htmlFor="vrc_exterior_condition">Exterior Condition</label>
                   <textarea 
+                    id="vrc_exterior_condition"
+                    name="exterior_condition"
                     value={vrcForm.exterior_condition}
                     onChange={(e) => setVrcForm({...vrcForm, exterior_condition: e.target.value})}
                   />
                 </div>
                 <div className="form-group">
-                  <label>Interior Condition</label>
+                  <label htmlFor="vrc_interior_condition">Interior Condition</label>
                   <textarea 
+                    id="vrc_interior_condition"
+                    name="interior_condition"
                     value={vrcForm.interior_condition}
                     onChange={(e) => setVrcForm({...vrcForm, interior_condition: e.target.value})}
                   />
@@ -449,8 +480,10 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
                     {key: 'checklist_10_handbrake', label: '10. Handbrake Holds'}
                   ].map(item => (
                     <div key={item.key} className="checklist-item">
-                      <label>{item.label}</label>
+                      <label htmlFor={`vrc_${item.key}`}>{item.label}</label>
                       <select 
+                        id={`vrc_${item.key}`}
+                        name={item.key}
                         value={vrcForm[item.key]}
                         onChange={(e) => setVrcForm({...vrcForm, [item.key]: e.target.value})}
                       >
@@ -466,8 +499,10 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
               <div className="form-section">
                 <h3>Additional Findings</h3>
                 <div className="form-group">
-                  <label>Findings</label>
+                  <label htmlFor="vrc_additional_findings">Findings</label>
                   <textarea 
+                    id="vrc_additional_findings"
+                    name="additional_findings"
                     value={vrcForm.additional_findings}
                     onChange={(e) => setVrcForm({...vrcForm, additional_findings: e.target.value})}
                     placeholder="Any additional observations or issues found..."
@@ -476,6 +511,8 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
                 <div className="form-group">
                   <label>
                     <input 
+                      id="vrc_settings_restored"
+                      name="settings_restored"
                       type="checkbox" 
                       checked={vrcForm.settings_restored}
                       onChange={(e) => setVrcForm({...vrcForm, settings_restored: e.target.checked})}
@@ -533,6 +570,22 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
             <h2>Document Management</h2>
             <div className="documents-section">
               <h3>Available Documents to Print</h3>
+              <div className="form-group">
+                <label htmlFor="sa_selected_order">Service Order</label>
+                <select
+                  id="sa_selected_order"
+                  name="service_order_id"
+                  value={selectedOrder || ''}
+                  onChange={(e) => setSelectedOrder(e.target.value ? parseInt(e.target.value) : null)}
+                >
+                  <option value="">Select service order</option>
+                  {serviceOrders.map(so => (
+                    <option key={so[0]} value={so[0]}>
+                      SO-{String(so[0]).padStart(5, '0')} - {so[2]}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="documents-grid">
                 {[
                   {type: 'service-order', label: 'Service Order', icon: '📄'},
@@ -545,6 +598,7 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
                   <button 
                     key={doc.type}
                     className="document-card"
+                    disabled={!selectedOrder}
                     onClick={() => handlePrintDocument(doc.type)}
                   >
                     <div className="doc-icon">{doc.icon}</div>

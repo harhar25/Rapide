@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/vehicle-handover-dashboard.css';
+import { fetchJson } from '../utils/fetchJson';
 
 export default function VehicleHandoverDashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('pending');
@@ -19,9 +20,8 @@ export default function VehicleHandoverDashboard({ user, onLogout }) {
       setLoading(true);
       
       // Fetch pending handovers
-      const pendingRes = await fetch('/api/vehicle-handover/handovers/pending');
-      const pendingData = await pendingRes.json();
-      if (pendingData.status === 'success') setPendingHandovers(pendingData.handovers || []);
+      const pendingData = await fetchJson('/api/vehicle-handover/handovers/pending');
+      if (pendingData.success) setPendingHandovers(pendingData.handovers || pendingData.data || []);
       
       setLoading(false);
     } catch (error) {
@@ -32,11 +32,10 @@ export default function VehicleHandoverDashboard({ user, onLogout }) {
 
   const handleSelectHandover = async (handoverId) => {
     try {
-      const res = await fetch(`/api/vehicle-handover/handovers/${handoverId}`);
-      const data = await res.json();
-      if (data.status === 'success') {
+      const data = await fetchJson(`/api/vehicle-handover/handovers/${handoverId}`);
+      if (data.success) {
         setSelectedHandover(handoverId);
-        setHandoverDetails(data.details);
+        setHandoverDetails(data.details || data.data);
       }
     } catch (error) {
       console.error('Error fetching handover details:', error);
@@ -50,7 +49,7 @@ export default function VehicleHandoverDashboard({ user, onLogout }) {
     }
 
     try {
-      const res = await fetch(`/api/vehicle-handover/handovers/${selectedHandover}/items`, {
+      const res = await fetchJson(`/api/vehicle-handover/handovers/${selectedHandover}/items`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -61,7 +60,7 @@ export default function VehicleHandoverDashboard({ user, onLogout }) {
         })
       });
 
-      if (res.ok) {
+      if (res.success) {
         alert('Item added successfully');
         setNewItem({ item_type: 'parts', description: '', quantity: 1, condition: 'good' });
         handleSelectHandover(selectedHandover);
@@ -73,7 +72,7 @@ export default function VehicleHandoverDashboard({ user, onLogout }) {
 
   const handleVerifyItem = async (itemId, conditionAfter) => {
     try {
-      const res = await fetch(`/api/vehicle-handover/handovers/${selectedHandover}/items/${itemId}/verify`, {
+      const res = await fetchJson(`/api/vehicle-handover/handovers/${selectedHandover}/items/${itemId}/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -82,7 +81,7 @@ export default function VehicleHandoverDashboard({ user, onLogout }) {
         })
       });
 
-      if (res.ok) {
+      if (res.success) {
         alert('Item verified successfully');
         handleSelectHandover(selectedHandover);
       }
@@ -96,7 +95,7 @@ export default function VehicleHandoverDashboard({ user, onLogout }) {
     if (!signatorName) return;
 
     try {
-      const res = await fetch(`/api/vehicle-handover/handovers/${selectedHandover}/signatures`, {
+      const res = await fetchJson(`/api/vehicle-handover/handovers/${selectedHandover}/signatures`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -108,7 +107,7 @@ export default function VehicleHandoverDashboard({ user, onLogout }) {
         })
       });
 
-      if (res.ok) {
+      if (res.success) {
         alert('Signature recorded successfully');
         handleSelectHandover(selectedHandover);
       }
@@ -119,7 +118,7 @@ export default function VehicleHandoverDashboard({ user, onLogout }) {
 
   const handleCompleteHandover = async () => {
     try {
-      const res = await fetch(`/api/vehicle-handover/handovers/${selectedHandover}/complete`, {
+      const res = await fetchJson(`/api/vehicle-handover/handovers/${selectedHandover}/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -131,7 +130,7 @@ export default function VehicleHandoverDashboard({ user, onLogout }) {
         })
       });
 
-      if (res.ok) {
+      if (res.success) {
         alert('Handover completed successfully');
         setSelectedHandover(null);
         setHandoverDetails(null);
@@ -219,6 +218,9 @@ export default function VehicleHandoverDashboard({ user, onLogout }) {
                   <h3>Handover Items</h3>
                   <div className="item-form">
                     <select 
+                      id="vh_item_type"
+                      name="item_type"
+                      aria-label="Item type"
                       value={newItem.item_type}
                       onChange={(e) => setNewItem({ ...newItem, item_type: e.target.value })}
                     >
@@ -230,12 +232,18 @@ export default function VehicleHandoverDashboard({ user, onLogout }) {
                       <option value="other">Other</option>
                     </select>
                     <input 
+                      id="vh_item_description"
+                      name="item_description"
+                      aria-label="Item description"
                       type="text"
                       placeholder="Item description"
                       value={newItem.description}
                       onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
                     />
                     <input 
+                      id="vh_item_quantity"
+                      name="quantity"
+                      aria-label="Quantity"
                       type="number"
                       placeholder="Quantity"
                       value={newItem.quantity}

@@ -27,7 +27,7 @@ class JobControllerService:
         query = """
         SELECT so.id, c.name, so.vehicle_plate_no, so.service_type,
                t.name as technician_name, ta.status, ta.clock_in_time,
-               ta.labor_hours, so.estimated_completion_time
+               ta.labor_hours, so.estimated_completion_time, ta.id as assignment_id
         FROM service_orders so
         JOIN customers c ON so.customer_id = c.id
         JOIN technician_assignments ta ON so.id = ta.service_order_id

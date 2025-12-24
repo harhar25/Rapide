@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/job-wrapup-dashboard.css';
+import { fetchJson } from '../utils/fetchJson';
 
 const JobWrapupDashboard = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState('ready');
@@ -13,7 +14,7 @@ const JobWrapupDashboard = ({ user, onLogout }) => {
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  const API_BASE = 'http://localhost:5000/api/job-wrapup';
+  const API_BASE = '/api/job-wrapup';
 
   useEffect(() => {
     loadAllData();
@@ -29,8 +30,7 @@ const JobWrapupDashboard = ({ user, onLogout }) => {
 
   const loadReadyJobs = async () => {
     try {
-      const response = await fetch(`${API_BASE}/jobs/ready`);
-      const data = await response.json();
+      const data = await fetchJson(`${API_BASE}/jobs/ready`);
       if (data.success) {
         setReadyJobs(data.data || []);
       }
@@ -41,8 +41,7 @@ const JobWrapupDashboard = ({ user, onLogout }) => {
 
   const loadActiveWrapups = async () => {
     try {
-      const response = await fetch(`${API_BASE}/wrapups/active`);
-      const data = await response.json();
+      const data = await fetchJson(`${API_BASE}/wrapups/active`);
       if (data.success) {
         setActiveWrapups(data.data || []);
       }
@@ -53,8 +52,7 @@ const JobWrapupDashboard = ({ user, onLogout }) => {
 
   const loadSummary = async () => {
     try {
-      const response = await fetch(`${API_BASE}/summary`);
-      const data = await response.json();
+      const data = await fetchJson(`${API_BASE}/summary`);
       if (data.success) {
         setSummary(data.data);
       }
@@ -65,7 +63,7 @@ const JobWrapupDashboard = ({ user, onLogout }) => {
 
   const handleStartWrapup = async (job) => {
     try {
-      const response = await fetch(`${API_BASE}/wrapups`, {
+      const data = await fetchJson(`${API_BASE}/wrapups`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -75,8 +73,6 @@ const JobWrapupDashboard = ({ user, onLogout }) => {
           qc_inspection_id: null
         })
       });
-
-      const data = await response.json();
       if (data.success) {
         setSelectedJob({ ...job, wrapupId: data.wrapup_id });
         setSuccessMessage('Job wrap-up started');
@@ -95,15 +91,13 @@ const JobWrapupDashboard = ({ user, onLogout }) => {
     setSuccessMessage('');
 
     try {
-      const response = await fetch(`${API_BASE}/wrapups/${selectedJob.wrapupId}/clock-out`, {
+      const data = await fetchJson(`${API_BASE}/wrapups/${selectedJob.wrapupId}/clock-out`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           notes: document.getElementById('finalNotes')?.value || ''
         })
       });
-
-      const data = await response.json();
       if (data.success) {
         setSuccessMessage(`Technician clocked out - ${data.labor_hours.toFixed(2)} hours logged`);
         setShowClockOutForm(false);
@@ -122,7 +116,7 @@ const JobWrapupDashboard = ({ user, onLogout }) => {
     setSuccessMessage('');
 
     try {
-      const response = await fetch(`${API_BASE}/wrapups/${selectedJob.wrapupId}/checklist`, {
+      const data = await fetchJson(`${API_BASE}/wrapups/${selectedJob.wrapupId}/checklist`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -133,8 +127,6 @@ const JobWrapupDashboard = ({ user, onLogout }) => {
           quality_passed: document.getElementById('qualityPassed')?.checked
         })
       });
-
-      const data = await response.json();
       if (data.success) {
         setSuccessMessage('Checklist updated successfully');
         setShowChecklistForm(false);
@@ -151,12 +143,10 @@ const JobWrapupDashboard = ({ user, onLogout }) => {
     if (!window.confirm('Return this job to Service Advisor?')) return;
 
     try {
-      const response = await fetch(`${API_BASE}/wrapups/${wrapupId}/return-to-sa`, {
+      const data = await fetchJson(`${API_BASE}/wrapups/${wrapupId}/return-to-sa`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
-
-      const data = await response.json();
       if (data.success) {
         setSuccessMessage('Job returned to Service Advisor');
         loadAllData();

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/follow-up-dashboard.css';
+import { fetchJson } from '../utils/fetchJson';
 
 export default function FollowUpDashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('pending');
@@ -37,19 +38,16 @@ export default function FollowUpDashboard({ user, onLogout }) {
       setLoading(true);
       
       // Fetch pending follow-ups
-      const pendingRes = await fetch('/api/follow-up/followups/pending');
-      const pendingData = await pendingRes.json();
-      if (pendingData.status === 'success') setPendingFollowups(pendingData.followups || []);
+      const pendingData = await fetchJson('/api/follow-up/followups/pending');
+      if (pendingData.success) setPendingFollowups(pendingData.followups || pendingData.data || []);
       
       // Fetch open issues
-      const issuesRes = await fetch('/api/follow-up/issues');
-      const issuesData = await issuesRes.json();
-      if (issuesData.status === 'success') setOpenIssues(issuesData.issues || []);
+      const issuesData = await fetchJson('/api/follow-up/issues');
+      if (issuesData.success) setOpenIssues(issuesData.issues || issuesData.data || []);
       
       // Fetch summary
-      const summaryRes = await fetch('/api/follow-up/summary');
-      const summaryData = await summaryRes.json();
-      if (summaryData.status === 'success') setSummary(summaryData.summary || {});
+      const summaryData = await fetchJson('/api/follow-up/summary');
+      if (summaryData.success) setSummary(summaryData.summary || summaryData.data || {});
       
       setLoading(false);
     } catch (error) {
@@ -60,11 +58,10 @@ export default function FollowUpDashboard({ user, onLogout }) {
 
   const handleSelectFollowup = async (followupId) => {
     try {
-      const res = await fetch(`/api/follow-up/followups/${followupId}`);
-      const data = await res.json();
-      if (data.status === 'success') {
+      const data = await fetchJson(`/api/follow-up/followups/${followupId}`);
+      if (data.success) {
         setSelectedFollowup(followupId);
-        setFollowupDetails(data.details);
+        setFollowupDetails(data.details || data.data);
       }
     } catch (error) {
       console.error('Error fetching follow-up details:', error);
@@ -78,7 +75,7 @@ export default function FollowUpDashboard({ user, onLogout }) {
     }
 
     try {
-      const res = await fetch('/api/follow-up/followups', {
+      const data = await fetchJson('/api/follow-up/followups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -90,7 +87,7 @@ export default function FollowUpDashboard({ user, onLogout }) {
         })
       });
 
-      if (res.ok) {
+      if (data.success) {
         alert('Follow-up created successfully');
         setNewFollowup({ service_order_id: '', customer_id: '', followup_date: new Date().toISOString().split('T')[0], contact_method: 'phone' });
         fetchData();
@@ -104,7 +101,7 @@ export default function FollowUpDashboard({ user, onLogout }) {
     if (!selectedFollowup) return;
 
     try {
-      const res = await fetch(`/api/follow-up/followups/${selectedFollowup}/feedback`, {
+      const data = await fetchJson(`/api/follow-up/followups/${selectedFollowup}/feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -114,7 +111,7 @@ export default function FollowUpDashboard({ user, onLogout }) {
         })
       });
 
-      if (res.ok) {
+      if (data.success) {
         alert('Feedback recorded successfully');
         handleSelectFollowup(selectedFollowup);
       }
@@ -130,7 +127,7 @@ export default function FollowUpDashboard({ user, onLogout }) {
     }
 
     try {
-      const res = await fetch(`/api/follow-up/followups/${selectedFollowup}/issues`, {
+      const data = await fetchJson(`/api/follow-up/followups/${selectedFollowup}/issues`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -140,7 +137,7 @@ export default function FollowUpDashboard({ user, onLogout }) {
         })
       });
 
-      if (res.ok) {
+      if (data.success) {
         alert('Issue logged successfully');
         setNewIssue({ category: 'quality', description: '', severity: 'medium' });
         handleSelectFollowup(selectedFollowup);
@@ -154,7 +151,7 @@ export default function FollowUpDashboard({ user, onLogout }) {
     if (!selectedFollowup) return;
 
     try {
-      const res = await fetch(`/api/follow-up/followups/${selectedFollowup}/complete`, {
+      const data = await fetchJson(`/api/follow-up/followups/${selectedFollowup}/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -165,7 +162,7 @@ export default function FollowUpDashboard({ user, onLogout }) {
         })
       });
 
-      if (res.ok) {
+      if (data.success) {
         alert('Follow-up completed successfully');
         setSelectedFollowup(null);
         setFollowupDetails(null);
@@ -181,7 +178,7 @@ export default function FollowUpDashboard({ user, onLogout }) {
     if (!resolutionType) return;
 
     try {
-      const res = await fetch(`/api/follow-up/issues/${issueId}/resolve`, {
+      const data = await fetchJson(`/api/follow-up/issues/${issueId}/resolve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -190,7 +187,7 @@ export default function FollowUpDashboard({ user, onLogout }) {
         })
       });
 
-      if (res.ok) {
+      if (data.success) {
         alert('Issue resolved successfully');
         fetchData();
       }
@@ -308,8 +305,10 @@ export default function FollowUpDashboard({ user, onLogout }) {
                   ) : (
                     <form className="feedback-form">
                       <div className="form-group">
-                        <label>Overall Experience (1-5)</label>
+                        <label htmlFor="fu_overall_experience">Overall Experience (1-5)</label>
                         <input 
+                          id="fu_overall_experience"
+                          name="overall_experience"
                           type="number" 
                           min="1" 
                           max="5"
@@ -318,8 +317,10 @@ export default function FollowUpDashboard({ user, onLogout }) {
                         />
                       </div>
                       <div className="form-group">
-                        <label>Would Recommend</label>
+                        <label htmlFor="fu_would_recommend">Would Recommend</label>
                         <select 
+                          id="fu_would_recommend"
+                          name="would_recommend"
                           value={feedback.would_recommend}
                           onChange={(e) => setFeedback({ ...feedback, would_recommend: e.target.value })}
                         >
@@ -329,8 +330,10 @@ export default function FollowUpDashboard({ user, onLogout }) {
                         </select>
                       </div>
                       <div className="form-group">
-                        <label>Comments</label>
+                        <label htmlFor="fu_feedback_comments">Comments</label>
                         <textarea 
+                          id="fu_feedback_comments"
+                          name="comments"
                           value={feedback.comments}
                           onChange={(e) => setFeedback({ ...feedback, comments: e.target.value })}
                           placeholder="Customer feedback comments"
@@ -359,7 +362,10 @@ export default function FollowUpDashboard({ user, onLogout }) {
                   
                   <div className="issue-form">
                     <h4>Log New Issue</h4>
+                    <label htmlFor="fu_issue_category">Category</label>
                     <select 
+                      id="fu_issue_category"
+                      name="issue_category"
                       value={newIssue.category}
                       onChange={(e) => setNewIssue({ ...newIssue, category: e.target.value })}
                     >
@@ -370,12 +376,18 @@ export default function FollowUpDashboard({ user, onLogout }) {
                       <option value="delayed">Delayed</option>
                       <option value="other">Other</option>
                     </select>
+                    <label htmlFor="fu_issue_description">Description</label>
                     <textarea 
+                      id="fu_issue_description"
+                      name="issue_description"
                       placeholder="Issue description"
                       value={newIssue.description}
                       onChange={(e) => setNewIssue({ ...newIssue, description: e.target.value })}
                     />
+                    <label htmlFor="fu_issue_severity">Severity</label>
                     <select 
+                      id="fu_issue_severity"
+                      name="severity"
                       value={newIssue.severity}
                       onChange={(e) => setNewIssue({ ...newIssue, severity: e.target.value })}
                     >
@@ -440,8 +452,10 @@ export default function FollowUpDashboard({ user, onLogout }) {
             <h2>Create New Follow-up</h2>
             <form className="form-container">
               <div className="form-group">
-                <label>Service Order ID *</label>
+                <label htmlFor="fu_service_order_id">Service Order ID *</label>
                 <input 
+                  id="fu_service_order_id"
+                  name="service_order_id"
                   type="text" 
                   value={newFollowup.service_order_id}
                   onChange={(e) => setNewFollowup({ ...newFollowup, service_order_id: e.target.value })}
@@ -449,8 +463,10 @@ export default function FollowUpDashboard({ user, onLogout }) {
                 />
               </div>
               <div className="form-group">
-                <label>Customer ID *</label>
+                <label htmlFor="fu_customer_id">Customer ID *</label>
                 <input 
+                  id="fu_customer_id"
+                  name="customer_id"
                   type="text" 
                   value={newFollowup.customer_id}
                   onChange={(e) => setNewFollowup({ ...newFollowup, customer_id: e.target.value })}
@@ -458,16 +474,20 @@ export default function FollowUpDashboard({ user, onLogout }) {
                 />
               </div>
               <div className="form-group">
-                <label>Follow-up Date *</label>
+                <label htmlFor="fu_followup_date">Follow-up Date *</label>
                 <input 
+                  id="fu_followup_date"
+                  name="followup_date"
                   type="date" 
                   value={newFollowup.followup_date}
                   onChange={(e) => setNewFollowup({ ...newFollowup, followup_date: e.target.value })}
                 />
               </div>
               <div className="form-group">
-                <label>Contact Method</label>
+                <label htmlFor="fu_contact_method">Contact Method</label>
                 <select 
+                  id="fu_contact_method"
+                  name="contact_method"
                   value={newFollowup.contact_method}
                   onChange={(e) => setNewFollowup({ ...newFollowup, contact_method: e.target.value })}
                 >
