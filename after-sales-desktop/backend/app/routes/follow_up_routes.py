@@ -9,9 +9,9 @@ def get_pending_followups():
     try:
         date_from = request.args.get('date_from', None)
         followups = FollowUpService.get_pending_followups(date_from)
-        return jsonify({'status': 'success', 'followups': followups}), 200
+        return jsonify({'success': True, 'followups': followups}), 200
     except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @follow_up_bp.route('/followups', methods=['POST'])
 def create_followup():
@@ -20,8 +20,8 @@ def create_followup():
         data = request.json
         required_fields = ['service_order_id', 'customer_id', 'followup_date', 'contact_method', 'scheduled_by']
         
-        if not all(field in data for field in required_fields):
-            return jsonify({'status': 'error', 'message': 'Missing required fields'}), 400
+        if not data or not all(field in data for field in required_fields):
+            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
         
         result = FollowUpService.create_followup(
             data['service_order_id'],
@@ -31,18 +31,18 @@ def create_followup():
             data['contact_method'],
             data['scheduled_by']
         )
-        return jsonify({'status': 'success', 'followup': result}), 201
+        return jsonify({'success': True, 'followup': result}), 201
     except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @follow_up_bp.route('/followups/<int:followup_id>', methods=['GET'])
 def get_followup_details(followup_id):
     """Get complete follow-up details"""
     try:
         details = FollowUpService.get_followup_details(followup_id)
-        return jsonify({'status': 'success', 'details': details}), 200
+        return jsonify({'success': True, 'details': details}), 200
     except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @follow_up_bp.route('/followups/<int:followup_id>/feedback', methods=['POST'])
 def record_feedback(followup_id):
@@ -51,8 +51,8 @@ def record_feedback(followup_id):
         data = request.json
         required_fields = ['overall_experience', 'would_recommend']
         
-        if not all(field in data for field in required_fields):
-            return jsonify({'status': 'error', 'message': 'Missing required fields'}), 400
+        if not data or not all(field in data for field in required_fields):
+            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
         
         result = FollowUpService.record_feedback(
             followup_id,
@@ -64,9 +64,9 @@ def record_feedback(followup_id):
             data['would_recommend'],
             data.get('comments', '')
         )
-        return jsonify({'status': 'success', 'feedback': result}), 201
+        return jsonify({'success': True, 'feedback': result}), 201
     except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @follow_up_bp.route('/followups/<int:followup_id>/issues', methods=['POST'])
 def log_issue(followup_id):
@@ -75,8 +75,8 @@ def log_issue(followup_id):
         data = request.json
         required_fields = ['issue_category', 'issue_description', 'severity']
         
-        if not all(field in data for field in required_fields):
-            return jsonify({'status': 'error', 'message': 'Missing required fields'}), 400
+        if not data or not all(field in data for field in required_fields):
+            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
         
         result = FollowUpService.log_issue(
             followup_id,
@@ -85,9 +85,9 @@ def log_issue(followup_id):
             data['severity'],
             data.get('assigned_to', None)
         )
-        return jsonify({'status': 'success', 'issue': result}), 201
+        return jsonify({'success': True, 'issue': result}), 201
     except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @follow_up_bp.route('/followups/<int:followup_id>/complete', methods=['POST'])
 def complete_followup(followup_id):
@@ -96,8 +96,8 @@ def complete_followup(followup_id):
         data = request.json
         required_fields = ['status', 'completed_by']
         
-        if not all(field in data for field in required_fields):
-            return jsonify({'status': 'error', 'message': 'Missing required fields'}), 400
+        if not data or not all(field in data for field in required_fields):
+            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
         
         result = FollowUpService.update_followup_status(
             followup_id,
@@ -107,9 +107,9 @@ def complete_followup(followup_id):
             data.get('contact_phone', ''),
             data.get('notes', '')
         )
-        return jsonify({'status': 'success', 'followup': result}), 200
+        return jsonify({'success': True, 'followup': result}), 200
     except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @follow_up_bp.route('/issues', methods=['GET'])
 def get_open_issues():
@@ -117,9 +117,9 @@ def get_open_issues():
     try:
         severity = request.args.get('severity', None)
         issues = FollowUpService.get_open_issues(severity)
-        return jsonify({'status': 'success', 'issues': issues}), 200
+        return jsonify({'success': True, 'issues': issues}), 200
     except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @follow_up_bp.route('/issues/<int:issue_id>/resolve', methods=['POST'])
 def resolve_issue(issue_id):
@@ -128,8 +128,8 @@ def resolve_issue(issue_id):
         data = request.json
         required_fields = ['resolution_type', 'resolution_notes']
         
-        if not all(field in data for field in required_fields):
-            return jsonify({'status': 'error', 'message': 'Missing required fields'}), 400
+        if not data or not all(field in data for field in required_fields):
+            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
         
         result = FollowUpService.resolve_issue(
             issue_id,
@@ -137,9 +137,9 @@ def resolve_issue(issue_id):
             data['resolution_notes'],
             data.get('follow_up_action', '')
         )
-        return jsonify({'status': 'success', 'issue': result}), 200
+        return jsonify({'success': True, 'issue': result}), 200
     except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @follow_up_bp.route('/feedback/summary', methods=['GET'])
 def get_feedback_summary():
@@ -148,7 +148,7 @@ def get_feedback_summary():
         date_from = request.args.get('date_from', None)
         date_to = request.args.get('date_to', None)
         summary = FollowUpService.get_customer_feedback_summary(date_from, date_to)
-        return jsonify({'status': 'success', 'summary': {
+        return jsonify({'success': True, 'summary': {
             'avg_satisfaction': summary[0],
             'would_recommend_yes': summary[1],
             'would_recommend_no': summary[2],
@@ -156,7 +156,7 @@ def get_feedback_summary():
             'total_feedback': summary[4]
         }}), 200
     except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @follow_up_bp.route('/summary', methods=['GET'])
 def get_summary():
@@ -165,6 +165,6 @@ def get_summary():
         date_from = request.args.get('date_from', None)
         date_to = request.args.get('date_to', None)
         summary = FollowUpService.get_followup_summary(date_from, date_to)
-        return jsonify({'status': 'success', 'summary': summary}), 200
+        return jsonify({'success': True, 'summary': summary}), 200
     except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500

@@ -89,7 +89,6 @@ const AdminDashboard = ({ user, onLogout }) => {
           <h1>Admin Dashboard</h1>
           <p>Welcome, {user.name}</p>
         </div>
-        <button onClick={onLogout} className="logout-btn">Sign Out</button>
       </header>
 
       <div className="admin-content">

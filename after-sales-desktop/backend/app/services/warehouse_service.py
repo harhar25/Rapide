@@ -2,7 +2,7 @@ from database import db
 from datetime import datetime
 
 class WarehouseService:
-    """Warehouse product and inventory management service"""
+    """Warehouse management service"""
 
     def _to_int(self, value, field_name, *, min_value=None):
         if value is None or value == '':
@@ -179,9 +179,22 @@ class WarehouseService:
             LIMIT %s
             """
             results = db.execute_query(query, (limit,)) or []
-        
-        # Convert dictionaries to tuples for consistency
-        return [tuple(r.values()) for r in results]
+
+        history = []
+        for r in results:
+            if isinstance(r, dict):
+                created_at = r.get('created_at')
+                if hasattr(created_at, 'isoformat'):
+                    r = dict(r)
+                    r['created_at'] = created_at.isoformat()
+                history.append(tuple(r.values()))
+            else:
+                vals = list(r)
+                if len(vals) >= 12 and hasattr(vals[11], 'isoformat'):
+                    vals[11] = vals[11].isoformat()
+                history.append(tuple(vals))
+
+        return history
     
     def get_low_stock_products(self):
         """Get products below reorder level"""
@@ -216,22 +229,40 @@ class WarehouseService:
                 data.get('low_stock_count', 0) or 0
             )
         return (0, 0, 0, 0)
+
+    def ensure_parts_requests_table(self):
+        db.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS parts_requests (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                service_order_id INT NOT NULL,
+                technician_id INT NOT NULL,
+                requested_parts JSON NOT NULL,
+                notes TEXT,
+                status VARCHAR(50) DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_parts_requests_service_order_id (service_order_id),
+                INDEX idx_parts_requests_status (status)
+            )
+            """
+        )
     
     # ==================== PROCESS 4.1 & 4.2: PARTS REQUEST & ISSUANCE ====================
     
     def get_pending_parts_requests(self):
         """Get all pending parts requests from technicians (Process 4.1 - Warehouse View)"""
+        self.ensure_parts_requests_table()
         query = """
-        SELECT sod.id, sod.service_order_id, sod.document_data, sod.created_at,
+        SELECT pr.id, pr.service_order_id, pr.requested_parts as document_data, pr.created_at,
                so.vehicle_plate_no, so.service_type, c.name as customer_name,
-               ta.technician_id, t.name as technician_name
-        FROM service_order_documents sod
-        JOIN service_orders so ON sod.service_order_id = so.id
+               pr.technician_id, t.name as technician_name
+        FROM parts_requests pr
+        JOIN service_orders so ON pr.service_order_id = so.id
         LEFT JOIN customers c ON so.customer_id = c.id
-        LEFT JOIN technician_assignments ta ON so.id = ta.service_order_id
-        LEFT JOIN technicians t ON ta.technician_id = t.id
-        WHERE sod.document_type = 'parts-request'
-        ORDER BY sod.created_at DESC
+        LEFT JOIN technicians t ON pr.technician_id = t.id
+        WHERE pr.status = 'pending'
+        ORDER BY pr.created_at DESC
         """
         results = db.execute_query(query) or []
         return results
@@ -286,10 +317,11 @@ class WarehouseService:
     
     def get_parts_request_for_approval(self, service_order_id):
         """Get parts request details ready for warehouse approval (Process 4.2)"""
+        self.ensure_parts_requests_table()
         query = """
-        SELECT id, service_order_id, document_data, created_at
-        FROM service_order_documents
-        WHERE service_order_id = %s AND document_type = 'parts-request'
+        SELECT id, service_order_id, requested_parts as document_data, created_at
+        FROM parts_requests
+        WHERE service_order_id = %s
         ORDER BY created_at DESC
         LIMIT 1
         """

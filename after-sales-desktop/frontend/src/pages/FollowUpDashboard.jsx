@@ -204,7 +204,9 @@ export default function FollowUpDashboard({ user, onLogout }) {
         </div>
         <div className="fu-user-info">
           <span>{user.name} ({user.role})</span>
-          <button onClick={onLogout} className="logout-btn">Logout</button>
+          {user.role !== 'admin' && (
+            <button onClick={onLogout} className="logout-btn">Logout</button>
+          )}
         </div>
       </div>
 

@@ -3,6 +3,24 @@ from datetime import datetime, timedelta
 
 class JobControllerService:
     """Job Controller module for technician assignment and labor tracking"""
+
+    def ensure_parts_requests_table(self):
+        db.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS parts_requests (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                service_order_id INT NOT NULL,
+                technician_id INT NOT NULL,
+                requested_parts JSON NOT NULL,
+                notes TEXT,
+                status VARCHAR(50) DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_parts_requests_service_order_id (service_order_id),
+                INDEX idx_parts_requests_status (status)
+            )
+            """
+        )
     
     # ==================== VIEW SERVICE ORDERS ====================
     
@@ -321,25 +339,20 @@ class JobControllerService:
     
     def request_parts_from_warehouse(self, service_order_id, technician_id, requested_parts, notes=None):
         """Technician requests parts from warehouse (Process 4.1)"""
-        # Create parts request record - would need a new table in production
-        # For now, we'll log this as a note in service order
-        query = """
-        INSERT INTO service_order_documents
-        (service_order_id, document_type, document_data, created_at)
-        VALUES (%s, 'parts-request', %s, NOW())
-        """
-        
+        self.ensure_parts_requests_table()
         import json
-        request_data = json.dumps({
-            'technician_id': technician_id,
-            'requested_parts': requested_parts,
-            'notes': notes,
-            'requested_at': datetime.now().isoformat(),
-            'status': 'pending'
-        })
-        
-        result = db.execute_update(query, (service_order_id, request_data))
-        
+
+        query = """
+        INSERT INTO parts_requests
+        (service_order_id, technician_id, requested_parts, notes, status, created_at)
+        VALUES (%s, %s, %s, %s, 'pending', NOW())
+        """
+
+        result = db.execute_update(
+            query,
+            (service_order_id, technician_id, json.dumps(requested_parts), notes),
+        )
+
         if result['success']:
             return {
                 'success': True,
@@ -347,15 +360,16 @@ class JobControllerService:
                 'status': 'pending',
                 'timestamp': datetime.now().isoformat()
             }
-        
+
         return {'success': False, 'error': 'Parts request failed'}
     
     def get_parts_request_status(self, service_order_id):
         """Get status of parts request (Process 4.1 - Tracking)"""
+        self.ensure_parts_requests_table()
         query = """
-        SELECT id, document_type, document_data, created_at
-        FROM service_order_documents
-        WHERE service_order_id = %s AND document_type = 'parts-request'
+        SELECT id, service_order_id, technician_id, requested_parts, notes, status, created_at
+        FROM parts_requests
+        WHERE service_order_id = %s
         ORDER BY created_at DESC
         LIMIT 1
         """

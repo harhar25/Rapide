@@ -1,29 +1,57 @@
 from database import db
-from datetime import datetime, timedelta
+from datetime import datetime
 
 class FollowUpService:
+
+    @staticmethod
+    def _to_json_value(v):
+        if v is None:
+            return None
+        try:
+            # date/datetime/time
+            if hasattr(v, 'isoformat'):
+                return v.isoformat()
+        except Exception:
+            pass
+        try:
+            # Decimal
+            if hasattr(v, 'quantize'):
+                return float(v)
+        except Exception:
+            pass
+        return v
+
+    @staticmethod
+    def _row_to_tuple(row, keys):
+        if not row:
+            return None
+        return tuple(FollowUpService._to_json_value(row.get(k)) for k in keys)
     
     @staticmethod
     def create_followup(service_order_id, customer_id, followup_date, followup_time, contact_method, scheduled_by):
         """Create a new follow-up task"""
         try:
-            cursor = db.get_cursor()
-            
             query = """
             INSERT INTO follow_ups 
             (service_order_id, customer_id, followup_date, followup_time, contact_method, followup_status, scheduled_by)
             VALUES (%s, %s, %s, %s, %s, 'pending', %s)
             """
-            cursor.execute(query, (service_order_id, customer_id, followup_date, followup_time, contact_method, scheduled_by))
-            followup_id = cursor.lastrowid
-            db.commit()
+            result = db.execute_update(
+                query,
+                (service_order_id, customer_id, followup_date, followup_time, contact_method, scheduled_by),
+            )
+
+            if not result.get('success'):
+                raise Exception(result.get('error') or 'Failed to create follow-up')
+
+            followup_id = result.get('last_id')
             
             return {
                 'followup_id': followup_id,
                 'service_order_id': service_order_id,
                 'customer_id': customer_id,
                 'status': 'pending',
-                'scheduled_for': followup_date
+                'scheduled_for': FollowUpService._to_json_value(followup_date)
             }
         except Exception as e:
             raise Exception(f"Error creating follow-up: {str(e)}")
@@ -32,18 +60,31 @@ class FollowUpService:
     def record_feedback(followup_id, service_quality, work_satisfaction, staff_rating, value_rating, overall_experience, would_recommend, comments):
         """Record customer feedback"""
         try:
-            cursor = db.get_cursor()
-            
             query = """
             INSERT INTO customer_feedback 
             (followup_id, service_quality_rating, work_done_satisfaction, staff_behavior_rating, 
              value_for_money_rating, overall_experience, would_recommend, feedback_comments)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """
-            cursor.execute(query, (followup_id, service_quality, work_satisfaction, staff_rating, 
-                                   value_rating, overall_experience, would_recommend, comments))
-            feedback_id = cursor.lastrowid
-            db.commit()
+
+            result = db.execute_update(
+                query,
+                (
+                    followup_id,
+                    service_quality,
+                    work_satisfaction,
+                    staff_rating,
+                    value_rating,
+                    overall_experience,
+                    would_recommend,
+                    comments,
+                ),
+            )
+
+            if not result.get('success'):
+                raise Exception(result.get('error') or 'Failed to record feedback')
+
+            feedback_id = result.get('last_id')
             
             return {
                 'feedback_id': feedback_id,
@@ -58,16 +99,21 @@ class FollowUpService:
     def log_issue(followup_id, issue_category, issue_description, severity, assigned_to):
         """Log a customer issue"""
         try:
-            cursor = db.get_cursor()
-            
             query = """
             INSERT INTO issue_tracking 
             (followup_id, issue_category, issue_description, severity, issue_status, assigned_to)
             VALUES (%s, %s, %s, %s, 'open', %s)
             """
-            cursor.execute(query, (followup_id, issue_category, issue_description, severity, assigned_to))
-            issue_id = cursor.lastrowid
-            db.commit()
+
+            result = db.execute_update(
+                query,
+                (followup_id, issue_category, issue_description, severity, assigned_to),
+            )
+
+            if not result.get('success'):
+                raise Exception(result.get('error') or 'Failed to log issue')
+
+            issue_id = result.get('last_id')
             
             return {
                 'issue_id': issue_id,
@@ -83,8 +129,6 @@ class FollowUpService:
     def update_followup_status(followup_id, status, completed_by, contact_person_name, contact_phone, notes):
         """Update follow-up status after completion"""
         try:
-            cursor = db.get_cursor()
-            
             completion_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             
             query = """
@@ -98,9 +142,22 @@ class FollowUpService:
                 feedback_received = TRUE
             WHERE id = %s
             """
-            cursor.execute(query, (status, completed_by, completion_date, contact_person_name, 
-                                   contact_phone, notes, followup_id))
-            db.commit()
+
+            result = db.execute_update(
+                query,
+                (
+                    status,
+                    completed_by,
+                    completion_date,
+                    contact_person_name,
+                    contact_phone,
+                    notes,
+                    followup_id,
+                ),
+            )
+
+            if not result.get('success'):
+                raise Exception(result.get('error') or 'Failed to update follow-up')
             
             return {
                 'followup_id': followup_id,
@@ -114,8 +171,18 @@ class FollowUpService:
     def get_pending_followups(date_from=None):
         """Get all pending follow-ups"""
         try:
-            cursor = db.get_cursor()
-            
+            keys = [
+                'id',
+                'service_order_id',
+                'customer_id',
+                'followup_date',
+                'followup_time',
+                'contact_method',
+                'followup_status',
+                'feedback_received',
+                'issue_reported',
+            ]
+
             if date_from:
                 query = """
                 SELECT f.id, f.service_order_id, f.customer_id, f.followup_date, f.followup_time,
@@ -124,7 +191,7 @@ class FollowUpService:
                 WHERE f.followup_status = 'pending' AND DATE(f.followup_date) >= %s
                 ORDER BY f.followup_date ASC
                 """
-                cursor.execute(query, (date_from,))
+                rows = db.execute_query(query, (date_from,)) or []
             else:
                 query = """
                 SELECT f.id, f.service_order_id, f.customer_id, f.followup_date, f.followup_time,
@@ -133,11 +200,9 @@ class FollowUpService:
                 WHERE f.followup_status = 'pending'
                 ORDER BY f.followup_date ASC
                 """
-                cursor.execute(query)
-            
-            followups = cursor.fetchall()
-            
-            return [tuple(fu) for fu in followups]
+                rows = db.execute_query(query) or []
+
+            return [FollowUpService._row_to_tuple(r, keys) for r in rows]
         except Exception as e:
             raise Exception(f"Error fetching pending follow-ups: {str(e)}")
     
@@ -145,8 +210,6 @@ class FollowUpService:
     def get_followup_details(followup_id):
         """Get complete follow-up details with feedback and issues"""
         try:
-            cursor = db.get_cursor()
-            
             # Get follow-up details
             query = """
             SELECT id, service_order_id, customer_id, followup_date, followup_time, contact_method,
@@ -155,8 +218,8 @@ class FollowUpService:
             FROM follow_ups
             WHERE id = %s
             """
-            cursor.execute(query, (followup_id,))
-            followup = cursor.fetchone()
+            followup_rows = db.execute_query(query, (followup_id,)) or []
+            followup = followup_rows[0] if followup_rows else None
             
             if not followup:
                 raise Exception("Follow-up not found")
@@ -168,8 +231,8 @@ class FollowUpService:
             FROM customer_feedback
             WHERE followup_id = %s
             """
-            cursor.execute(query, (followup_id,))
-            feedback = cursor.fetchone()
+            feedback_rows = db.execute_query(query, (followup_id,)) or []
+            feedback = feedback_rows[0] if feedback_rows else None
             
             # Get issues
             query = """
@@ -179,13 +242,49 @@ class FollowUpService:
             WHERE followup_id = %s
             ORDER BY severity DESC
             """
-            cursor.execute(query, (followup_id,))
-            issues = cursor.fetchall()
+
+            issues_rows = db.execute_query(query, (followup_id,)) or []
+
+            followup_keys = [
+                'id',
+                'service_order_id',
+                'customer_id',
+                'followup_date',
+                'followup_time',
+                'contact_method',
+                'contact_person_name',
+                'contact_person_phone',
+                'followup_status',
+                'feedback_received',
+                'issue_reported',
+                'followup_notes',
+                'satisfaction_rating',
+            ]
+            feedback_keys = [
+                'id',
+                'service_quality_rating',
+                'work_done_satisfaction',
+                'staff_behavior_rating',
+                'value_for_money_rating',
+                'overall_experience',
+                'would_recommend',
+                'feedback_comments',
+            ]
+            issue_keys = [
+                'id',
+                'issue_category',
+                'issue_description',
+                'severity',
+                'issue_status',
+                'investigation_notes',
+                'resolution_notes',
+                'assigned_to',
+            ]
             
             return {
-                'followup': tuple(followup),
-                'feedback': tuple(feedback) if feedback else None,
-                'issues': [tuple(issue) for issue in issues]
+                'followup': FollowUpService._row_to_tuple(followup, followup_keys),
+                'feedback': FollowUpService._row_to_tuple(feedback, feedback_keys) if feedback else None,
+                'issues': [FollowUpService._row_to_tuple(issue, issue_keys) for issue in issues_rows]
             }
         except Exception as e:
             raise Exception(f"Error fetching follow-up details: {str(e)}")
@@ -194,8 +293,6 @@ class FollowUpService:
     def get_customer_feedback_summary(date_from=None, date_to=None):
         """Get customer feedback statistics"""
         try:
-            cursor = db.get_cursor()
-            
             query = """
             SELECT 
                 COALESCE(AVG(overall_experience), 0) as avg_satisfaction,
@@ -215,11 +312,20 @@ class FollowUpService:
             if date_to:
                 query += " AND DATE(cf.feedback_date) <= %s"
                 params.append(date_to)
-            
-            cursor.execute(query, params)
-            stats = cursor.fetchone()
-            
-            return tuple(stats) if stats else (0, 0, 0, 0, 0)
+
+            rows = db.execute_query(query, tuple(params)) or []
+            stats = rows[0] if rows else None
+
+            if not stats:
+                return (0, 0, 0, 0, 0)
+
+            return (
+                FollowUpService._to_json_value(stats.get('avg_satisfaction')),
+                FollowUpService._to_json_value(stats.get('would_recommend_yes')),
+                FollowUpService._to_json_value(stats.get('would_recommend_no')),
+                FollowUpService._to_json_value(stats.get('would_recommend_maybe')),
+                FollowUpService._to_json_value(stats.get('total_feedback')),
+            )
         except Exception as e:
             raise Exception(f"Error fetching feedback summary: {str(e)}")
     
@@ -227,8 +333,17 @@ class FollowUpService:
     def get_open_issues(severity_filter=None):
         """Get all open issues"""
         try:
-            cursor = db.get_cursor()
-            
+            keys = [
+                'id',
+                'followup_id',
+                'issue_category',
+                'issue_description',
+                'severity',
+                'issue_status',
+                'assigned_to',
+                'reported_date',
+            ]
+
             if severity_filter:
                 query = """
                 SELECT i.id, i.followup_id, i.issue_category, i.issue_description, i.severity,
@@ -237,7 +352,7 @@ class FollowUpService:
                 WHERE i.issue_status != 'closed' AND i.severity = %s
                 ORDER BY i.severity DESC, i.reported_date DESC
                 """
-                cursor.execute(query, (severity_filter,))
+                rows = db.execute_query(query, (severity_filter,)) or []
             else:
                 query = """
                 SELECT i.id, i.followup_id, i.issue_category, i.issue_description, i.severity,
@@ -246,11 +361,10 @@ class FollowUpService:
                 WHERE i.issue_status != 'closed'
                 ORDER BY i.severity DESC, i.reported_date DESC
                 """
-                cursor.execute(query)
-            
-            issues = cursor.fetchall()
-            
-            return [tuple(issue) for issue in issues]
+
+                rows = db.execute_query(query) or []
+
+            return [FollowUpService._row_to_tuple(issue, keys) for issue in rows]
         except Exception as e:
             raise Exception(f"Error fetching open issues: {str(e)}")
     
@@ -258,8 +372,6 @@ class FollowUpService:
     def resolve_issue(issue_id, resolution_type, resolution_notes, follow_up_action):
         """Resolve an issue"""
         try:
-            cursor = db.get_cursor()
-            
             resolved_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             
             query = """
@@ -271,8 +383,14 @@ class FollowUpService:
                 resolved_date = %s
             WHERE id = %s
             """
-            cursor.execute(query, (resolution_type, resolution_notes, follow_up_action, resolved_date, issue_id))
-            db.commit()
+
+            result = db.execute_update(
+                query,
+                (resolution_type, resolution_notes, follow_up_action, resolved_date, issue_id),
+            )
+
+            if not result.get('success'):
+                raise Exception(result.get('error') or 'Failed to resolve issue')
             
             return {
                 'issue_id': issue_id,
@@ -287,8 +405,6 @@ class FollowUpService:
     def get_followup_summary(date_from=None, date_to=None):
         """Get follow-up summary statistics"""
         try:
-            cursor = db.get_cursor()
-            
             query = "SELECT COUNT(*) as total, followup_status FROM follow_ups"
             conditions = []
             params = []
@@ -304,8 +420,12 @@ class FollowUpService:
                 query += " WHERE " + " AND ".join(conditions)
             
             query += " GROUP BY followup_status"
-            cursor.execute(query, params)
-            status_stats = cursor.fetchall()
+
+            status_rows = db.execute_query(query, tuple(params)) or []
+            status_stats = [
+                (FollowUpService._to_json_value(r.get('total')), FollowUpService._to_json_value(r.get('followup_status')))
+                for r in status_rows
+            ]
             
             # Get issue stats
             query = """
@@ -321,12 +441,16 @@ class FollowUpService:
                 issue_params.append(date_to)
             
             query += " GROUP BY issue_status"
-            cursor.execute(query, issue_params)
-            issue_stats = cursor.fetchall()
+
+            issue_rows = db.execute_query(query, tuple(issue_params)) or []
+            issue_stats = [
+                (FollowUpService._to_json_value(r.get('total')), FollowUpService._to_json_value(r.get('issue_status')))
+                for r in issue_rows
+            ]
             
             return {
-                'by_status': [tuple(stat) for stat in status_stats],
-                'issues_by_status': [tuple(stat) for stat in issue_stats]
+                'by_status': status_stats,
+                'issues_by_status': issue_stats
             }
         except Exception as e:
             raise Exception(f"Error fetching follow-up summary: {str(e)}")

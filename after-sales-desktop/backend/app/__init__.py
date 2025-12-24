@@ -23,6 +23,7 @@ def create_app(config_name='development'):
     from app.routes.warehouse_routes import warehouse_bp
     from app.routes.service_advisor_routes import service_advisor_bp
     from app.routes.job_controller_routes import job_controller_bp
+    from app.routes.technician_routes import technician_bp
     from app.routes.foreman_qc_routes import foreman_qc_bp
     from app.routes.job_wrapup_routes import job_wrapup_bp
     from app.routes.car_jockey_routes import car_jockey_bp
@@ -38,6 +39,7 @@ def create_app(config_name='development'):
     app.register_blueprint(warehouse_bp)
     app.register_blueprint(service_advisor_bp)
     app.register_blueprint(job_controller_bp)
+    app.register_blueprint(technician_bp)
     app.register_blueprint(foreman_qc_bp)
     app.register_blueprint(job_wrapup_bp)
     app.register_blueprint(car_jockey_bp)
