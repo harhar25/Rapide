@@ -95,12 +95,19 @@ export default function SecurityGateDashboard({ user, onLogout }) {
     const vehiclePlate = prompt('Enter vehicle plate number:');
     if (!vehiclePlate) return;
 
+    const soIdInput = prompt('Enter service order ID (optional):');
+    let serviceOrderId = null;
+    if (soIdInput && soIdInput.trim() !== '') {
+      const parsed = parseInt(soIdInput, 10);
+      serviceOrderId = Number.isFinite(parsed) ? parsed : null;
+    }
+
     try {
       const res = await fetchJson('/api/security-gate/access/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          service_order_id: null,
+          service_order_id: serviceOrderId,
           vehicle_plate_no: vehiclePlate,
           customer_name: null,
           access_type: accessType,
@@ -125,7 +132,9 @@ export default function SecurityGateDashboard({ user, onLogout }) {
         </div>
         <div className="sg-user-info">
           <span>{user.name} ({user.role})</span>
-          <button onClick={onLogout} className="logout-btn">Logout</button>
+          {user?.role !== 'admin' && (
+            <button onClick={onLogout} className="logout-btn">Logout</button>
+          )}
         </div>
       </div>
 
@@ -141,11 +150,11 @@ export default function SecurityGateDashboard({ user, onLogout }) {
               <div className="summary-label">Exits Today</div>
             </div>
             <div className="summary-card warning">
-              <div className="summary-value">{summary.access_denied || 0}</div>
+              <div className="summary-value">{(summary.denied_entries || 0) + (summary.denied_exits || 0)}</div>
               <div className="summary-label">Access Denied</div>
             </div>
             <div className="summary-card">
-              <div className="summary-value">{summary.active_vehicles || 0}</div>
+              <div className="summary-value">{summary.vehicles_processed || 0}</div>
               <div className="summary-label">Vehicles On-Site</div>
             </div>
           </>
@@ -181,11 +190,11 @@ export default function SecurityGateDashboard({ user, onLogout }) {
                 <tbody>
                   {entryLogs.map((log, idx) => (
                     <tr key={idx}>
-                      <td>{log[5]?.substring(11, 19) || 'N/A'}</td>
-                      <td>{log[2] || 'N/A'}</td>
-                      <td>{log[3] || 'N/A'}</td>
-                      <td>Operator {log[6] || 'N/A'}</td>
-                      <td><span className={`badge ${log[7] ? 'authorized' : 'unauthorized'}`}>{log[7] ? 'Authorized' : 'Not Authorized'}</span></td>
+                      <td>{log.time?.substring(11, 19) || 'N/A'}</td>
+                      <td>{log.plate_no || 'N/A'}</td>
+                      <td>{log.customer || 'N/A'}</td>
+                      <td>{log.operator || 'N/A'}</td>
+                      <td><span className={`badge ${log.authorized ? 'authorized' : 'unauthorized'}`}>{log.authorized ? 'Authorized' : 'Not Authorized'}</span></td>
                     </tr>
                   ))}
                 </tbody>
@@ -215,10 +224,10 @@ export default function SecurityGateDashboard({ user, onLogout }) {
                 <tbody>
                   {exitLogs.map((log, idx) => (
                     <tr key={idx}>
-                      <td>{log[5]?.substring(11, 19) || 'N/A'}</td>
-                      <td>{log[2] || 'N/A'}</td>
-                      <td>{log[3] || 'N/A'}</td>
-                      <td>Operator {log[6] || 'N/A'}</td>
+                      <td>{log.time?.substring(11, 19) || 'N/A'}</td>
+                      <td>{log.plate_no || 'N/A'}</td>
+                      <td>{log.customer || 'N/A'}</td>
+                      <td>{log.operator || 'N/A'}</td>
                       <td><span className="badge success">Completed</span></td>
                     </tr>
                   ))}
@@ -251,15 +260,15 @@ export default function SecurityGateDashboard({ user, onLogout }) {
                 <tbody>
                   {activeBadges.map((badge, idx) => (
                     <tr key={idx}>
-                      <td>{badge[1] || 'N/A'}</td>
-                      <td>{badge[3] || 'N/A'}</td>
-                      <td>{badge[5] || 'N/A'}</td>
-                      <td>{badge[6]?.substring(0, 10) || 'N/A'}</td>
-                      <td>{badge[7]?.substring(0, 10) || 'N/A'}</td>
-                      <td>{badge[8] || 'N/A'}</td>
-                      <td>{badge[10] || 0}</td>
+                      <td>{badge.badge_no || 'N/A'}</td>
+                      <td>{badge.plate_no || 'N/A'}</td>
+                      <td>{badge.customer || 'N/A'}</td>
+                      <td>{badge.issued?.substring(0, 10) || 'N/A'}</td>
+                      <td>{badge.expires?.substring(0, 10) || 'N/A'}</td>
+                      <td>{badge.type || 'N/A'}</td>
+                      <td>{badge.scans ?? 0}</td>
                       <td>
-                        <button onClick={() => handleRevokeBadge(badge[0])} className="action-btn delete">Revoke</button>
+                        <button onClick={() => handleRevokeBadge(badge.badge_no)} className="action-btn delete">Revoke</button>
                       </td>
                     </tr>
                   ))}

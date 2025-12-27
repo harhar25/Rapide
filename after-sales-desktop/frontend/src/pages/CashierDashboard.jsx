@@ -170,7 +170,9 @@ export default function CashierDashboard({ user, onLogout }) {
           <h1>💳 Cashier Operations</h1>
           <p>Payment Collection & Cash Management</p>
         </div>
-        <button onClick={onLogout} className="logout-btn">Logout</button>
+        {user?.role !== 'admin' && (
+          <button onClick={onLogout} className="logout-btn">Logout</button>
+        )}
       </div>
 
       {errorMessage && <div className="error-message">{errorMessage}</div>}

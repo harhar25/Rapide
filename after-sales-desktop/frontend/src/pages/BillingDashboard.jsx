@@ -210,7 +210,9 @@ export default function BillingDashboard({ user, onLogout }) {
           <h1>💰 Billing Management</h1>
           <p>Invoice Generation & Payment Tracking</p>
         </div>
-        <button onClick={onLogout} className="logout-btn">Logout</button>
+        {user?.role !== 'admin' && (
+          <button onClick={onLogout} className="logout-btn">Logout</button>
+        )}
       </div>
 
       {/* Messages */}

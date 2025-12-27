@@ -129,8 +129,8 @@ CREATE TABLE service_orders (
     vehicle_plate_no VARCHAR(20),
     service_type VARCHAR(50),
     check_in_time TIMESTAMP,
-    estimated_completion_time TIMESTAMP,
-    actual_completion_time TIMESTAMP,
+    estimated_completion_time DATETIME NULL DEFAULT NULL,
+    actual_completion_time DATETIME NULL DEFAULT NULL,
     status ENUM('pending', 'in-progress', 'completed', 'cancelled') DEFAULT 'pending',
     advisor_id INT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -711,7 +711,7 @@ CREATE TABLE IF NOT EXISTS payment_methods_config (
 
 CREATE TABLE IF NOT EXISTS gate_access_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    service_order_id INT NOT NULL,
+    service_order_id INT NULL,
     vehicle_plate_no VARCHAR(20),
     customer_name VARCHAR(255),
     access_type ENUM('entry', 'exit', 'emergency-exit') DEFAULT 'entry',

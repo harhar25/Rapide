@@ -149,7 +149,9 @@ export default function VehicleHandoverDashboard({ user, onLogout }) {
         </div>
         <div className="vh-user-info">
           <span>{user.name} ({user.role})</span>
-          <button onClick={onLogout} className="logout-btn">Logout</button>
+          {user?.role !== 'admin' && (
+            <button onClick={onLogout} className="logout-btn">Logout</button>
+          )}
         </div>
       </div>
 

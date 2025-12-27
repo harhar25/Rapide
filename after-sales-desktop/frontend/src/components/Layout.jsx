@@ -28,9 +28,11 @@ export default function Layout({ children, onLogout, user }) {
           </li>
         </nav>
         <div className="sidebar-footer">
-          <button className="btn btn-outline" onClick={onLogout}>
-            Sign Out
-          </button>
+          {user?.role !== 'admin' && (
+            <button className="btn btn-outline" onClick={onLogout}>
+              Sign Out
+            </button>
+          )}
         </div>
       </aside>
 

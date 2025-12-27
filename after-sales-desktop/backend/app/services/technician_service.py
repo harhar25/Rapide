@@ -53,6 +53,30 @@ class TechnicianService:
                             'matched_by': 'auto_provisioned_employee_id'
                         }
 
+            db.execute_update(
+                """
+                INSERT INTO technicians (name, employee_id, status)
+                SELECT p.name, p.username, 'active'
+                FROM personnel p
+                WHERE p.role = 'technician' AND p.status = 'active'
+                  AND NOT EXISTS (SELECT 1 FROM technicians t WHERE t.employee_id = p.username)
+                ORDER BY p.id ASC
+                LIMIT 1
+                """
+            )
+
+            any_active = db.execute_query(
+                "SELECT id, name, employee_id FROM technicians WHERE status = 'active' ORDER BY id ASC LIMIT 1"
+            )
+            if any_active:
+                row = any_active[0]
+                return {
+                    'technician_id': row.get('id'),
+                    'technician_name': row.get('name'),
+                    'employee_id': row.get('employee_id'),
+                    'matched_by': 'fallback_any_active'
+                }
+
         if name:
             result = db.execute_query(
                 "SELECT id, name, employee_id FROM technicians WHERE name = %s LIMIT 1",

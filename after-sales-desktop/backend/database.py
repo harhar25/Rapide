@@ -156,6 +156,28 @@ class Database:
     def ensure_core_tables(self):
         self.execute_update(
             """
+            CREATE TABLE IF NOT EXISTS personnel (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                username VARCHAR(50) NOT NULL UNIQUE,
+                password VARCHAR(255) NOT NULL,
+                name VARCHAR(255) NOT NULL,
+                role VARCHAR(50) DEFAULT 'cro',
+                email VARCHAR(100),
+                status VARCHAR(20) DEFAULT 'active',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_username (username),
+                INDEX idx_role (role),
+                INDEX idx_status (status)
+            )
+            """
+        )
+
+        self.execute_update("ALTER TABLE personnel MODIFY role VARCHAR(50) DEFAULT 'cro'")
+        self.execute_update("ALTER TABLE personnel MODIFY status VARCHAR(20) DEFAULT 'active'")
+
+        self.execute_update(
+            """
             CREATE TABLE IF NOT EXISTS service_order_documents (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 service_order_id INT NOT NULL,
@@ -201,7 +223,155 @@ class Database:
             """
         )
 
-        self.execute_update("ALTER TABLE service_orders MODIFY estimated_completion_time DATETIME NULL DEFAULT NULL")
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS invoices (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                service_order_id INT NOT NULL,
+                invoice_number VARCHAR(50) UNIQUE NOT NULL,
+                customer_id INT NOT NULL,
+                job_wrapup_id INT,
+                invoice_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                due_date DATE,
+                labor_hours DECIMAL(5, 2),
+                labor_rate DECIMAL(8, 2) DEFAULT 50.00,
+                labor_cost DECIMAL(10, 2),
+                materials_cost DECIMAL(10, 2) DEFAULT 0,
+                parts_cost DECIMAL(10, 2) DEFAULT 0,
+                parking_cost DECIMAL(10, 2) DEFAULT 0,
+                discount_amount DECIMAL(10, 2) DEFAULT 0,
+                tax_amount DECIMAL(10, 2) DEFAULT 0,
+                subtotal DECIMAL(10, 2),
+                total_amount DECIMAL(10, 2),
+                status VARCHAR(50) DEFAULT 'draft',
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_service_order_id (service_order_id),
+                INDEX idx_customer_id (customer_id),
+                INDEX idx_invoice_number (invoice_number),
+                INDEX idx_status (status),
+                INDEX idx_invoice_date (invoice_date),
+                INDEX idx_due_date (due_date)
+            )
+            """
+        )
+
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS billing_items (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                invoice_id INT NOT NULL,
+                item_type VARCHAR(50) DEFAULT 'service',
+                item_description VARCHAR(255) NOT NULL,
+                item_code VARCHAR(50),
+                quantity DECIMAL(10, 2) DEFAULT 1,
+                unit_price DECIMAL(10, 2),
+                line_total DECIMAL(10, 2),
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_invoice_id (invoice_id),
+                INDEX idx_item_type (item_type)
+            )
+            """
+        )
+
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS invoice_payments (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                invoice_id INT NOT NULL,
+                payment_amount DECIMAL(10, 2),
+                payment_method VARCHAR(50) DEFAULT 'cash',
+                payment_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                reference_number VARCHAR(100),
+                notes TEXT,
+                created_by INT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_invoice_id (invoice_id),
+                INDEX idx_payment_date (payment_date),
+                INDEX idx_payment_method (payment_method)
+            )
+            """
+        )
+
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS payment_transactions (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                invoice_id INT,
+                customer_id INT NOT NULL,
+                transaction_type VARCHAR(50) DEFAULT 'payment',
+                amount DECIMAL(10, 2),
+                payment_method VARCHAR(50) DEFAULT 'cash',
+                reference_number VARCHAR(100),
+                card_last_four VARCHAR(4),
+                bank_name VARCHAR(100),
+                check_number VARCHAR(50),
+                transaction_status VARCHAR(50) DEFAULT 'pending',
+                notes TEXT,
+                created_by INT NOT NULL,
+                processed_by INT,
+                transaction_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                processed_date DATETIME,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_invoice_id (invoice_id),
+                INDEX idx_customer_id (customer_id),
+                INDEX idx_payment_method (payment_method),
+                INDEX idx_transaction_status (transaction_status),
+                INDEX idx_transaction_date (transaction_date)
+            )
+            """
+        )
+
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS cash_drawer (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                cashier_id INT NOT NULL,
+                opening_balance DECIMAL(10, 2) DEFAULT 0,
+                opening_time DATETIME,
+                closing_balance DECIMAL(10, 2),
+                closing_time DATETIME,
+                cash_counted DECIMAL(10, 2),
+                card_total DECIMAL(10, 2) DEFAULT 0,
+                check_total DECIMAL(10, 2) DEFAULT 0,
+                bank_transfer_total DECIMAL(10, 2) DEFAULT 0,
+                mobile_money_total DECIMAL(10, 2) DEFAULT 0,
+                discrepancy DECIMAL(10, 2),
+                drawer_status VARCHAR(50) DEFAULT 'open',
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_cashier_id (cashier_id),
+                INDEX idx_drawer_status (drawer_status),
+                INDEX idx_opening_time (opening_time),
+                INDEX idx_closing_time (closing_time)
+            )
+            """
+        )
+
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS payment_methods_config (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                method_type VARCHAR(50) DEFAULT 'cash',
+                method_name VARCHAR(100),
+                is_enabled BOOLEAN DEFAULT TRUE,
+                requires_verification BOOLEAN DEFAULT FALSE,
+                processing_fee_percent DECIMAL(5, 2) DEFAULT 0,
+                daily_limit DECIMAL(12, 2),
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY unique_method_type (method_type),
+                INDEX idx_is_enabled (is_enabled)
+            )
+            """
+        )
+
+        self.execute_update("ALTER TABLE service_orders MODIFY estimated_completion_time DATETIME NULL DEFAULT NULL, MODIFY actual_completion_time DATETIME NULL DEFAULT NULL")
         self.execute_update("ALTER TABLE scheduling_orders MODIFY status VARCHAR(50) DEFAULT 'scheduled'")
         self.execute_update("ALTER TABLE service_orders MODIFY status VARCHAR(50) DEFAULT 'pending'")
         self.execute_update("ALTER TABLE service_order_documents MODIFY document_type VARCHAR(50) NOT NULL")
@@ -287,7 +457,7 @@ class Database:
             """
             CREATE TABLE IF NOT EXISTS gate_access_logs (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                service_order_id INT NOT NULL,
+                service_order_id INT NULL,
                 vehicle_plate_no VARCHAR(20),
                 customer_name VARCHAR(255),
                 access_type VARCHAR(50) DEFAULT 'entry',
@@ -312,6 +482,8 @@ class Database:
             """
         )
 
+        self.execute_update("ALTER TABLE gate_access_logs MODIFY service_order_id INT NULL")
+
         self.execute_update(
             """
             CREATE TABLE IF NOT EXISTS vehicle_badges (
@@ -333,6 +505,73 @@ class Database:
                 INDEX idx_service_order_id (service_order_id),
                 INDEX idx_badge_status (badge_status),
                 INDEX idx_expiry_date (expiry_date)
+            )
+            """
+        )
+
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS vehicle_handovers (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                service_order_id INT NOT NULL,
+                job_wrapup_id INT,
+                handover_date DATETIME,
+                technician_id INT,
+                customer_id INT NOT NULL,
+                final_inspection_notes TEXT,
+                vehicle_cleanliness VARCHAR(50),
+                fuel_level_final VARCHAR(50),
+                mileage_final INT,
+                overall_condition VARCHAR(100),
+                all_items_returned BOOLEAN DEFAULT TRUE,
+                customer_signature_date DATETIME,
+                customer_signature_captured BOOLEAN DEFAULT FALSE,
+                handover_status VARCHAR(50) DEFAULT 'pending',
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_service_order_id (service_order_id),
+                INDEX idx_handover_status (handover_status),
+                INDEX idx_handover_date (handover_date)
+            )
+            """
+        )
+
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS handover_items (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                handover_id INT NOT NULL,
+                item_type VARCHAR(50) DEFAULT 'parts',
+                item_description VARCHAR(255),
+                quantity INT DEFAULT 1,
+                condition_before VARCHAR(50),
+                condition_after VARCHAR(50),
+                item_verified BOOLEAN DEFAULT FALSE,
+                verified_by INT,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_handover_id (handover_id),
+                INDEX idx_item_type (item_type)
+            )
+            """
+        )
+
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS handover_signatures (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                handover_id INT NOT NULL,
+                signatory_type VARCHAR(50) DEFAULT 'customer',
+                signatory_name VARCHAR(255),
+                signatory_role VARCHAR(100),
+                signature_image LONGBLOB,
+                signature_timestamp DATETIME,
+                printed_name VARCHAR(255),
+                id_or_reference VARCHAR(100),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_handover_id (handover_id),
+                INDEX idx_signatory_type (signatory_type)
             )
             """
         )

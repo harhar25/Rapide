@@ -191,7 +191,9 @@ const ForemanQCDashboard = ({ user, onLogout }) => {
           <h1>Quality Control Inspection</h1>
           <p>Welcome, {user.name}</p>
         </div>
-        <button onClick={onLogout} className="logout-btn">Sign Out</button>
+        {user?.role !== 'admin' && (
+          <button onClick={onLogout} className="logout-btn">Sign Out</button>
+        )}
       </header>
 
       <div className="qc-content">

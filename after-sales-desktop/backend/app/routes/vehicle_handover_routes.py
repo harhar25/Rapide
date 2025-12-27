@@ -9,7 +9,18 @@ def get_pending_handovers():
     try:
         date_from = request.args.get('date_from', None)
         handovers = VehicleHandoverService.get_pending_handovers(date_from)
-        return jsonify({'status': 'success', 'handovers': handovers}), 200
+        safe_handovers = []
+        for row in handovers or []:
+            safe_row = []
+            for v in row:
+                if v is None:
+                    safe_row.append(None)
+                elif hasattr(v, 'isoformat'):
+                    safe_row.append(v.isoformat())
+                else:
+                    safe_row.append(v)
+            safe_handovers.append(safe_row)
+        return jsonify({'status': 'success', 'handovers': safe_handovers}), 200
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -39,7 +50,27 @@ def get_handover_details(handover_id):
     """Get complete handover details"""
     try:
         details = VehicleHandoverService.get_handover_details(handover_id)
-        return jsonify({'status': 'success', 'details': details}), 200
+        handover = details.get('handover')
+        items = details.get('items') or []
+        signatures = details.get('signatures') or []
+
+        def _safe_seq(seq):
+            safe = []
+            for v in seq:
+                if v is None:
+                    safe.append(None)
+                elif hasattr(v, 'isoformat'):
+                    safe.append(v.isoformat())
+                else:
+                    safe.append(v)
+            return safe
+
+        safe_details = {
+            'handover': _safe_seq(handover) if handover else None,
+            'items': [_safe_seq(i) for i in items],
+            'signatures': [_safe_seq(s) for s in signatures],
+        }
+        return jsonify({'status': 'success', 'details': safe_details}), 200
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 

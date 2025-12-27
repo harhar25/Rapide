@@ -167,9 +167,10 @@ def get_active_drawer():
                 }
             }), 200
         return jsonify({
-            'success': False,
+            'success': True,
+            'data': None,
             'message': 'No active drawer'
-        }), 404
+        }), 200
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 

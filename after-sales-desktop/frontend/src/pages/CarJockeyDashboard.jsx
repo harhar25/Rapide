@@ -262,7 +262,9 @@ export default function CarJockeyDashboard({ user, onLogout }) {
           <h1>🚗 Car Jockey Operations</h1>
           <p>Vehicle Movement & Parking Management</p>
         </div>
-        <button onClick={onLogout} className="logout-btn">Logout</button>
+        {user?.role !== 'admin' && (
+          <button onClick={onLogout} className="logout-btn">Logout</button>
+        )}
       </div>
 
       {/* Messages */}

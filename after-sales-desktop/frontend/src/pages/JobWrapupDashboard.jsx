@@ -165,7 +165,9 @@ const JobWrapupDashboard = ({ user, onLogout }) => {
           <h1>Job Wrap-Up Management</h1>
           <p>Welcome, {user.name}</p>
         </div>
-        <button onClick={onLogout} className="logout-btn">Sign Out</button>
+        {user?.role !== 'admin' && (
+          <button onClick={onLogout} className="logout-btn">Sign Out</button>
+        )}
       </header>
 
       <div className="wu-content">

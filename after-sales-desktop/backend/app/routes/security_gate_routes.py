@@ -9,14 +9,36 @@ service = SecurityGateService()
 def log_access():
     """Log vehicle access"""
     try:
-        data = request.get_json()
-        
+        data = request.get_json() or {}
+
+        vehicle_plate_no = data.get('vehicle_plate_no')
+        gate_operator_id = data.get('gate_operator_id')
+
+        if not vehicle_plate_no:
+            raise ValueError('vehicle_plate_no is required')
+        if gate_operator_id is None or str(gate_operator_id).strip() == '':
+            raise ValueError('gate_operator_id is required')
+
+        try:
+            gate_operator_id = int(gate_operator_id)
+        except Exception:
+            raise ValueError('gate_operator_id must be a number')
+
+        service_order_id = data.get('service_order_id')
+        if service_order_id is None or str(service_order_id).strip() == '':
+            service_order_id = None
+        else:
+            try:
+                service_order_id = int(service_order_id)
+            except Exception:
+                raise ValueError('service_order_id must be a number')
+
         log_id = service.create_access_log(
-            service_order_id=data['service_order_id'],
-            vehicle_plate_no=data['vehicle_plate_no'],
-            customer_name=data['customer_name'],
+            service_order_id=service_order_id,
+            vehicle_plate_no=vehicle_plate_no,
+            customer_name=data.get('customer_name'),
             access_type=data.get('access_type', 'entry'),
-            gate_operator_id=data['gate_operator_id'],
+            gate_operator_id=gate_operator_id,
             mileage=data.get('mileage', 0),
             vehicle_condition=data.get('vehicle_condition', 'Good'),
             badge_scanned=data.get('badge_scanned', ''),
@@ -85,14 +107,44 @@ def get_exits():
 def issue_badge():
     """Issue an access badge"""
     try:
-        data = request.get_json()
-        
+        data = request.get_json() or {}
+
+        service_order_id = data.get('service_order_id')
+        vehicle_plate_no = data.get('vehicle_plate_no')
+        issued_by = data.get('issued_by')
+
+        if service_order_id is None or str(service_order_id).strip() == '':
+            raise ValueError('service_order_id is required')
+        if not vehicle_plate_no:
+            raise ValueError('vehicle_plate_no is required')
+        if issued_by is None or str(issued_by).strip() == '':
+            raise ValueError('issued_by is required')
+
+        try:
+            service_order_id = int(service_order_id)
+        except Exception:
+            raise ValueError('service_order_id must be a number')
+
+        try:
+            issued_by = int(issued_by)
+        except Exception:
+            raise ValueError('issued_by must be a number')
+
+        customer_id = data.get('customer_id')
+        if customer_id is None or str(customer_id).strip() == '':
+            customer_id = None
+        else:
+            try:
+                customer_id = int(customer_id)
+            except Exception:
+                raise ValueError('customer_id must be a number')
+
         badge_number = service.issue_badge(
-            service_order_id=data['service_order_id'],
-            vehicle_plate_no=data['vehicle_plate_no'],
-            customer_id=data['customer_id'],
+            service_order_id=service_order_id,
+            vehicle_plate_no=vehicle_plate_no,
+            customer_id=customer_id,
             badge_type=data.get('badge_type', 'temporary'),
-            issued_by=data['issued_by'],
+            issued_by=issued_by,
             expiry_days=data.get('expiry_days', 1)
         )
         

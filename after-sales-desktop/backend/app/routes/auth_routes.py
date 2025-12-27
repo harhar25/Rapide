@@ -78,6 +78,9 @@ def register_personnel():
             }), 201
         else:
             return jsonify({'success': False, 'error': 'Failed to register personnel'}), 500
+
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
     
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -122,6 +125,9 @@ def update_personnel(personnel_id):
             return jsonify({'success': True, 'message': 'Personnel updated'}), 200
         else:
             return jsonify({'success': False, 'error': 'Failed to update personnel'}), 500
+
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
     
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

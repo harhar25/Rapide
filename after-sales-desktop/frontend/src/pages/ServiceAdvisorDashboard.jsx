@@ -168,7 +168,9 @@ const ServiceAdvisorDashboard = ({ user, onLogout }) => {
           <h1>Service Advisor Module</h1>
           <p>Welcome, {user?.name}</p>
         </div>
-        <button onClick={onLogout} className="logout-btn">Sign Out</button>
+        {user?.role !== 'admin' && (
+          <button onClick={onLogout} className="logout-btn">Sign Out</button>
+        )}
       </header>
 
       <div className="sa-content">

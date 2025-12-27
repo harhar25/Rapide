@@ -19,7 +19,7 @@ def resolve_technician():
 
         resolved = technician_service.resolve_technician(username, name)
         if not resolved:
-            return jsonify({'success': False, 'error': 'Technician record not found. Ensure technicians.employee_id matches personnel.username.'}), 404
+            return jsonify({'success': False, 'error': 'Technician record not found. Ensure technicians.employee_id matches personnel.username.'}), 200
 
         return jsonify({'success': True, 'data': resolved}), 200
     except Exception as e:

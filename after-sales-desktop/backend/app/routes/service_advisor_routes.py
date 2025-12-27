@@ -11,10 +11,21 @@ def get_pending_appointments():
     """Get all pending scheduled appointments"""
     try:
         appointments = service_advisor_service.get_pending_appointments()
+        safe_appointments = []
+        for row in appointments or []:
+            safe_row = []
+            for v in row:
+                if v is None:
+                    safe_row.append(None)
+                elif hasattr(v, 'isoformat'):
+                    safe_row.append(v.isoformat())
+                else:
+                    safe_row.append(v)
+            safe_appointments.append(safe_row)
         return jsonify({
             'success': True,
-            'data': appointments,
-            'count': len(appointments)
+            'data': safe_appointments,
+            'count': len(safe_appointments)
         }), 200
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
