@@ -3,11 +3,56 @@ from datetime import datetime, timedelta
 
 class CashierService:
     """Cashier and payment collection service"""
+
+    def _get_invoice_customer_id(self, invoice_id):
+        if not invoice_id:
+            return None
+        result = db.execute_query(
+            "SELECT customer_id FROM invoices WHERE id = %s LIMIT 1",
+            (invoice_id,),
+        )
+        if result:
+            row = result[0]
+            if isinstance(row, dict):
+                return row.get('customer_id')
+            try:
+                return row[0]
+            except Exception:
+                return None
+        return None
     
     def process_payment(self, invoice_id, customer_id, amount, payment_method, 
                        created_by, reference_number="", card_last_four="", 
                        bank_name="", check_number=""):
         """Process a payment transaction"""
+        if not invoice_id:
+            raise ValueError('invoice_id is required')
+
+        if customer_id is None or customer_id == '':
+            customer_id = self._get_invoice_customer_id(invoice_id)
+
+        if customer_id is None or customer_id == '':
+            raise ValueError('customer_id is required')
+
+        try:
+            amount_num = float(amount)
+        except (TypeError, ValueError):
+            raise ValueError('Invalid amount')
+
+        if amount_num <= 0:
+            raise ValueError('Amount must be greater than 0')
+
+        if not payment_method:
+            raise ValueError('payment_method is required')
+
+        if created_by is None or created_by == '':
+            raise ValueError('created_by is required')
+
+        if isinstance(created_by, str):
+            created_by_str = created_by.strip()
+            if created_by_str.isdigit():
+                created_by = int(created_by_str)
+
         query = """
         INSERT INTO payment_transactions
         (invoice_id, customer_id, transaction_type, amount, payment_method,
@@ -15,13 +60,14 @@ class CashierService:
          transaction_status, created_by, transaction_date)
         VALUES (%s, %s, 'payment', %s, %s, %s, %s, %s, %s, 'completed', %s, NOW())
         """
-        params = (invoice_id, customer_id, amount, payment_method, reference_number,
+        params = (invoice_id, customer_id, amount_num, payment_method, reference_number,
                  card_last_four, bank_name, check_number, created_by)
         
         result = db.execute_update(query, params)
         if result['success']:
             # Update invoice status
-            self._update_invoice_after_payment(invoice_id)
+            if invoice_id:
+                self._update_invoice_after_payment(invoice_id)
             return result.get('last_id')
         raise ValueError("Failed to process payment")
     

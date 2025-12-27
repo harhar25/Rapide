@@ -86,6 +86,22 @@ class ServiceAdvisorService:
         if result:
             return tuple(result[0].values())
         return None
+
+    def get_service_order_customer_id(self, service_order_id):
+        """Get customer_id for a service order"""
+        if not service_order_id:
+            return None
+        query = "SELECT customer_id FROM service_orders WHERE id = %s LIMIT 1"
+        result = db.execute_query(query, (service_order_id,))
+        if result:
+            row = result[0]
+            if isinstance(row, dict):
+                return row.get('customer_id')
+            try:
+                return row[0]
+            except Exception:
+                return None
+        return None
     
     def get_pending_service_orders(self):
         """Get all pending service orders"""

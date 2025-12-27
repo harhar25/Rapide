@@ -1,4 +1,5 @@
 from flask import Blueprint, jsonify, request
+from datetime import timedelta
 from app.services.service_advisor_service import ServiceAdvisorService
 
 service_advisor_bp = Blueprint('service_advisor', __name__, url_prefix='/api/service-advisor')
@@ -17,6 +18,12 @@ def get_pending_appointments():
             for v in row:
                 if v is None:
                     safe_row.append(None)
+                elif isinstance(v, timedelta):
+                    total_seconds = int(v.total_seconds())
+                    hours = total_seconds // 3600
+                    minutes = (total_seconds % 3600) // 60
+                    seconds = total_seconds % 60
+                    safe_row.append(f"{hours:02d}:{minutes:02d}:{seconds:02d}")
                 elif hasattr(v, 'isoformat'):
                     safe_row.append(v.isoformat())
                 else:
@@ -92,12 +99,27 @@ def get_service_order(service_order_id):
 def create_or_update_cis():
     """Create or update Customer Info Sheet"""
     try:
-        data = request.json
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            data = {}
+
         service_order_id = data.get('service_order_id')
         customer_id = data.get('customer_id')
-        
-        if not service_order_id or not customer_id:
-            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+
+        if isinstance(service_order_id, str) and service_order_id.isdigit():
+            service_order_id = int(service_order_id)
+
+        if isinstance(customer_id, str) and customer_id.strip().isdigit():
+            customer_id = int(customer_id.strip())
+
+        if not service_order_id:
+            return jsonify({'success': False, 'error': 'Missing service_order_id'}), 400
+
+        if not customer_id:
+            customer_id = service_advisor_service.get_service_order_customer_id(service_order_id)
+
+        if not customer_id:
+            return jsonify({'success': False, 'error': 'Missing customer_id'}), 400
         
         success = service_advisor_service.create_or_update_cis(service_order_id, customer_id, data)
         
@@ -108,6 +130,8 @@ def create_or_update_cis():
             }), 201
         else:
             return jsonify({'success': False, 'error': 'Failed to save CIS'}), 500
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -130,12 +154,27 @@ def get_cis(service_order_id):
 def create_or_update_vrc():
     """Create or update Vehicle Report Card with 10-point diagnosis"""
     try:
-        data = request.json
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            data = {}
+
         service_order_id = data.get('service_order_id')
         customer_id = data.get('customer_id')
-        
-        if not service_order_id or not customer_id:
-            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+
+        if isinstance(service_order_id, str) and service_order_id.isdigit():
+            service_order_id = int(service_order_id)
+
+        if isinstance(customer_id, str) and customer_id.strip().isdigit():
+            customer_id = int(customer_id.strip())
+
+        if not service_order_id:
+            return jsonify({'success': False, 'error': 'Missing service_order_id'}), 400
+
+        if not customer_id:
+            customer_id = service_advisor_service.get_service_order_customer_id(service_order_id)
+
+        if not customer_id:
+            return jsonify({'success': False, 'error': 'Missing customer_id'}), 400
         
         success = service_advisor_service.create_or_update_vrc(service_order_id, customer_id, data)
         
@@ -146,6 +185,8 @@ def create_or_update_vrc():
             }), 201
         else:
             return jsonify({'success': False, 'error': 'Failed to save VRC'}), 500
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

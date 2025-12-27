@@ -28,14 +28,29 @@ def get_pending():
 def process_payment():
     """Process a payment"""
     try:
-        data = request.get_json()
-        
+        data = request.get_json(silent=True) or {}
+
+        invoice_id = data.get('invoice_id')
+        customer_id = data.get('customer_id')
+        amount = data.get('amount')
+        payment_method = data.get('payment_method')
+        created_by = data.get('created_by')
+
+        if not invoice_id:
+            return jsonify({'success': False, 'message': 'Missing invoice_id'}), 400
+        if amount is None:
+            return jsonify({'success': False, 'message': 'Missing amount'}), 400
+        if not payment_method:
+            return jsonify({'success': False, 'message': 'Missing payment_method'}), 400
+        if created_by is None or created_by == '':
+            return jsonify({'success': False, 'message': 'Missing created_by'}), 400
+
         payment_id = service.process_payment(
-            invoice_id=data.get('invoice_id'),
-            customer_id=data['customer_id'],
-            amount=data['amount'],
-            payment_method=data['payment_method'],
-            created_by=data['created_by'],
+            invoice_id=invoice_id,
+            customer_id=data.get('customer_id'),
+            amount=amount,
+            payment_method=payment_method,
+            created_by=created_by,
             reference_number=data.get('reference_number', ''),
             card_last_four=data.get('card_last_four', ''),
             bank_name=data.get('bank_name', ''),

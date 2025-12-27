@@ -26,6 +26,23 @@ export default function CashierDashboard({ user, onLogout }) {
     notes: ''
   });
 
+  const formatMoney = (value) => {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return '₱0.00';
+    return new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(num);
+  };
+
+  const parseFloatInput = (raw) => {
+    if (raw === '') return '';
+    const num = parseFloat(raw);
+    return Number.isFinite(num) ? num : '';
+  };
+
   useEffect(() => {
     loadAllData();
     const interval = setInterval(loadAllData, 30000);
@@ -84,6 +101,12 @@ export default function CashierDashboard({ user, onLogout }) {
   };
 
   const handleSubmitPayment = async () => {
+    const paymentAmount = Number(paymentForm.amount);
+    if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
+      setErrorMessage('Payment amount must be greater than 0');
+      return;
+    }
+
     try {
       const customerId = selectedInvoice?.customer_id ?? selectedInvoice?.customerId;
       const result = await fetchJson('/api/cashier/payments', {
@@ -92,7 +115,7 @@ export default function CashierDashboard({ user, onLogout }) {
         body: JSON.stringify({
           invoice_id: selectedInvoice.id,
           customer_id: customerId,
-          amount: paymentForm.amount,
+          amount: paymentAmount,
           payment_method: paymentForm.payment_method,
           reference_number: paymentForm.reference_number,
           created_by: user.id
@@ -115,13 +138,19 @@ export default function CashierDashboard({ user, onLogout }) {
   };
 
   const handleOpenDrawer = async () => {
+    const openingBalance = Number(drawerForm.opening_balance);
+    if (!Number.isFinite(openingBalance) || openingBalance < 0) {
+      setErrorMessage('Opening balance must be a valid amount');
+      return;
+    }
+
     try {
       const result = await fetchJson('/api/cashier/drawer/open', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           cashier_id: user.id,
-          opening_balance: drawerForm.opening_balance
+          opening_balance: openingBalance
         })
       });
 
@@ -140,12 +169,18 @@ export default function CashierDashboard({ user, onLogout }) {
 
   const handleCloseDrawer = async () => {
     if (!activeDrawer) return;
+    const cashCounted = Number(drawerForm.cash_counted);
+    if (!Number.isFinite(cashCounted) || cashCounted < 0) {
+      setErrorMessage('Cash counted must be a valid amount');
+      return;
+    }
+
     try {
       const result = await fetchJson(`/api/cashier/drawer/${activeDrawer.id}/close`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          cash_counted: drawerForm.cash_counted,
+          cash_counted: cashCounted,
           notes: drawerForm.notes
         })
       });
@@ -194,10 +229,10 @@ export default function CashierDashboard({ user, onLogout }) {
 
       {dailySummary && (
         <div className="summary-cards">
-          <div className="card total"><div className="card-value">${dailySummary.grand_total.toFixed(2)}</div><div className="card-label">Total Collected</div></div>
-          <div className="card cash"><div className="card-value">${dailySummary.cash_total.toFixed(2)}</div><div className="card-label">Cash</div></div>
-          <div className="card card-type"><div className="card-value">${dailySummary.card_total.toFixed(2)}</div><div className="card-label">Card</div></div>
-          <div className="card check"><div className="card-value">${dailySummary.check_total.toFixed(2)}</div><div className="card-label">Check</div></div>
+          <div className="card total"><div className="card-value">{formatMoney(dailySummary.grand_total)}</div><div className="card-label">Total Collected</div></div>
+          <div className="card cash"><div className="card-value">{formatMoney(dailySummary.cash_total)}</div><div className="card-label">Cash</div></div>
+          <div className="card card-type"><div className="card-value">{formatMoney(dailySummary.card_total)}</div><div className="card-label">Card</div></div>
+          <div className="card check"><div className="card-value">{formatMoney(dailySummary.check_total)}</div><div className="card-label">Check</div></div>
           <div className="card transactions"><div className="card-value">{dailySummary.total_transactions}</div><div className="card-label">Transactions</div></div>
         </div>
       )}
@@ -225,9 +260,9 @@ export default function CashierDashboard({ user, onLogout }) {
                 <tr key={idx}>
                   <td>{inv.invoice_no}</td>
                   <td>{inv.customer}</td>
-                  <td>${inv.total.toFixed(2)}</td>
-                  <td>${inv.paid.toFixed(2)}</td>
-                  <td>${inv.remaining.toFixed(2)}</td>
+                  <td>{formatMoney(inv.total)}</td>
+                  <td>{formatMoney(inv.paid)}</td>
+                  <td>{formatMoney(inv.remaining)}</td>
                   <td><button className="btn-action" onClick={() => handleRecordPayment(inv)}>Record Payment</button></td>
                 </tr>
               ))}
@@ -252,7 +287,7 @@ export default function CashierDashboard({ user, onLogout }) {
                 <tr key={idx}>
                   <td>{trans.reference}</td>
                   <td>{trans.customer}</td>
-                  <td>${trans.amount.toFixed(2)}</td>
+                  <td>{formatMoney(trans.amount)}</td>
                   <td>{trans.method}</td>
                   <td>{trans.received_by}</td>
                   <td>{new Date(trans.timestamp).toLocaleTimeString()}</td>
@@ -268,7 +303,7 @@ export default function CashierDashboard({ user, onLogout }) {
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <h2>Record Payment</h2>
             <form>
-              <label>Amount: <input type="number" value={paymentForm.amount} onChange={(e) => setPaymentForm({...paymentForm, amount: parseFloat(e.target.value)})} step="0.01" /></label>
+              <label>Amount: <input type="number" value={paymentForm.amount} onChange={(e) => setPaymentForm({...paymentForm, amount: parseFloatInput(e.target.value)})} step="0.01" /></label>
               <label>Method: <select value={paymentForm.payment_method} onChange={(e) => setPaymentForm({...paymentForm, payment_method: e.target.value})}>
                 <option>cash</option><option>card</option><option>check</option><option>bank-transfer</option><option>mobile-money</option>
               </select></label>
@@ -289,7 +324,7 @@ export default function CashierDashboard({ user, onLogout }) {
             <form>
               {!activeDrawer ? (
                 <>
-                  <label>Opening Balance: <input type="number" value={drawerForm.opening_balance} onChange={(e) => setDrawerForm({...drawerForm, opening_balance: parseFloat(e.target.value)})} step="0.01" /></label>
+                  <label>Opening Balance: <input type="number" value={drawerForm.opening_balance} onChange={(e) => setDrawerForm({...drawerForm, opening_balance: parseFloatInput(e.target.value)})} step="0.01" /></label>
                   <div className="modal-buttons">
                     <button type="button" className="btn-cancel" onClick={() => setShowDrawerModal(false)}>Cancel</button>
                     <button type="button" className="btn-submit" onClick={handleOpenDrawer}>Open Drawer</button>
@@ -297,7 +332,7 @@ export default function CashierDashboard({ user, onLogout }) {
                 </>
               ) : (
                 <>
-                  <label>Cash Counted: <input type="number" value={drawerForm.cash_counted} onChange={(e) => setDrawerForm({...drawerForm, cash_counted: parseFloat(e.target.value)})} step="0.01" /></label>
+                  <label>Cash Counted: <input type="number" value={drawerForm.cash_counted} onChange={(e) => setDrawerForm({...drawerForm, cash_counted: parseFloatInput(e.target.value)})} step="0.01" /></label>
                   <label>Notes: <textarea value={drawerForm.notes} onChange={(e) => setDrawerForm({...drawerForm, notes: e.target.value})} rows="3" /></label>
                   <div className="modal-buttons">
                     <button type="button" className="btn-cancel" onClick={() => setShowDrawerModal(false)}>Cancel</button>

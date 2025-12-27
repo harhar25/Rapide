@@ -37,6 +37,29 @@ export default function BillingDashboard({ user, onLogout }) {
     reference_number: ''
   });
 
+  const formatMoney = (value) => {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return '₱0.00';
+    return new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(num);
+  };
+
+  const parseFloatInput = (raw) => {
+    if (raw === '') return '';
+    const num = parseFloat(raw);
+    return Number.isFinite(num) ? num : '';
+  };
+
+  const parseIntInput = (raw) => {
+    if (raw === '') return '';
+    const num = parseInt(raw, 10);
+    return Number.isFinite(num) ? num : '';
+  };
+
   // Load data on mount
   useEffect(() => {
     loadAllData();
@@ -132,12 +155,19 @@ export default function BillingDashboard({ user, onLogout }) {
   };
 
   const handleSubmitPayment = async () => {
+    const paymentAmount = Number(paymentForm.payment_amount);
+    if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
+      setErrorMessage('Payment amount must be greater than 0');
+      return;
+    }
+
     try {
       const result = await fetchJson(`/api/billing/invoices/${selectedInvoice.id}/payments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...paymentForm,
+          payment_amount: paymentAmount,
           created_by: user.id
         })
       });
@@ -180,11 +210,33 @@ export default function BillingDashboard({ user, onLogout }) {
   };
 
   const handleCreateInvoice = async () => {
+    const serviceOrderId = Number(createForm.service_order_id);
+    const customerId = Number(createForm.customer_id);
+
+    if (!Number.isInteger(serviceOrderId) || serviceOrderId <= 0) {
+      setErrorMessage('Service Order ID is required');
+      return;
+    }
+    if (!Number.isInteger(customerId) || customerId <= 0) {
+      setErrorMessage('Customer ID is required');
+      return;
+    }
+
     try {
       const result = await fetchJson('/api/billing/invoices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(createForm)
+        body: JSON.stringify({
+          ...createForm,
+          service_order_id: serviceOrderId,
+          customer_id: customerId,
+          labor_hours: Number(createForm.labor_hours) || 0,
+          labor_rate: Number(createForm.labor_rate) || 0,
+          materials_cost: Number(createForm.materials_cost) || 0,
+          parts_cost: Number(createForm.parts_cost) || 0,
+          parking_cost: Number(createForm.parking_cost) || 0,
+          discount: Number(createForm.discount) || 0
+        })
       });
 
       if (result.success) {
@@ -239,15 +291,15 @@ export default function BillingDashboard({ user, onLogout }) {
             <div className="card-label">Paid</div>
           </div>
           <div className="card pending">
-            <div className="card-value">${summary.pending_amount.toFixed(2)}</div>
+            <div className="card-value">{formatMoney(summary.pending_amount)}</div>
             <div className="card-label">Pending Amount</div>
           </div>
           <div className="card overdue">
-            <div className="card-value">${summary.overdue_amount.toFixed(2)}</div>
+            <div className="card-value">{formatMoney(summary.overdue_amount)}</div>
             <div className="card-label">Overdue Amount</div>
           </div>
           <div className="card paid-total">
-            <div className="card-value">${summary.paid_amount.toFixed(2)}</div>
+            <div className="card-value">{formatMoney(summary.paid_amount)}</div>
             <div className="card-label">Total Paid</div>
           </div>
         </div>
@@ -311,7 +363,7 @@ export default function BillingDashboard({ user, onLogout }) {
                       <td><strong>{inv.invoice_no}</strong></td>
                       <td>{inv.customer}</td>
                       <td>{inv.plate_no}</td>
-                      <td>${inv.total.toFixed(2)}</td>
+                      <td>{formatMoney(inv.total)}</td>
                       <td><span className={`status-badge ${inv.status}`}>{inv.status}</span></td>
                       <td>{new Date(inv.due_date).toLocaleDateString()}</td>
                       <td>
@@ -350,7 +402,7 @@ export default function BillingDashboard({ user, onLogout }) {
                       <td><strong>{inv.invoice_no}</strong></td>
                       <td>{inv.customer}</td>
                       <td>{inv.plate_no}</td>
-                      <td>${inv.total.toFixed(2)}</td>
+                      <td>{formatMoney(inv.total)}</td>
                       <td>{new Date(inv.due_date).toLocaleDateString()}</td>
                       <td><span className="days-overdue">{inv.days_overdue} days</span></td>
                       <td>
@@ -388,7 +440,7 @@ export default function BillingDashboard({ user, onLogout }) {
                       <td><strong>{inv.invoice_no}</strong></td>
                       <td>{inv.customer}</td>
                       <td>{inv.plate_no}</td>
-                      <td>${inv.total.toFixed(2)}</td>
+                      <td>{formatMoney(inv.total)}</td>
                       <td>{new Date(inv.invoice_date).toLocaleDateString()}</td>
                       <td>
                         <button className="btn-action btn-view" onClick={() => handleViewInvoice(inv)}>View</button>
@@ -423,26 +475,26 @@ export default function BillingDashboard({ user, onLogout }) {
                 <tbody>
                   {invoiceDetails.labor_hours > 0 && (
                     <tr>
-                      <td>Labor ({invoiceDetails.labor_hours}h × ${invoiceDetails.labor_rate})</td>
-                      <td>${invoiceDetails.labor_cost.toFixed(2)}</td>
+                      <td>Labor ({invoiceDetails.labor_hours}h × {formatMoney(invoiceDetails.labor_rate)})</td>
+                      <td>{formatMoney(invoiceDetails.labor_cost)}</td>
                     </tr>
                   )}
                   {invoiceDetails.materials_cost > 0 && (
                     <tr>
                       <td>Materials</td>
-                      <td>${invoiceDetails.materials_cost.toFixed(2)}</td>
+                      <td>{formatMoney(invoiceDetails.materials_cost)}</td>
                     </tr>
                   )}
                   {invoiceDetails.parts_cost > 0 && (
                     <tr>
                       <td>Parts</td>
-                      <td>${invoiceDetails.parts_cost.toFixed(2)}</td>
+                      <td>{formatMoney(invoiceDetails.parts_cost)}</td>
                     </tr>
                   )}
                   {invoiceDetails.parking_cost > 0 && (
                     <tr>
                       <td>Parking</td>
-                      <td>${invoiceDetails.parking_cost.toFixed(2)}</td>
+                      <td>{formatMoney(invoiceDetails.parking_cost)}</td>
                     </tr>
                   )}
                 </tbody>
@@ -451,10 +503,10 @@ export default function BillingDashboard({ user, onLogout }) {
 
             <div className="invoice-summary">
               {invoiceDetails.discount > 0 && (
-                <div><strong>Discount:</strong> -${invoiceDetails.discount.toFixed(2)}</div>
+                <div><strong>Discount:</strong> -{formatMoney(invoiceDetails.discount)}</div>
               )}
-              <div><strong>Tax:</strong> ${invoiceDetails.tax.toFixed(2)}</div>
-              <div className="total"><strong>Total:</strong> ${invoiceDetails.total.toFixed(2)}</div>
+              <div><strong>Tax:</strong> {formatMoney(invoiceDetails.tax)}</div>
+              <div className="total"><strong>Total:</strong> {formatMoney(invoiceDetails.total)}</div>
             </div>
 
             {invoiceDetails.payments.length > 0 && (
@@ -474,7 +526,7 @@ export default function BillingDashboard({ user, onLogout }) {
                       <tr key={idx}>
                         <td>{new Date(p.date).toLocaleDateString()}</td>
                         <td>{p.method}</td>
-                        <td>${p.amount.toFixed(2)}</td>
+                        <td>{formatMoney(p.amount)}</td>
                         <td>{p.received_by}</td>
                       </tr>
                     ))}
@@ -508,14 +560,14 @@ export default function BillingDashboard({ user, onLogout }) {
         <div className="modal-overlay" onClick={() => setShowPaymentModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <h2>Record Payment</h2>
-            <p>Invoice: <strong>{selectedInvoice?.invoice_no}</strong> | Amount Due: <strong>${selectedInvoice?.total.toFixed(2)}</strong></p>
+            <p>Invoice: <strong>{selectedInvoice?.invoice_no}</strong> | Amount Due: <strong>{formatMoney(selectedInvoice?.total)}</strong></p>
             
             <form>
               <label>Payment Amount:
                 <input 
                   type="number"
                   value={paymentForm.payment_amount}
-                  onChange={(e) => setPaymentForm({...paymentForm, payment_amount: parseFloat(e.target.value)})}
+                  onChange={(e) => setPaymentForm({...paymentForm, payment_amount: parseFloatInput(e.target.value)})}
                   step="0.01"
                   min="0"
                 />
@@ -559,36 +611,36 @@ export default function BillingDashboard({ user, onLogout }) {
                 <input 
                   type="number"
                   value={createForm.service_order_id}
-                  onChange={(e) => setCreateForm({...createForm, service_order_id: parseInt(e.target.value)})}
+                  onChange={(e) => setCreateForm({...createForm, service_order_id: parseIntInput(e.target.value)})}
                 />
               </label>
               <label>Customer ID:
                 <input 
                   type="number"
                   value={createForm.customer_id}
-                  onChange={(e) => setCreateForm({...createForm, customer_id: parseInt(e.target.value)})}
+                  onChange={(e) => setCreateForm({...createForm, customer_id: parseIntInput(e.target.value)})}
                 />
               </label>
               <label>Labor Hours:
                 <input 
                   type="number"
                   value={createForm.labor_hours}
-                  onChange={(e) => setCreateForm({...createForm, labor_hours: parseFloat(e.target.value)})}
+                  onChange={(e) => setCreateForm({...createForm, labor_hours: parseFloatInput(e.target.value)})}
                   step="0.5"
                 />
               </label>
-              <label>Labor Rate ($/hr):
+              <label>Labor Rate (₱/hr):
                 <input 
                   type="number"
                   value={createForm.labor_rate}
-                  onChange={(e) => setCreateForm({...createForm, labor_rate: parseFloat(e.target.value)})}
+                  onChange={(e) => setCreateForm({...createForm, labor_rate: parseFloatInput(e.target.value)})}
                 />
               </label>
               <label>Materials Cost:
                 <input 
                   type="number"
                   value={createForm.materials_cost}
-                  onChange={(e) => setCreateForm({...createForm, materials_cost: parseFloat(e.target.value)})}
+                  onChange={(e) => setCreateForm({...createForm, materials_cost: parseFloatInput(e.target.value)})}
                   step="0.01"
                 />
               </label>
@@ -596,7 +648,7 @@ export default function BillingDashboard({ user, onLogout }) {
                 <input 
                   type="number"
                   value={createForm.parts_cost}
-                  onChange={(e) => setCreateForm({...createForm, parts_cost: parseFloat(e.target.value)})}
+                  onChange={(e) => setCreateForm({...createForm, parts_cost: parseFloatInput(e.target.value)})}
                   step="0.01"
                 />
               </label>
@@ -604,7 +656,7 @@ export default function BillingDashboard({ user, onLogout }) {
                 <input 
                   type="number"
                   value={createForm.parking_cost}
-                  onChange={(e) => setCreateForm({...createForm, parking_cost: parseFloat(e.target.value)})}
+                  onChange={(e) => setCreateForm({...createForm, parking_cost: parseFloatInput(e.target.value)})}
                   step="0.01"
                 />
               </label>
@@ -612,7 +664,7 @@ export default function BillingDashboard({ user, onLogout }) {
                 <input 
                   type="number"
                   value={createForm.discount}
-                  onChange={(e) => setCreateForm({...createForm, discount: parseFloat(e.target.value)})}
+                  onChange={(e) => setCreateForm({...createForm, discount: parseFloatInput(e.target.value)})}
                   step="0.01"
                 />
               </label>
