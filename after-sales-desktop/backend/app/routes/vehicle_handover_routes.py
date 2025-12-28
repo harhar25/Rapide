@@ -24,6 +24,51 @@ def get_pending_handovers():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+
+@vehicle_handover_bp.route('/pending', methods=['GET'])
+def get_pending():
+    """Get all pending handovers (alternate path)"""
+    try:
+        date_from = request.args.get('date_from', None)
+        handovers = VehicleHandoverService.get_pending_handovers(date_from)
+        safe_handovers = []
+        for row in handovers or []:
+            safe_row = []
+            for v in row:
+                if v is None:
+                    safe_row.append(None)
+                elif hasattr(v, 'isoformat'):
+                    safe_row.append(v.isoformat())
+                else:
+                    safe_row.append(v)
+            safe_handovers.append(safe_row)
+        return jsonify({'success': True, 'data': safe_handovers}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@vehicle_handover_bp.route('/completed', methods=['GET'])
+def get_completed():
+    """Get completed handovers"""
+    try:
+        date_from = request.args.get('date_from', None)
+        date_to = request.args.get('date_to', None)
+        handovers = VehicleHandoverService.get_completed_handovers(date_from, date_to)
+        safe_handovers = []
+        for row in handovers or []:
+            safe_row = []
+            for v in row:
+                if v is None:
+                    safe_row.append(None)
+                elif hasattr(v, 'isoformat'):
+                    safe_row.append(v.isoformat())
+                else:
+                    safe_row.append(v)
+            safe_handovers.append(safe_row)
+        return jsonify({'success': True, 'data': safe_handovers}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 @vehicle_handover_bp.route('/handovers', methods=['POST'])
 def create_handover():
     """Create a new vehicle handover"""

@@ -24,6 +24,26 @@ def get_pending():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
+
+@cashier_bp.route('/invoices/for-payment', methods=['GET'])
+def get_for_payment():
+    """Get invoices for payment (alternate path)"""
+    try:
+        invoices = service.get_pending_invoices_for_payment()
+        return jsonify({
+            'success': True,
+            'data': [
+                {
+                    'id': i[0], 'invoice_no': i[1], 'customer': i[2], 'plate_no': i[3],
+                    'so_no': i[4], 'total': i[5], 'paid': i[6], 'remaining': i[7],
+                    'due_date': str(i[8])
+                }
+                for i in invoices
+            ]
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 @cashier_bp.route('/payments', methods=['POST'])
 def process_payment():
     """Process a payment"""
@@ -86,6 +106,27 @@ def get_daily_transactions():
                     'timestamp': str(t[7])
                 }
                 for t in transactions
+            ]
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@cashier_bp.route('/transactions/recent', methods=['GET'])
+def get_recent_transactions():
+    """Get recent transactions (alternate path)"""
+    try:
+        limit = request.args.get('limit', 50, type=int)
+        transactions = service.get_daily_transactions(None)  # Get today's transactions
+        return jsonify({
+            'success': True,
+            'data': [
+                {
+                    'id': t[0], 'reference': t[1], 'customer': t[2], 'amount': t[3],
+                    'method': t[4], 'status': t[5], 'received_by': t[6],
+                    'timestamp': str(t[7])
+                }
+                for t in transactions[:limit]
             ]
         }), 200
     except Exception as e:
@@ -166,6 +207,33 @@ def close_drawer(drawer_id):
 @cashier_bp.route('/drawer/active', methods=['GET'])
 def get_active_drawer():
     """Get active cash drawer"""
+    try:
+        cashier_id = request.args.get('cashier_id')
+        drawer = service.get_active_drawer(cashier_id)
+        
+        if drawer:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'id': drawer[0],
+                    'cashier_id': drawer[1],
+                    'opening_balance': float(drawer[2]),
+                    'opening_time': str(drawer[3]),
+                    'status': drawer[4]
+                }
+            }), 200
+        return jsonify({
+            'success': True,
+            'data': None,
+            'message': 'No active drawer'
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@cashier_bp.route('/drawer/status', methods=['GET'])
+def get_drawer_status():
+    """Get cash drawer status (alternate path)"""
     try:
         cashier_id = request.args.get('cashier_id')
         drawer = service.get_active_drawer(cashier_id)

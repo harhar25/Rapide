@@ -14,6 +14,7 @@ import AdminDashboard from '../pages/AdminDashboard';
 import SecurityGateDashboard from '../pages/SecurityGateDashboard';
 import VehicleHandoverDashboard from '../pages/VehicleHandoverDashboard';
 import FollowUpDashboard from '../pages/FollowUpDashboard';
+import ServiceManagerDashboard from '../pages/ServiceManagerDashboard';
 import Login from '../pages/Login';
 import '../styles/app.css';
 import { ADMIN_MODULES } from '../utils/roles';
@@ -72,15 +73,62 @@ export default function App() {
     };
 
     const AdminSwitcher = (
-      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999, background: '#111827', color: '#fff', padding: '8px 12px', display: 'flex', gap: '10px', alignItems: 'center' }}>
-        <strong>Admin</strong>
-        <span style={{ opacity: 0.85 }}>Module:</span>
-        <select value={adminModule} onChange={onAdminModuleChange} style={{ padding: '6px 8px' }}>
+      <div style={{ 
+        position: 'fixed', 
+        top: 0, 
+        left: 0, 
+        right: 0, 
+        zIndex: 9999, 
+        background: '#111827', 
+        color: '#fff', 
+        padding: '10px 20px', 
+        display: 'flex', 
+        gap: '12px', 
+        alignItems: 'center',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+      }}>
+        <strong style={{ fontSize: '14px', fontWeight: '600' }}>Admin</strong>
+        <span style={{ opacity: 0.7, fontSize: '13px' }}>Module:</span>
+        <select 
+          value={adminModule} 
+          onChange={onAdminModuleChange} 
+          style={{ 
+            padding: '8px 12px', 
+            borderRadius: '6px',
+            border: 'none',
+            background: '#374151',
+            color: 'white',
+            fontSize: '14px',
+            fontWeight: '500',
+            cursor: 'pointer',
+            maxWidth: '200px',
+            minWidth: '160px'
+          }}
+        >
           {modules.map(m => (
             <option key={m.key} value={m.key}>{m.label}</option>
           ))}
         </select>
-        <button onClick={handleLogout} style={{ marginLeft: 'auto', padding: '6px 10px' }}>Sign Out</button>
+        <button 
+          onClick={handleLogout} 
+          style={{ 
+            marginLeft: 'auto', 
+            padding: '8px 16px',
+            background: '#ef4444',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '13px',
+            fontWeight: '500',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            whiteSpace: 'nowrap'
+          }}
+          onMouseOver={(e) => e.target.style.background = '#dc2626'}
+          onMouseOut={(e) => e.target.style.background = '#ef4444'}
+        >
+          Sign Out
+        </button>
       </div>
     );
 
@@ -135,13 +183,7 @@ export default function App() {
         moduleView = <FollowUpDashboard user={user} onLogout={handleLogout} />;
         break;
       case 'manager':
-        moduleView = (
-          <Layout onLogout={handleLogout} user={user}>
-            <div style={{ padding: '40px', textAlign: 'center', fontSize: '24px' }}>
-              👔 Service Manager Dashboard (Coming Soon)
-            </div>
-          </Layout>
-        );
+        moduleView = <ServiceManagerDashboard user={user} onLogout={handleLogout} />;
         break;
       default:
         moduleView = <AdminDashboard user={user} onLogout={handleLogout} />;
@@ -188,13 +230,7 @@ export default function App() {
     case 'follow_up':
       return <FollowUpDashboard user={user} onLogout={handleLogout} />;
     case 'manager':
-      return (
-        <Layout onLogout={handleLogout} user={user}>
-          <div style={{ padding: '40px', textAlign: 'center', fontSize: '24px' }}>
-            👔 Service Manager Dashboard (Coming Soon)
-          </div>
-        </Layout>
-      );
+      return <ServiceManagerDashboard user={user} onLogout={handleLogout} />;
     default:
       return <Login onLogin={handleLogin} />;
   }

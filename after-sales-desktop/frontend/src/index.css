@@ -1,3 +1,8 @@
+@import './styles/global.css';
+@import './styles/beautiful-buttons.css';
+@import './styles/enterprise-ui.css';
+@import './styles/dashboard-common.css';
+
 :root {
     --primary: #2563eb;
     --primary-dark: #1e40af;

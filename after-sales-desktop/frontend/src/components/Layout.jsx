@@ -1,7 +1,16 @@
 import React from 'react';
 import '../styles/layout.css';
 
-export default function Layout({ children, onLogout, user }) {
+export default function Layout({ children, onLogout, user, activeView, onNavigate }) {
+  const [currentView, setCurrentView] = React.useState(activeView || 'dashboard');
+
+  const handleNavClick = (view) => {
+    setCurrentView(view);
+    if (onNavigate) {
+      onNavigate(view);
+    }
+  };
+
   return (
     <div className="app-container">
       <aside className="sidebar">
@@ -12,19 +21,44 @@ export default function Layout({ children, onLogout, user }) {
         </div>
         <nav className="nav-menu">
           <li className="nav-item">
-            <button className="nav-link">Dashboard</button>
+            <button 
+              className={`nav-link ${currentView === 'dashboard' ? 'active' : ''}`}
+              onClick={() => handleNavClick('dashboard')}
+            >
+              📊 Dashboard
+            </button>
           </li>
           <li className="nav-item">
-            <button className="nav-link">Customers</button>
+            <button 
+              className={`nav-link ${currentView === 'customers' ? 'active' : ''}`}
+              onClick={() => handleNavClick('customers')}
+            >
+              👥 Customers
+            </button>
           </li>
           <li className="nav-item">
-            <button className="nav-link">Scheduling</button>
+            <button 
+              className={`nav-link ${currentView === 'scheduling' ? 'active' : ''}`}
+              onClick={() => handleNavClick('scheduling')}
+            >
+              📅 Scheduling
+            </button>
           </li>
           <li className="nav-item">
-            <button className="nav-link">Contacts</button>
+            <button 
+              className={`nav-link ${currentView === 'contacts' ? 'active' : ''}`}
+              onClick={() => handleNavClick('contacts')}
+            >
+              📞 Contacts
+            </button>
           </li>
           <li className="nav-item">
-            <button className="nav-link">Reports</button>
+            <button 
+              className={`nav-link ${currentView === 'reports' ? 'active' : ''}`}
+              onClick={() => handleNavClick('reports')}
+            >
+              📈 Reports
+            </button>
           </li>
         </nav>
         <div className="sidebar-footer">

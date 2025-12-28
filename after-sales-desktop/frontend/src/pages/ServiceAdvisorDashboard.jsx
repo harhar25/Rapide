@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/service-advisor-dashboard.css';
+import '../styles/enterprise-ui.css';
+import '../styles/dashboard-common.css';
 import { fetchJson } from '../utils/fetchJson';
+import { StatCard, EnterpriseCard, StatusBadge, EnterpriseTabs, LoadingSpinner, EmptyState } from '../components/EnterpriseComponents';
 
 const ServiceAdvisorDashboard = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState('appointments');

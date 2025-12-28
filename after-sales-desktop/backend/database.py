@@ -11,7 +11,7 @@ class Database:
     def __init__(self):
         self.pool = None
         self._lock = threading.Lock()
-    
+
     def connect(self):
         """Establish connection to MySQL database"""
         try:
@@ -173,6 +173,261 @@ class Database:
             """
         )
 
+        # Create warehouse tables
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS warehouse_products (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                product_code VARCHAR(50) NOT NULL UNIQUE,
+                product_name VARCHAR(255) NOT NULL,
+                category VARCHAR(100),
+                unit_price DECIMAL(10, 2) NOT NULL,
+                quantity_in_stock INT DEFAULT 0,
+                reorder_level INT DEFAULT 10,
+                supplier VARCHAR(255),
+                description TEXT,
+                status VARCHAR(50) DEFAULT 'active',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                created_by VARCHAR(100),
+                INDEX idx_product_code (product_code),
+                INDEX idx_category (category),
+                INDEX idx_status (status)
+            )
+            """
+        )
+
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS warehouse_inventory_history (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                product_id INT NOT NULL,
+                transaction_type VARCHAR(50) DEFAULT 'in',
+                quantity INT NOT NULL,
+                previous_quantity INT,
+                new_quantity INT,
+                reference_no VARCHAR(100),
+                reference_type VARCHAR(50) DEFAULT 'purchase',
+                notes TEXT,
+                created_by VARCHAR(100),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_product_id (product_id),
+                INDEX idx_transaction_type (transaction_type),
+                INDEX idx_created_at (created_at),
+                INDEX idx_reference_no (reference_no)
+            )
+            """
+        )
+
+        # Create follow-up and feedback tables
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS follow_ups (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                service_order_id INT NOT NULL,
+                customer_id INT NOT NULL,
+                followup_date DATE NOT NULL,
+                followup_time TIME,
+                contact_method VARCHAR(50) DEFAULT 'phone',
+                contact_person_name VARCHAR(255),
+                contact_person_phone VARCHAR(20),
+                followup_status VARCHAR(50) DEFAULT 'pending',
+                feedback_received BOOLEAN DEFAULT FALSE,
+                issue_reported BOOLEAN DEFAULT FALSE,
+                followup_notes LONGTEXT,
+                scheduled_by INT,
+                completed_by INT,
+                completion_date DATETIME,
+                satisfaction_rating INT DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_service_order_id (service_order_id),
+                INDEX idx_customer_id (customer_id),
+                INDEX idx_followup_date (followup_date),
+                INDEX idx_followup_status (followup_status)
+            )
+            """
+        )
+
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS customer_feedback (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                followup_id INT NOT NULL,
+                service_quality_rating INT DEFAULT NULL,
+                work_done_satisfaction INT DEFAULT NULL,
+                staff_behavior_rating INT DEFAULT NULL,
+                value_for_money_rating INT DEFAULT NULL,
+                overall_experience INT DEFAULT NULL,
+                would_recommend VARCHAR(20) DEFAULT NULL,
+                feedback_comments LONGTEXT,
+                improvement_suggestions VARCHAR(500),
+                feedback_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                feedback_channel VARCHAR(50) DEFAULT 'form',
+                INDEX idx_followup_id (followup_id),
+                INDEX idx_overall_experience (overall_experience)
+            )
+            """
+        )
+
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS issue_tracking (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                followup_id INT NOT NULL,
+                issue_category VARCHAR(50) DEFAULT 'other',
+                issue_description VARCHAR(500),
+                severity VARCHAR(50) DEFAULT 'medium',
+                reported_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                investigation_notes LONGTEXT,
+                resolution_notes LONGTEXT,
+                issue_status VARCHAR(50) DEFAULT 'open',
+                assigned_to INT,
+                resolved_date DATETIME,
+                resolution_type VARCHAR(50) DEFAULT NULL,
+                follow_up_action VARCHAR(500),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_followup_id (followup_id),
+                INDEX idx_issue_status (issue_status),
+                INDEX idx_severity (severity)
+            )
+            """
+        )
+
+        # Create appointment-related tables
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS appointment_confirmations (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                scheduling_order_id INT NOT NULL,
+                method VARCHAR(50) DEFAULT 'sms',
+                contact_info VARCHAR(255),
+                message TEXT,
+                sent_at TIMESTAMP NULL,
+                delivered_at TIMESTAMP NULL,
+                status VARCHAR(50) DEFAULT 'pending',
+                retry_count INT DEFAULT 0,
+                error_message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_scheduling_order_id (scheduling_order_id),
+                INDEX idx_status (status),
+                INDEX idx_sent_at (sent_at)
+            )
+            """
+        )
+
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS appointment_reminders (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                scheduling_order_id INT NOT NULL,
+                reminder_type VARCHAR(50) DEFAULT '24h',
+                scheduled_time DATETIME,
+                sent_time TIMESTAMP NULL,
+                reminder_recipients VARCHAR(50) DEFAULT 'all',
+                status VARCHAR(50) DEFAULT 'pending',
+                sent_to_customer BOOLEAN DEFAULT FALSE,
+                sent_to_technician BOOLEAN DEFAULT FALSE,
+                sent_to_advisor BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_scheduling_order_id (scheduling_order_id),
+                INDEX idx_scheduled_time (scheduled_time),
+                INDEX idx_status (status)
+            )
+            """
+        )
+
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS appointment_reschedules (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                scheduling_order_id INT NOT NULL,
+                old_date DATE,
+                old_time TIME,
+                new_date DATE,
+                new_time TIME,
+                reason VARCHAR(255),
+                rescheduled_by VARCHAR(100),
+                rescheduled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_scheduling_order_id (scheduling_order_id),
+                INDEX idx_rescheduled_at (rescheduled_at)
+            )
+            """
+        )
+
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS no_show_tracking (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                scheduling_order_id INT NOT NULL,
+                customer_id INT NOT NULL,
+                scheduled_date DATE,
+                scheduled_time TIME,
+                reason VARCHAR(255),
+                notified_at TIMESTAMP NULL,
+                follow_up_created BOOLEAN DEFAULT FALSE,
+                tracked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_scheduling_order_id (scheduling_order_id),
+                INDEX idx_customer_id (customer_id),
+                INDEX idx_tracked_at (tracked_at)
+            )
+            """
+        )
+
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS follow_up_tasks (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                scheduling_order_id INT NOT NULL,
+                customer_id INT NOT NULL,
+                task_type VARCHAR(50) DEFAULT 'no-show',
+                priority VARCHAR(50) DEFAULT 'normal',
+                status VARCHAR(50) DEFAULT 'pending',
+                assigned_to VARCHAR(100),
+                due_date DATE,
+                completed_at TIMESTAMP NULL,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_scheduling_order_id (scheduling_order_id),
+                INDEX idx_customer_id (customer_id),
+                INDEX idx_status (status),
+                INDEX idx_due_date (due_date)
+            )
+            """
+        )
+
+        # Create SMS outbox table
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS sms_outbox (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                customer_id INT NULL,
+                scheduling_order_id INT NULL,
+                purpose VARCHAR(50) DEFAULT 'PMS_OUTREACH',
+                phone VARCHAR(30) NOT NULL,
+                message TEXT NOT NULL,
+                scheduled_at DATETIME NOT NULL,
+                sent_at TIMESTAMP NULL,
+                delivered_at TIMESTAMP NULL,
+                status VARCHAR(50) DEFAULT 'queued',
+                provider_message_id VARCHAR(100) NULL,
+                retry_count INT DEFAULT 0,
+                error_message TEXT,
+                created_by VARCHAR(100),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_status (status),
+                INDEX idx_scheduled_at (scheduled_at),
+                INDEX idx_customer_id (customer_id),
+                INDEX idx_scheduling_order_id (scheduling_order_id),
+                INDEX idx_provider_message_id (provider_message_id)
+            )
+            """
+        )
+
         self.execute_update("ALTER TABLE personnel MODIFY role VARCHAR(50) DEFAULT 'cro'")
         self.execute_update("ALTER TABLE personnel MODIFY status VARCHAR(20) DEFAULT 'active'")
 
@@ -206,6 +461,226 @@ class Database:
                 hire_date DATE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 INDEX idx_employee_id (employee_id)
+            )
+            """
+        )
+
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS customers (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                contact_no VARCHAR(20) NOT NULL UNIQUE,
+                plate_no VARCHAR(20) UNIQUE,
+                vehicle_model VARCHAR(100),
+                vehicle_year YEAR,
+                engine_no VARCHAR(50),
+                chassis_no VARCHAR(50),
+                customer_type ENUM('regular', 'corporate', 'government', 'walk-in') DEFAULT 'regular',
+                address TEXT,
+                city VARCHAR(100),
+                email VARCHAR(100),
+                service_interval_days INT DEFAULT 10000,
+                last_service_date DATE,
+                registration_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                status ENUM('active', 'inactive') DEFAULT 'active',
+                INDEX idx_plate_no (plate_no),
+                INDEX idx_contact_no (contact_no),
+                INDEX idx_last_service_date (last_service_date)
+            )
+            """
+        )
+
+        False and self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS customers (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                contact_no VARCHAR(20) NOT NULL UNIQUE,
+                plate_no VARCHAR(20) UNIQUE,
+                vehicle_model VARCHAR(100),
+                vehicle_year YEAR,
+                engine_no VARCHAR(50),
+                chassis_no VARCHAR(50),
+                customer_type VARCHAR(50) DEFAULT 'regular',
+                address TEXT,
+                city VARCHAR(100),
+                email VARCHAR(100),
+                service_interval_days INT挣 INT DEFAULT, DEFAULT 100ieb10,000gers INT DEFAULT [3 eighteen-
+                last_service驱动 [diesel]quenba [reps INT [fifty [eighty [twentynine [ submode [eight. [one [O] [one [ cultures, [ Onewindows/hundred [ OneyO Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney, Oney,中来, modifies, O; [0] “ [0 ; [ [ [ [ [.
+                last_service 
+                registration_dateCaller [ [ [ [ Wars [ [ [花儿 [ [de [ [ihan [ [indr [ [ Oney,anoth hundre [ [ famously [ [ AI [ [—who [ [ulo [ [<|code_suffix|>] [0eighty [ [ Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [Oney [O river [O 
+                registration_date TIMESTAMPREFEREES DEFAULT CURRENT_TIMESTAMP,
+                status VARCHAR(20) DEFAULT 'active',
+                INDEX idx_plate_no (plate_no),
+                INDEX idx_contact_no (contact_no),
+                INDEX idx_last_service_date (last_service_date)
+            )
+            """
+        )
+
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS technicians (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                employee_id VARCHAR(50) UNIQUE NOT NULL,
+                specialization VARCHAR(100),
+                contact_no VARCHAR(20),
+                email VARCHAR(100),
+                status VARCHAR(50) DEFAULT 'active',
+                hire_date DATE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_employee_id (employee_id)
+            )
+            """
+        )
+
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS contact_attempts (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                customer_id INT NOT NULL,
+                contact_type VARCHAR(50) NOT NULL,
+                attempt_date TIMESTAMP,
+                status VARCHAR(50) DEFAULT 'attempted',
+                notes TEXT,
+                created_by VARCHAR(100),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_customer_id (customer_id),
+                INDEX idx_attempt_date (attempt_date)
+            )
+            """
+        )
+
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS scheduling_orders (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                customer_id INT NOT NULL,
+                scheduled_date DATE NOT NULL,
+                scheduled_time TIME NOT NULL,
+                bay_id INT,
+                technician_id INT,
+                advisor_id INT,
+                service_type VARCHAR(50) DEFAULT 'PMS',
+                status VARCHAR(50) DEFAULT 'scheduled',
+                priority VARCHAR(50) DEFAULT 'normal',
+                estimated_duration_hours DECIMAL(5, 2),
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_by VARCHAR(100),
+                INDEX idx_customer_id (customer_id),
+                INDEX idx_scheduled_date (scheduled_date),
+                INDEX idx_status (status),
+                UNIQUE KEY unique_slot (bay_id, scheduled_date, scheduled_time)
+            )
+            """
+        )
+
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS service_orders (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                scheduling_order_id INT,
+                customer_id INT NOT NULL,
+                vehicle_plate_no VARCHAR(20),
+                service_type VARCHAR(50),
+                check_in_time TIMESTAMP,
+                estimated_completion_time DATETIME NULL DEFAULT NULL,
+                actual_completion_time DATETIME NULL DEFAULT NULL,
+                status VARCHAR(50) DEFAULT 'pending',
+                advisor_id INT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_customer_id (customer_id),
+                INDEX idx_status (status)
+            )
+            """
+        )
+
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS customer_info_sheets (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                customer_id INT NOT NULL,
+                service_order_id INT,
+                name VARCHAR(255) NOT NULL,
+                contact_no VARCHAR(20) NOT NULL,
+                email VARCHAR(100),
+                address TEXT,
+                vehicle_plate_no VARCHAR(20),
+                vehicle_model VARCHAR(100),
+                vehicle_year YEAR,
+                engine_no VARCHAR(50),
+                chassis_no VARCHAR(50),
+                mileage_in INT,
+                service_type VARCHAR(50),
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                created_by VARCHAR(100),
+                INDEX idx_customer_id (customer_id),
+                INDEX idx_service_order_id (service_order_id)
+            )
+            """
+        )
+
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS vehicle_report_cards (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                service_order_id INT NOT NULL,
+                customer_id INT NOT NULL,
+                mileage_in INT,
+                mileage_out INT,
+                exterior_condition VARCHAR(500),
+                interior_condition VARCHAR(500),
+                checklist_1_engine_starts VARCHAR(50) DEFAULT 'na',
+                checklist_2_idle_smooth VARCHAR(50) DEFAULT 'na',
+                checklist_3_acceleration VARCHAR(50) DEFAULT 'na',
+                checklist_4_brakes VARCHAR(50) DEFAULT 'na',
+                checklist_5_steering VARCHAR(50) DEFAULT 'na',
+                checklist_6_lights VARCHAR(50) DEFAULT 'na',
+                checklist_7_wipers VARCHAR(50) DEFAULT 'na',
+                checklist_8_horn VARCHAR(50) DEFAULT 'na',
+                checklist_9_tires VARCHAR(50) DEFAULT 'na',
+                checklist_10_battery VARCHAR(50) DEFAULT 'na',
+                checklist_11_fluids VARCHAR(50) DEFAULT 'na',
+                checklist_12_brakes_pads VARCHAR(50) DEFAULT 'na',
+                checklist_13_clutch VARCHAR(50) DEFAULT 'na',
+                checklist_14_cooling VARCHAR(50) DEFAULT 'na',
+                checklist_15_exhaust VARCHAR(50) DEFAULT 'na',
+                checklist_16_suspension VARCHAR(50) DEFAULT 'na',
+                checklist_17_aircon VARCHAR(50) DEFAULT 'na',
+                checklist_18_electrical VARCHAR(50) DEFAULT 'na',
+                checklist_19_safety VARCHAR(50) DEFAULT 'na',
+                checklist_20_cleanliness VARCHAR(50) DEFAULT 'na',
+                additional_work VARCHAR(500),
+                customer_signature LONGBLOB,
+                customer_signature_date DATETIME,
+                service_advisor_signature LONGBLOB,
+                service_advisor_signature_date DATETIME,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_service_order_id (service_order_id),
+                INDEX idx_customer_id (customer_id)
+            )
+            """
+        )
+
+        self.execute_update(
+            """
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                table_name VARCHAR(100),
+                record_id INT,
+                action VARCHAR(50) NOT NULL,
+                old_value JSON,
+                new_value JSON,
+                user_id VARCHAR(100),
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_table_name (table_name),
+                INDEX idx_timestamp (timestamp)
             )
             """
         )

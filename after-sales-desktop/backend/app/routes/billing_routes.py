@@ -193,6 +193,27 @@ def get_overdue():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
+
+@billing_bp.route('/invoices/recent', methods=['GET'])
+def get_recent_invoices():
+    """Get recent invoices"""
+    try:
+        limit = request.args.get('limit', 50, type=int)
+        invoices = service.get_paid_invoices()  # Returns recent paid invoices
+        return jsonify({
+            'success': True,
+            'data': [
+                {
+                    'id': i[0], 'invoice_no': i[1], 'customer': i[2],
+                    'plate_no': i[3], 'so_no': i[4], 'total': i[5],
+                    'status': i[6], 'invoice_date': str(i[7])
+                }
+                for i in invoices[:limit]
+            ]
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 @billing_bp.route('/summary', methods=['GET'])
 def get_summary():
     """Get billing summary"""

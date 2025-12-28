@@ -220,9 +220,41 @@ def get_low_stock():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@warehouse_bp.route('/inventory/low-stock', methods=['GET'])
+def get_inventory_low_stock():
+    """Get low stock products (alternate path)"""
+    try:
+        products = warehouse_service.get_low_stock_products()
+        return jsonify({
+            'success': True,
+            'data': products,
+            'count': len(products)
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @warehouse_bp.route('/summary', methods=['GET'])
 def get_summary():
     """Get warehouse summary"""
+    try:
+        summary = warehouse_service.get_inventory_summary()
+        return jsonify({
+            'success': True,
+            'data': {
+                'total_products': summary[0],
+                'total_quantity': summary[1],
+                'total_value': float(summary[2]) if summary[2] else 0,
+                'low_stock_count': summary[3]
+            }
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@warehouse_bp.route('/inventory/summary', methods=['GET'])
+def get_inventory_summary():
+    """Get warehouse inventory summary (alternate path)"""
     try:
         summary = warehouse_service.get_inventory_summary()
         return jsonify({

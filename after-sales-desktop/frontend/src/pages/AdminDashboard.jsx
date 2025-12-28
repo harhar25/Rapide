@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/admin-dashboard.css';
+import '../styles/enterprise-ui.css';
+import '../styles/dashboard-common.css';
 import { fetchJson } from '../utils/fetchJson';
+import { StatCard, EnterpriseCard, StatusBadge, EnterpriseTabs, LoadingSpinner, EmptyState } from '../components/EnterpriseComponents';
 import { PERSONNEL_ROLES, getRoleLabel } from '../utils/roles';
 
 const AdminDashboard = ({ user, onLogout }) => {

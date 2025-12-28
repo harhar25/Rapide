@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/car-jockey-dashboard.css';
+import '../styles/enterprise-ui.css';
+import '../styles/dashboard-common.css';
 import { fetchJson } from '../utils/fetchJson';
+import { StatCard, EnterpriseCard, StatusBadge, EnterpriseTabs, ActionBar, LoadingSpinner, EmptyState } from '../components/EnterpriseComponents';
 
 export default function CarJockeyDashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('pending');
@@ -12,6 +15,17 @@ export default function CarJockeyDashboard({ user, onLogout }) {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  const formatMoney = (value) => {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return '₱0.00';
+    return new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(num);
+  };
   
   // Modal states
   const [showMovementModal, setShowMovementModal] = useState(false);
@@ -255,118 +269,135 @@ export default function CarJockeyDashboard({ user, onLogout }) {
   };
 
   return (
-    <div className="car-jockey-dashboard">
-      {/* Header */}
-      <div className="dashboard-header">
-        <div className="header-left">
-          <h1>🚗 Car Jockey Operations</h1>
-          <p>Vehicle Movement & Parking Management</p>
+    <div className="dashboard-container">
+      <div className="dashboard-wrapper">
+        {/* Enterprise Header */}
+        <div className="dashboard-header">
+          <div className="dashboard-header-content">
+            <div className="dashboard-title-section">
+              <h1 className="dashboard-title">
+                <span className="dashboard-title-icon">🚗</span>
+                Car Jockey Operations
+              </h1>
+              <p className="dashboard-subtitle">Vehicle Movement & Parking Management</p>
+            </div>
+            <div className="dashboard-actions">
+              <button onClick={loadAllData} className="btn-enterprise btn-secondary btn-sm" disabled={loading}>
+                {loading ? <LoadingSpinner size={16} /> : '🔄'} Refresh
+              </button>
+              {user?.role !== 'admin' && (
+                <button onClick={onLogout} className="btn-enterprise btn-secondary btn-sm">Logout</button>
+              )}
+            </div>
+          </div>
         </div>
-        {user?.role !== 'admin' && (
-          <button onClick={onLogout} className="logout-btn">Logout</button>
+
+        {/* Messages */}
+        {errorMessage && (
+          <div className="alert alert-error" style={{ marginBottom: 'var(--spacing-6)' }}>
+            <span>✗</span>
+            <div>{errorMessage}</div>
+          </div>
         )}
-      </div>
+        {successMessage && (
+          <div className="alert alert-success" style={{ marginBottom: 'var(--spacing-6)' }}>
+            <span>✓</span>
+            <div>{successMessage}</div>
+          </div>
+        )}
 
-      {/* Messages */}
-      {errorMessage && <div className="error-message">{errorMessage}</div>}
-      {successMessage && <div className="success-message">{successMessage}</div>}
+        {/* Enterprise Summary Cards */}
+        {summary && (
+          <div className="summary-grid stagger-children">
+            <StatCard 
+              value={summary.total_movements} 
+              label="Total Movements"
+              icon="📊"
+            />
+            <StatCard 
+              value={summary.active_movements} 
+              label="In Progress"
+              icon="🚙"
+            />
+            <StatCard 
+              value={summary.completed_movements} 
+              label="Completed"
+              icon="✓"
+            />
+            <StatCard 
+              value={summary.currently_parked} 
+              label="Currently Parked"
+              icon="🅿️"
+            />
+            <StatCard 
+              value={formatMoney(summary.parking_revenue)} 
+              label="Parking Revenue"
+              icon="💰"
+            />
+            <StatCard 
+              value={`${Number(summary.avg_mileage_traveled || 0).toFixed(0)} km`}
+              label="Avg Mileage"
+              icon="📏"
+            />
+          </div>
+        )}
 
-      {/* Summary Cards */}
-      {summary && (
-        <div className="summary-cards">
-          <div className="card total">
-            <div className="card-value">{summary.total_movements}</div>
-            <div className="card-label">Total Movements</div>
-          </div>
-          <div className="card active">
-            <div className="card-value">{summary.active_movements}</div>
-            <div className="card-label">In Progress</div>
-          </div>
-          <div className="card completed">
-            <div className="card-value">{summary.completed_movements}</div>
-            <div className="card-label">Completed</div>
-          </div>
-          <div className="card parked">
-            <div className="card-value">{summary.currently_parked}</div>
-            <div className="card-label">Currently Parked</div>
-          </div>
-          <div className="card revenue">
-            <div className="card-value">${summary.parking_revenue.toFixed(2)}</div>
-            <div className="card-label">Parking Revenue</div>
-          </div>
-          <div className="card mileage">
-            <div className="card-value">{summary.avg_mileage_traveled.toFixed(0)} km</div>
-            <div className="card-label">Avg Mileage</div>
-          </div>
-        </div>
-      )}
+        {/* Enterprise Tabs */}
+        <EnterpriseTabs
+          tabs={[
+            { id: 'pending', label: 'Pending Vehicles', icon: '📋' },
+            { id: 'active', label: 'Active Movements', icon: '🚙' },
+            { id: 'parked', label: 'Parked Vehicles', icon: '🅿️' }
+          ]}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+        />
 
-      {/* Tabs */}
-      <div className="dashboard-tabs">
-        <button
-          className={`tab-button ${activeTab === 'pending' ? 'active' : ''}`}
-          onClick={() => setActiveTab('pending')}
-        >
-          📋 Pending Vehicles
-        </button>
-        <button
-          className={`tab-button ${activeTab === 'active' ? 'active' : ''}`}
-          onClick={() => setActiveTab('active')}
-        >
-          🚙 Active Movements
-        </button>
-        <button
-          className={`tab-button ${activeTab === 'parked' ? 'active' : ''}`}
-          onClick={() => setActiveTab('parked')}
-        >
-          🅿️ Parked Vehicles
-        </button>
-      </div>
-
-      {/* Content */}
-      <div className="dashboard-content">
-        {/* Pending Vehicles Tab */}
-        {activeTab === 'pending' && (
-          <div className="tab-content">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>SO #</th>
-                  <th>Customer</th>
-                  <th>Plate No</th>
-                  <th>Model</th>
-                  <th>Year</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pendingVehicles.length === 0 ? (
-                  <tr><td colSpan="7" style={{ textAlign: 'center' }}>No pending vehicles</td></tr>
-                ) : (
-                  pendingVehicles.map((v, idx) => (
-                    <tr key={idx}>
-                      <td>{v.so_id}</td>
-                      <td>{v.customer_name}</td>
-                      <td>{v.plate_no}</td>
-                      <td>{v.model}</td>
-                      <td>{v.year}</td>
-                      <td><span className="status-badge">{v.status}</span></td>
-                      <td>
-                        <button 
-                          className="btn-action btn-start"
-                          onClick={() => handleStartMovement(v)}
-                        >
-                          Start Movement
-                        </button>
-                      </td>
+        {/* Content */}
+        <div className="content-section">
+          <div className="section-body">
+            {/* Pending Vehicles Tab */}
+            {activeTab === 'pending' && (
+              <div className="enterprise-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>SO #</th>
+                      <th>Customer</th>
+                      <th>Plate No</th>
+                      <th>Model</th>
+                      <th>Year</th>
+                      <th>Status</th>
+                      <th>Actions</th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+                  </thead>
+                  <tbody>
+                    {pendingVehicles.length === 0 ? (
+                      <tr><td colSpan="7"><EmptyState icon="🚗" title="No Pending Vehicles" description="All vehicles have been processed" /></td></tr>
+                    ) : (
+                      pendingVehicles.map((v, idx) => (
+                        <tr key={idx}>
+                          <td><strong>{v.so_id}</strong></td>
+                          <td>{v.customer_name}</td>
+                          <td><strong>{v.plate_no}</strong></td>
+                          <td>{v.model}</td>
+                          <td>{v.year}</td>
+                          <td><StatusBadge status={v.status}>{v.status}</StatusBadge></td>
+                          <td>
+                            <button 
+                              className="btn-enterprise btn-primary btn-sm"
+                              onClick={() => handleStartMovement(v)}
+                            >
+                              Start Movement
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
         {/* Active Movements Tab */}
         {activeTab === 'active' && (
@@ -446,7 +477,7 @@ export default function CarJockeyDashboard({ user, onLogout }) {
                       <td>{p.zone}</td>
                       <td>{new Date(p.parked_at).toLocaleString()}</td>
                       <td>{p.duration_hrs?.toFixed(1) || '-'}</td>
-                      <td>${p.fee}</td>
+                      <td>{formatMoney(p.fee)}</td>
                       <td>
                         <button 
                           className="btn-action btn-release"
@@ -462,7 +493,8 @@ export default function CarJockeyDashboard({ user, onLogout }) {
             </table>
           </div>
         )}
-      </div>
+          </div>
+        </div>
 
       {/* Modals */}
       {showMovementModal && (
@@ -614,11 +646,11 @@ export default function CarJockeyDashboard({ user, onLogout }) {
                   <option value="damaged">Damaged</option>
                 </select>
               </label>
-              <label>Parking Fee ($):
+              <label>Parking Fee (₱):
                 <input 
                   type="number"
                   value={parkingForm.parking_fee}
-                  onChange={(e) => setParkingForm({...parkingForm, parking_fee: parseFloat(e.target.value)})}
+                  onChange={(e) => setParkingForm({...parkingForm, parking_fee: parseFloat(e.target.value) || 0})}
                   min="0" step="0.01"
                 />
               </label>
@@ -644,9 +676,10 @@ export default function CarJockeyDashboard({ user, onLogout }) {
         </div>
       )}
 
-      {/* Footer */}
-      <div className="dashboard-footer">
-        <p>*Rapide Services - Car Jockey Module | {new Date().toLocaleDateString()}</p>
+        {/* Footer */}
+        <div className="dashboard-footer">
+          <p>*Rapide Services - Car Jockey Module | {new Date().toLocaleDateString()}</p>
+        </div>
       </div>
     </div>
   );
