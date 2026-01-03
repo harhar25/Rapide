@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-"""
-Comprehensive API Testing Script
-Tests all endpoints for errors and validates responses
-"""
-
 import requests
 import json
 from datetime import datetime, timedelta
