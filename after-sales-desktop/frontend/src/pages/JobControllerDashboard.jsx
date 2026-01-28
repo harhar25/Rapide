@@ -4,6 +4,7 @@ import '../styles/enterprise-ui.css';
 import '../styles/dashboard-common.css';
 import { fetchJson } from '../utils/fetchJson';
 import { StatCard, EnterpriseCard, StatusBadge, EnterpriseTabs, LoadingSpinner, EmptyState } from '../components/EnterpriseComponents';
+import AnvilJobOrderForm from '../components/AnvilJobOrderForm';
 
 const JobControllerDashboard = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState('pending-orders');
@@ -16,6 +17,8 @@ const JobControllerDashboard = ({ user, onLogout }) => {
 
   const [laborSummary, setLaborSummary] = useState(null);
   const [clockRecords, setClockRecords] = useState([]);
+  const [showJobOrderForm, setShowJobOrderForm] = useState(false);
+  const [selectedJobOrder, setSelectedJobOrder] = useState(null);
 
   const API_BASE = '/api/job-controller';
 
@@ -176,6 +179,12 @@ const JobControllerDashboard = ({ user, onLogout }) => {
             onClick={() => setActiveTab('assignment')}
           >
             Technician Assignment
+          </button>
+          <button 
+            className={`tab ${activeTab === 'job-order-print' ? 'active' : ''}`}
+            onClick={() => setActiveTab('job-order-print')}
+          >
+            Print Job Order
           </button>
           <button 
             className={`tab ${activeTab === 'resources' ? 'active' : ''}`}
@@ -339,6 +348,75 @@ const JobControllerDashboard = ({ user, onLogout }) => {
                 Assign Technician
               </button>
             </div>
+          </div>
+        )}
+
+        {/* TAB 4: Print Job Order Form */}
+        {activeTab === 'job-order-print' && (
+          <div className="tab-content full-width">
+            {!showJobOrderForm ? (
+              <div className="job-order-selection">
+                <h2>Select Service Order to Print</h2>
+                <div className="order-selection-container">
+                  <div className="order-tabs">
+                    <button className="order-tab-btn active">From Pending Orders</button>
+                    <button className="order-tab-btn">From Active Orders</button>
+                    <button className="order-tab-btn">Manual Entry</button>
+                  </div>
+                  <div className="order-list">
+                    <h3>Pending Orders Available for Printing</h3>
+                    {pendingOrders.length > 0 ? (
+                      <div className="orders-grid">
+                        {pendingOrders.map(order => (
+                          <div 
+                            key={order[0]} 
+                            className="order-card"
+                            onClick={() => {
+                              setSelectedJobOrder(order);
+                              setShowJobOrderForm(true);
+                            }}
+                          >
+                            <div className="order-card-header">
+                              <span className="order-id">SO-{String(order[0]).padStart(5, '0')}</span>
+                              <span className="order-date">{order[5]}</span>
+                            </div>
+                            <div className="order-card-body">
+                              <p><strong>{order[1]}</strong></p>
+                              <p className="vehicle-info">{order[3]}</p>
+                              <p className="service-type">{order[4]}</p>
+                            </div>
+                            <div className="order-card-footer">
+                              <button className="btn-print-order">Print Order</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="empty-state">No pending orders available</p>
+                    )}
+                  </div>
+                  <div className="manual-entry">
+                    <button 
+                      className="btn-manual-entry"
+                      onClick={() => {
+                        setSelectedJobOrder(null);
+                        setShowJobOrderForm(true);
+                      }}
+                    >
+                      ➕ Create New Job Order
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <AnvilJobOrderForm 
+                jobOrder={selectedJobOrder}
+                onClose={() => {
+                  setShowJobOrderForm(false);
+                  setSelectedJobOrder(null);
+                }}
+              />
+            )}
           </div>
         )}
 

@@ -155,3 +155,70 @@ def release_vehicle():
         return jsonify(result), 200
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==================== GATEPASS WITH PROCESS TRACKING ====================
+
+@gatepass_bp.route('/process-status/<int:service_order_id>', methods=['GET'])
+def get_gatepass_with_processes(service_order_id):
+    """
+    Get gatepass along with complete process tracking
+    Shows all processes: not catered, skipped, completed, etc.
+    Used for printing gatepass with process history
+    """
+    try:
+        result = gatepass_service.get_service_order_process_status(service_order_id)
+        
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@gatepass_bp.route('/print/<int:service_order_id>', methods=['GET'])
+def get_gatepass_for_printing(service_order_id):
+    """
+    Get formatted gatepass with process history ready for printing
+    Includes all process steps, guard can see what's completed/skipped/not catered
+    """
+    try:
+        process_status = gatepass_service.get_service_order_process_status(service_order_id)
+        
+        if not process_status.get('success'):
+            return jsonify(process_status), 400
+        
+        # Add gatepass details to the process status
+        from app.database import db
+        
+        gatepass_query = """
+        SELECT sod.id, sod.file_name as gatepass_number, sod.created_at,
+               sod.document_data, so.total_amount, i.invoice_no
+        FROM service_order_documents sod
+        JOIN service_orders so ON sod.service_order_id = so.id
+        LEFT JOIN invoices i ON so.id = i.service_order_id
+        WHERE sod.service_order_id = %s AND sod.document_type = 'gatepass'
+        ORDER BY sod.created_at DESC
+        LIMIT 1
+        """
+        
+        gatepass_result = db.execute_query(gatepass_query, (service_order_id,))
+        
+        if gatepass_result:
+            import json
+            gatepass_data = json.loads(gatepass_result[0]['document_data'])
+            process_status['gatepass_number'] = gatepass_result[0]['gatepass_number']
+            process_status['gatepass_id'] = gatepass_result[0]['id']
+            process_status['invoice_number'] = gatepass_result[0].get('invoice_no', 'N/A')
+            process_status['total_amount'] = gatepass_result[0].get('total_amount', 0)
+            process_status['gatepass_signatures'] = {
+                'cashier': gatepass_data.get('cashier_signature', False),
+                'accounting': gatepass_data.get('accounting_signature', False),
+                'warranty': gatepass_data.get('warranty_signature', False),
+                'manager': gatepass_data.get('manager_signature', False)
+            }
+        
+        return jsonify(process_status), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500

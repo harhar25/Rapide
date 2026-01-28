@@ -37,6 +37,7 @@ def create_app(config_name='development'):
     from app.routes.auto_followup_routes import auto_followup_bp
     from app.routes.gatepass_routes import gatepass_bp
     from app.routes.scheduler_routes import scheduler_task_bp
+    from app.routes.print_service_routes import print_bp
     app.register_blueprint(customer_bp)
     app.register_blueprint(scheduler_bp)
     app.register_blueprint(auth_bp)
@@ -56,6 +57,7 @@ def create_app(config_name='development'):
     app.register_blueprint(auto_followup_bp)
     app.register_blueprint(gatepass_bp)
     app.register_blueprint(scheduler_task_bp)
+    app.register_blueprint(print_bp)
     
     # Health check endpoint
     @app.route('/api/health', methods=['GET'])

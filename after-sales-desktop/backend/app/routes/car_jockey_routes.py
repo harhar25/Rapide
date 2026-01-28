@@ -223,3 +223,25 @@ def get_summary():
         }), 200
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+@car_jockey_bp.route('/parts-requests', methods=['POST'])
+def create_parts_request():
+    """Create a parts request from technician"""
+    try:
+        data = request.get_json()
+        
+        service_order_id = data.get('service_order_id')
+        jockey_id = data.get('jockey_id')
+        items = data.get('items', [])
+        
+        if not service_order_id or not items:
+            return jsonify({'success': False, 'message': 'Missing required fields'}), 400
+        
+        result = service.create_parts_request(service_order_id, jockey_id, items)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Parts request submitted successfully',
+            'data': {'request_id': result}
+        }), 201
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500

@@ -352,3 +352,165 @@ class WarehouseService:
         """
         results = db.execute_query(query, (limit,)) or []
         return results
+    # ==================== PICKLIST METHODS ====================
+
+    def get_active_picklists(self):
+        """Get all active picklists (pending or in_progress)"""
+        query = """
+        SELECT id, picklist_number, request_date, job_order_number, customer, vehicle, 
+               priority_level, requested_by, status, notes, created_at
+        FROM warehouse_picklists
+        WHERE status IN ('pending', 'in_progress')
+        ORDER BY created_at DESC
+        """
+        results = db.execute_query(query) or []
+        
+        # Convert to JSON-compatible format with items
+        picklists = []
+        for p in results:
+            picklist = {
+                'id': p.get('id'),
+                'picklistNumber': p.get('picklist_number'),
+                'requestDate': p.get('request_date'),
+                'jobOrderNumber': p.get('job_order_number'),
+                'customer': p.get('customer'),
+                'vehicle': p.get('vehicle'),
+                'priorityLevel': p.get('priority_level'),
+                'requestedBy': p.get('requested_by'),
+                'status': p.get('status'),
+                'notes': p.get('notes'),
+                'items': self._get_picklist_items(p.get('id'))
+            }
+            picklists.append(picklist)
+        return picklists
+    
+    def _get_picklist_items(self, picklist_id):
+        """Get all items in a picklist"""
+        query = """
+        SELECT id, item_id, product_code, description, quantity_required, 
+               quantity_picked, bin_location, picked_notes
+        FROM warehouse_picklist_items
+        WHERE picklist_id = %s
+        ORDER BY item_id ASC
+        """
+        results = db.execute_query(query, (picklist_id,)) or []
+        
+        items = []
+        for item in results:
+            items.append({
+                'id': item.get('id'),
+                'itemId': item.get('item_id'),
+                'code': item.get('product_code'),
+                'description': item.get('description'),
+                'quantity': item.get('quantity_required'),
+                'pickedQuantity': item.get('quantity_picked'),
+                'location': item.get('bin_location'),
+                'notes': item.get('picked_notes')
+            })
+        return items
+    
+    def get_picklist_by_id(self, picklist_id):
+        """Get specific picklist with all items"""
+        query = """
+        SELECT id, picklist_number, request_date, job_order_number, customer, vehicle,
+               priority_level, requested_by, status, notes, created_at
+        FROM warehouse_picklists
+        WHERE id = %s
+        """
+        result = db.execute_query(query, (picklist_id,))
+        
+        if not result or len(result) == 0:
+            return None
+        
+        p = result[0]
+        picklist = {
+            'id': p.get('id'),
+            'picklistNumber': p.get('picklist_number'),
+            'requestDate': p.get('request_date'),
+            'jobOrderNumber': p.get('job_order_number'),
+            'customer': p.get('customer'),
+            'vehicle': p.get('vehicle'),
+            'priorityLevel': p.get('priority_level'),
+            'requestedBy': p.get('requested_by'),
+            'status': p.get('status'),
+            'notes': p.get('notes'),
+            'items': self._get_picklist_items(picklist_id)
+        }
+        return picklist
+    
+    def create_picklist(self, picklist_data):
+        """Create a new picklist from job controller request"""
+        # Generate unique picklist number
+        import uuid
+        picklist_number = f"PL-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8].upper()}"
+        
+        query = """
+        INSERT INTO warehouse_picklists 
+        (picklist_number, request_date, job_order_number, customer, vehicle, priority_level, requested_by, status)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, 'pending')
+        """
+        
+        params = (
+            picklist_number,
+            datetime.now().strftime('%Y-%m-%d'),
+            picklist_data.get('jobOrderNumber'),
+            picklist_data.get('customer'),
+            picklist_data.get('vehicle'),
+            picklist_data.get('priorityLevel', 'normal'),
+            picklist_data.get('requestedBy', 'SYSTEM')
+        )
+        
+        result = db.execute_update(query, params)
+        picklist_id = result.get('last_id') if result['success'] else None
+        
+        if not picklist_id:
+            return None
+        
+        # Add items to picklist
+        items = picklist_data.get('items', [])
+        for item in items:
+            item_query = """
+            INSERT INTO warehouse_picklist_items 
+            (picklist_id, item_id, product_code, description, quantity_required)
+            VALUES (%s, %s, %s, %s, %s)
+            """
+            item_params = (
+                picklist_id,
+                item.get('id'),
+                item.get('code', ''),
+                item.get('description', ''),
+                self._to_int(item.get('quantity'), 'quantity', min_value=1)
+            )
+            db.execute_update(item_query, item_params)
+        
+        return picklist_id
+    
+    def update_picked_item(self, picklist_id, item_id, picked_qty, location, notes):
+        """Update quantity picked and location for an item"""
+        query = """
+        UPDATE warehouse_picklist_items
+        SET quantity_picked = %s, bin_location = %s, picked_notes = %s
+        WHERE picklist_id = %s AND id = %s
+        """
+        
+        params = (
+            self._to_int(picked_qty, 'pickedQuantity', min_value=0),
+            location,
+            notes,
+            picklist_id,
+            item_id
+        )
+        
+        result = db.execute_update(query, params)
+        return result['success']
+    
+    def complete_picklist(self, picklist_id, picklist_data):
+        """Mark picklist as completed"""
+        query = """
+        UPDATE warehouse_picklists
+        SET status = 'completed'
+        WHERE id = %s
+        """
+        
+        result = db.execute_update(query, (picklist_id,))
+        return result['success']

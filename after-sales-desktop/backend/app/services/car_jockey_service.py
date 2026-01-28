@@ -162,3 +162,47 @@ class CarJockeyService:
         if result:
             return tuple(result[0].values())
         raise ValueError("Movement not found")
+    
+    def create_parts_request(self, service_order_id, jockey_id, items):
+        """Create a parts request from technician (Car Jockey)
+        This will be forwarded to Job Controller and then to Warehouse
+        """
+        try:
+            # First, insert the main parts request record
+            query = """
+            INSERT INTO parts_requests 
+            (service_order_id, requested_by, requested_by_role, status, created_at)
+            VALUES (%s, %s, 'technician', 'pending', NOW())
+            """
+            params = (service_order_id, jockey_id)
+            result = db.execute_update(query, params)
+            
+            if not result['success']:
+                raise ValueError("Failed to create parts request")
+            
+            request_id = result.get('last_id')
+            
+            # Insert each item in the request
+            for item in items:
+                item_query = """
+                INSERT INTO parts_request_items 
+                (parts_request_id, product_id, quantity_requested, created_at)
+                VALUES (%s, %s, %s, NOW())
+                """
+                item_params = (request_id, item['product_id'], item['quantity'])
+                item_result = db.execute_update(item_query, item_params)
+                
+                if not item_result['success']:
+                    raise ValueError(f"Failed to add item to request: {item['product_id']}")
+            
+            # Mark request as sent to job controller
+            update_query = """
+            UPDATE parts_requests 
+            SET status = 'sent-to-jc', updated_at = NOW()
+            WHERE id = %s
+            """
+            db.execute_update(update_query, (request_id,))
+            
+            return request_id
+        except Exception as e:
+            raise Exception(f"Error creating parts request: {str(e)}")

@@ -15,6 +15,7 @@ export default function CarJockeyDashboard({ user, onLogout }) {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [warehouseInventory, setWarehouseInventory] = useState([]);
 
   const formatMoney = (value) => {
     const num = Number(value);
@@ -32,6 +33,7 @@ export default function CarJockeyDashboard({ user, onLogout }) {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [showParkingModal, setShowParkingModal] = useState(false);
   const [showReleaseModal, setShowReleaseModal] = useState(false);
+  const [showPartsRequestModal, setShowPartsRequestModal] = useState(false);
   
   // Form states
   const [movementForm, setMovementForm] = useState({
@@ -59,9 +61,16 @@ export default function CarJockeyDashboard({ user, onLogout }) {
     parking_fee: 0
   });
 
+  const [partsRequestForm, setPartsRequestForm] = useState({
+    items: [
+      { product_id: '', product_code: '', description: '', quantity: 1 }
+    ]
+  });
+
   // Load data on component mount and auto-refresh
   useEffect(() => {
     loadAllData();
+    loadWarehouseInventory();
     const interval = setInterval(loadAllData, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -123,6 +132,27 @@ export default function CarJockeyDashboard({ user, onLogout }) {
       }
     } catch (error) {
       console.error('Error loading summary:', error);
+    }
+  };
+
+  const loadWarehouseInventory = async () => {
+    try {
+      const result = await fetchJson('/api/warehouse/products');
+      if (result.success) {
+        // Convert tuples to objects for easier access
+        const inventory = (result.data || []).map(product => {
+          // Product tuple format: (id, code, name, category, price, qty, reorder_level, supplier, description, status)
+          return {
+            product_id: product[0],
+            product_code: product[1],
+            description: product[2] + (product[3] ? ' - ' + product[3] : ''),  // name + category
+            quantity_in_stock: product[5]
+          };
+        });
+        setWarehouseInventory(inventory);
+      }
+    } catch (error) {
+      console.error('Error loading warehouse inventory:', error);
     }
   };
 
@@ -265,6 +295,83 @@ export default function CarJockeyDashboard({ user, onLogout }) {
       }
     } catch (error) {
       setErrorMessage('Error releasing vehicle: ' + error.message);
+    }
+  };
+
+  const handleRequestParts = (movement) => {
+    setSelectedVehicle(movement);
+    setPartsRequestForm({
+      items: [
+        { product_id: '', product_code: '', description: '', quantity: 1 }
+      ]
+    });
+    setShowPartsRequestModal(true);
+  };
+
+  const handleAddPartsItem = () => {
+    setPartsRequestForm({
+      items: [
+        ...partsRequestForm.items,
+        { product_id: '', product_code: '', description: '', quantity: 1 }
+      ]
+    });
+  };
+
+  const handleRemovePartsItem = (index) => {
+    setPartsRequestForm({
+      items: partsRequestForm.items.filter((_, i) => i !== index)
+    });
+  };
+
+  const handlePartsItemChange = (index, field, value) => {
+    const updatedItems = [...partsRequestForm.items];
+    
+    if (field === 'product_id') {
+      const product = warehouseInventory.find(p => p.product_id === value);
+      if (product) {
+        updatedItems[index] = {
+          product_id: product.product_id,
+          product_code: product.product_code,
+          description: product.description,
+          quantity: updatedItems[index].quantity
+        };
+      }
+    } else if (field === 'quantity') {
+      updatedItems[index].quantity = parseInt(value) || 1;
+    }
+    
+    setPartsRequestForm({ items: updatedItems });
+  };
+
+  const handleSubmitPartsRequest = async () => {
+    if (partsRequestForm.items.some(item => !item.product_id)) {
+      setErrorMessage('Please select a product for all items');
+      return;
+    }
+
+    try {
+      const result = await fetchJson('/api/car-jockey/parts-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          service_order_id: selectedVehicle.so_id,
+          jockey_id: user.id,
+          items: partsRequestForm.items
+        })
+      });
+
+      if (result.success) {
+        setSuccessMessage('Parts request submitted to Job Controller');
+        setShowPartsRequestModal(false);
+        setTimeout(() => {
+          setSuccessMessage('');
+          loadAllData();
+        }, 2000);
+      } else {
+        setErrorMessage(result.message);
+      }
+    } catch (error) {
+      setErrorMessage('Error submitting parts request: ' + error.message);
     }
   };
 
@@ -434,6 +541,13 @@ export default function CarJockeyDashboard({ user, onLogout }) {
                             onClick={() => handleParkVehicle(m)}
                           >
                             Park Vehicle
+                          </button>
+                          <button 
+                            className="btn-action btn-request"
+                            onClick={() => handleRequestParts(m)}
+                            style={{ backgroundColor: '#2196F3' }}
+                          >
+                            Request Parts
                           </button>
                         </>
                       ) : (
@@ -672,6 +786,131 @@ export default function CarJockeyDashboard({ user, onLogout }) {
               <button type="button" className="btn-cancel" onClick={() => setShowReleaseModal(false)}>Cancel</button>
               <button type="button" className="btn-submit" onClick={handleSubmitRelease}>Confirm Release</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showPartsRequestModal && (
+        <div className="modal-overlay" onClick={() => setShowPartsRequestModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px', maxHeight: '80vh', overflowY: 'auto' }}>
+            <h2>Request Parts from Warehouse</h2>
+            <p style={{ color: '#666', marginBottom: '15px' }}>
+              Service Order: <strong>{selectedVehicle?.so_id}</strong> | Plate: <strong>{selectedVehicle?.plate_no}</strong>
+            </p>
+            <form style={{ marginBottom: '20px' }}>
+              <div style={{ marginBottom: '15px', padding: '15px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid #ddd' }}>
+                      <th style={{ textAlign: 'left', padding: '8px', fontWeight: 'bold' }}>Product</th>
+                      <th style={{ textAlign: 'left', padding: '8px', fontWeight: 'bold', width: '100px' }}>Qty</th>
+                      <th style={{ textAlign: 'center', padding: '8px', width: '50px' }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {partsRequestForm.items.map((item, index) => (
+                      <tr key={index} style={{ borderBottom: '1px solid #eee' }}>
+                        <td style={{ padding: '10px' }}>
+                          <select
+                            value={item.product_id}
+                            onChange={(e) => handlePartsItemChange(index, 'product_id', e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '8px',
+                              border: '1px solid #ddd',
+                              borderRadius: '4px',
+                              fontFamily: 'inherit',
+                              fontSize: 'inherit'
+                            }}
+                          >
+                            <option value="">-- Select Product --</option>
+                            {warehouseInventory.map((product, i) => (
+                              <option key={i} value={product.product_id}>
+                                {product.product_code} - {product.description} (Stock: {product.quantity_in_stock})
+                              </option>
+                            ))}
+                          </select>
+                          {item.product_code && (
+                            <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                              Code: {item.product_code}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ padding: '10px' }}>
+                          <input
+                            type="number"
+                            value={item.quantity}
+                            onChange={(e) => handlePartsItemChange(index, 'quantity', e.target.value)}
+                            min="1"
+                            style={{
+                              width: '80px',
+                              padding: '8px',
+                              border: '1px solid #ddd',
+                              borderRadius: '4px',
+                              fontFamily: 'inherit',
+                              fontSize: 'inherit'
+                            }}
+                          />
+                        </td>
+                        <td style={{ textAlign: 'center', padding: '10px' }}>
+                          {partsRequestForm.items.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePartsItem(index)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#f44336',
+                                cursor: 'pointer',
+                                fontSize: '18px',
+                                padding: '0'
+                              }}
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleAddPartsItem}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#4CAF50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  marginBottom: '20px',
+                  fontFamily: 'inherit',
+                  fontSize: 'inherit'
+                }}
+              >
+                + Add Item
+              </button>
+
+              <div className="modal-buttons">
+                <button 
+                  type="button" 
+                  className="btn-cancel" 
+                  onClick={() => setShowPartsRequestModal(false)}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button" 
+                  className="btn-submit" 
+                  onClick={handleSubmitPartsRequest}
+                >
+                  Submit Request to Job Controller
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

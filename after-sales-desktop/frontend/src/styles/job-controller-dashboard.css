@@ -457,6 +457,193 @@
   color: #212529;
 }
 
+/* ========================================
+   Job Order Printing Section Styles
+   ======================================== */
+
+.tab-content.full-width {
+  max-width: 100%;
+}
+
+.job-order-selection {
+  background: white;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.job-order-selection h2 {
+  color: #212529;
+  margin-top: 0;
+  margin-bottom: 24px;
+  font-size: 20px;
+}
+
+.order-selection-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.order-tabs {
+  display: flex;
+  gap: 10px;
+  border-bottom: 2px solid #e9ecef;
+  padding-bottom: 0;
+}
+
+.order-tab-btn {
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: #666;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.order-tab-btn.active {
+  color: #0275d8;
+  border-bottom-color: #0275d8;
+}
+
+.order-tab-btn:hover {
+  color: #212529;
+}
+
+.order-list h3 {
+  font-size: 16px;
+  color: #212529;
+  margin-bottom: 16px;
+}
+
+.orders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.order-card {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+}
+
+.order-card:hover {
+  border-color: #0275d8;
+  box-shadow: 0 4px 12px rgba(2, 117, 216, 0.15);
+  transform: translateY(-2px);
+}
+
+.order-card-header {
+  background: #f8f9fa;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e9ecef;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.order-id {
+  font-weight: 700;
+  color: #0275d8;
+  font-size: 14px;
+}
+
+.order-date {
+  font-size: 12px;
+  color: #999;
+}
+
+.order-card-body {
+  padding: 16px;
+  flex: 1;
+}
+
+.order-card-body p {
+  margin: 0 0 8px 0;
+  color: #333;
+  font-size: 14px;
+}
+
+.order-card-body p:first-child {
+  font-weight: 600;
+  color: #212529;
+}
+
+.vehicle-info {
+  font-size: 13px;
+  color: #666;
+}
+
+.service-type {
+  font-size: 13px;
+  color: #5cb85c;
+  font-weight: 500;
+}
+
+.order-card-footer {
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border-top: 1px solid #e9ecef;
+}
+
+.btn-print-order {
+  width: 100%;
+  padding: 8px 12px;
+  background: #0275d8;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-print-order:hover {
+  background: #0259b3;
+}
+
+.manual-entry {
+  display: flex;
+  justify-content: center;
+  padding-top: 20px;
+  border-top: 2px solid #e9ecef;
+}
+
+.btn-manual-entry {
+  padding: 12px 32px;
+  background: #5cb85c;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.btn-manual-entry:hover {
+  background: #4cae4c;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(92, 184, 92, 0.3);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+  font-size: 14px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .jc-content {
@@ -482,4 +669,24 @@
   .records-table td {
     padding: 8px;
   }
+
+  .orders-grid {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  }
 }
+
+@media (max-width: 480px) {
+  .orders-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .order-tabs {
+    flex-wrap: wrap;
+  }
+
+  .order-tab-btn {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+}
+

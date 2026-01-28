@@ -1,0 +1,445 @@
+/* Gatepass Print Template Styles */
+
+.gatepass-print {
+  width: 100%;
+  max-width: 210mm; /* A4 width */
+  margin: 0 auto;
+  padding: 20px;
+  background: white;
+  color: #333;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* Header */
+.gatepass-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 15px;
+  border-bottom: 3px solid #1f2937;
+}
+
+.company-info h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: bold;
+  color: #1f2937;
+}
+
+.company-name {
+  margin: 5px 0 0 0;
+  font-size: 12px;
+  color: #666;
+}
+
+.gatepass-number {
+  text-align: right;
+  font-size: 14px;
+}
+
+.gatepass-number .label {
+  font-weight: bold;
+  display: block;
+  margin-bottom: 5px;
+}
+
+.gatepass-number .value {
+  font-size: 18px;
+  font-weight: bold;
+  color: #dc2626;
+  display: block;
+}
+
+/* Section Titles */
+.section-title {
+  background: #1f2937;
+  color: white;
+  padding: 10px 15px;
+  font-weight: bold;
+  font-size: 14px;
+  margin: 20px 0 10px 0;
+  border-radius: 4px;
+}
+
+/* Customer Section */
+.customer-section {
+  margin-bottom: 20px;
+  page-break-after: avoid;
+}
+
+.info-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+.info-table td {
+  padding: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.info-table td.label {
+  font-weight: bold;
+  background: #f3f4f6;
+  width: 25%;
+}
+
+.info-table td.value {
+  background: #fafafa;
+  width: 25%;
+}
+
+/* Summary Section */
+.summary-section {
+  margin: 20px 0;
+  page-break-after: avoid;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.summary-item {
+  padding: 12px;
+  border: 2px solid #e5e7eb;
+  border-radius: 6px;
+  text-align: center;
+  background: #f9fafb;
+}
+
+.summary-item.completed {
+  border-color: #22c55e;
+  background: #dcfce7;
+}
+
+.summary-item.in-progress {
+  border-color: #f59e0b;
+  background: #fef3c7;
+}
+
+.summary-item.skipped {
+  border-color: #9ca3af;
+  background: #f3f4f6;
+}
+
+.summary-item.not-catered {
+  border-color: #ef4444;
+  background: #fee2e2;
+}
+
+.summary-item.progress {
+  border-color: #3b82f6;
+  background: #dbeafe;
+}
+
+.summary-label {
+  font-size: 11px;
+  color: #666;
+  margin-bottom: 5px;
+}
+
+.summary-value {
+  font-size: 18px;
+  font-weight: bold;
+  color: #1f2937;
+}
+
+/* Progress Bar */
+.progress-bar-container {
+  margin: 15px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.progress-bar-label {
+  font-weight: bold;
+  min-width: 120px;
+  font-size: 12px;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 25px;
+  background: #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid #9ca3af;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 8px;
+  color: white;
+  font-weight: bold;
+  font-size: 11px;
+  transition: width 0.3s ease;
+}
+
+.progress-percentage {
+  min-width: 50px;
+  font-weight: bold;
+  font-size: 14px;
+  color: #22c55e;
+}
+
+/* Processes Table */
+.processes-section {
+  margin: 20px 0;
+  page-break-after: avoid;
+}
+
+.processes-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+.processes-table thead {
+  background: #374151;
+  color: white;
+}
+
+.processes-table th {
+  padding: 10px;
+  text-align: left;
+  font-weight: bold;
+  font-size: 12px;
+  border: 1px solid #1f2937;
+}
+
+.processes-table td {
+  padding: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.processes-table tr:nth-child(even) {
+  background: #f9fafb;
+}
+
+.step-number {
+  text-align: center;
+  font-weight: bold;
+  width: 5%;
+}
+
+.step-name {
+  font-weight: 600;
+  width: 40%;
+}
+
+.step-type {
+  font-size: 11px;
+  color: #666;
+  width: 15%;
+  text-transform: uppercase;
+}
+
+.status-cell {
+  width: 25%;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid;
+  font-weight: bold;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.remarks {
+  font-size: 11px;
+  color: #666;
+  width: 15%;
+}
+
+.error-note {
+  color: #ef4444;
+  font-weight: bold;
+}
+
+.status-note {
+  color: #666;
+}
+
+/* Status Row Colors */
+.processes-table tr.status-completed {
+  background: #f0fdf4;
+}
+
+.processes-table tr.status-in_progress {
+  background: #fffbeb;
+}
+
+.processes-table tr.status-not_catered {
+  background: #fef2f2;
+}
+
+/* Signatures Section */
+.signatures-section {
+  margin: 20px 0;
+  page-break-after: avoid;
+}
+
+.signatures-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin: 15px 0;
+}
+
+.signature-box {
+  border: 2px solid #e5e7eb;
+  padding: 15px;
+  text-align: center;
+  border-radius: 6px;
+  background: #f9fafb;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.signature-box.signed {
+  border-color: #22c55e;
+  background: #f0fdf4;
+}
+
+.signature-box.unsigned {
+  border-color: #ef4444;
+  background: #fef2f2;
+}
+
+.signature-label {
+  font-weight: bold;
+  font-size: 12px;
+  margin-bottom: 8px;
+  color: #1f2937;
+}
+
+.signature-status {
+  font-size: 14px;
+  font-weight: bold;
+  color: #666;
+}
+
+.signature-box.signed .signature-status {
+  color: #22c55e;
+}
+
+.signature-box.unsigned .signature-status {
+  color: #ef4444;
+}
+
+/* Footer Notes */
+.footer-notes {
+  margin: 30px 0;
+  padding: 15px;
+  background: #fef3c7;
+  border-left: 4px solid #f59e0b;
+  border-radius: 4px;
+  page-break-after: avoid;
+}
+
+.footer-notes p {
+  margin: 8px 0;
+  font-size: 12px;
+}
+
+.footer-notes strong {
+  color: #92400e;
+}
+
+.footer-notes ul {
+  margin: 10px 0 0 20px;
+  padding-left: 20px;
+}
+
+.footer-notes li {
+  margin: 6px 0;
+  font-size: 11px;
+  color: #78350f;
+}
+
+/* Print Info */
+.print-info {
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid #e5e7eb;
+  text-align: center;
+  font-size: 10px;
+  color: #999;
+}
+
+.print-info p {
+  margin: 3px 0;
+}
+
+/* Print Media */
+@media print {
+  body {
+    margin: 0;
+    padding: 0;
+  }
+
+  .gatepass-print {
+    max-width: 100%;
+    padding: 0;
+    margin: 0;
+  }
+
+  .processes-section {
+    page-break-inside: avoid;
+  }
+
+  .signatures-section {
+    page-break-inside: avoid;
+  }
+
+  .summary-section {
+    page-break-inside: avoid;
+  }
+
+  /* Hide UI elements for print */
+  .no-print,
+  .no-print * {
+    display: none !important;
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .signatures-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .processes-table {
+    font-size: 11px;
+  }
+
+  .gatepass-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .gatepass-number {
+    margin-top: 15px;
+    text-align: left;
+  }
+}

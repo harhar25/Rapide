@@ -280,4 +280,246 @@ class GatepassService:
             logger.error(f"Error retrieving pending gatepasses: {str(e)}", exc_info=True)
             return []
 
+    def get_service_order_process_status(self, service_order_id):
+        """
+        Get complete process history for a service order
+        Shows all process steps: not catered, skipped, in-progress, completed, pending
+        """
+        try:
+            # Get service order details
+            so_query = """
+            SELECT so.id, so.status, so.created_at, so.updated_at,
+                   c.name as customer_name, c.plate_no as vehicle_plate_no,
+                   cv.vehicle_model, cv.color
+            FROM service_orders so
+            JOIN customers c ON so.customer_id = c.id
+            LEFT JOIN customer_vehicles cv ON c.id = cv.customer_id
+            WHERE so.id = %s
+            """
+            so_result = db.execute_query(so_query, (service_order_id,))
+            
+            if not so_result:
+                return {'success': False, 'error': 'Service order not found', 'processes': []}
+            
+            so_data = so_result[0]
+            
+            # Define all standard processes in workflow order
+            process_steps = [
+                {'step': 1, 'name': 'CRO - Appointment & Scheduling', 'type': 'initial'},
+                {'step': 2, 'name': 'Service Advisor - Customer Check-In', 'type': 'service_advisor'},
+                {'step': 3, 'name': 'Service Advisor - VRC & CIS Creation', 'type': 'service_advisor'},
+                {'step': 4, 'name': 'Job Controller - Technician Assignment', 'type': 'job_controller'},
+                {'step': 5, 'name': 'Technician - Job Execution', 'type': 'technician'},
+                {'step': 6, 'name': 'Foreman - QC Inspection', 'type': 'qc'},
+                {'step': 7, 'name': 'Job Wrapup - Labor & Materials', 'type': 'wrapup'},
+                {'step': 8, 'name': 'Car Jockey - Vehicle Movement', 'type': 'jockey'},
+                {'step': 9, 'name': 'Billing - Invoice Creation', 'type': 'billing'},
+                {'step': 10, 'name': 'Cashier - Payment Processing', 'type': 'cashier'},
+                {'step': 11, 'name': 'Security Gate - Vehicle Release', 'type': 'security'},
+                {'step': 12, 'name': 'Vehicle Handover - Final Delivery', 'type': 'handover'},
+            ]
+            
+            processes_status = []
+            
+            # Track each process step
+            for process_step in process_steps:
+                step_status = self._get_process_step_status(service_order_id, process_step)
+                processes_status.append(step_status)
+            
+            # Calculate overall progress
+            completed = len([p for p in processes_status if p['status'] == 'completed'])
+            skipped = len([p for p in processes_status if p['status'] == 'skipped'])
+            in_progress = len([p for p in processes_status if p['status'] == 'in_progress'])
+            not_started = len([p for p in processes_status if p['status'] == 'not_started'])
+            not_catered = len([p for p in processes_status if p['status'] == 'not_catered'])
+            
+            logger.info(f"Service Order {service_order_id} Process Status: "
+                       f"Completed={completed}, In Progress={in_progress}, "
+                       f"Skipped={skipped}, Not Started={not_started}, Not Catered={not_catered}")
+            
+            return {
+                'success': True,
+                'service_order_id': service_order_id,
+                'customer_name': so_data['customer_name'],
+                'vehicle_plate_no': so_data['vehicle_plate_no'],
+                'vehicle_model': so_data.get('vehicle_model', 'Unknown'),
+                'vehicle_color': so_data.get('color', 'Unknown'),
+                'so_status': so_data['status'],
+                'processes': processes_status,
+                'summary': {
+                    'total_steps': len(process_steps),
+                    'completed': completed,
+                    'in_progress': in_progress,
+                    'skipped': skipped,
+                    'not_started': not_started,
+                    'not_catered': not_catered,
+                    'progress_percentage': int((completed / len(process_steps)) * 100) if process_steps else 0
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting service order process status: {str(e)}", exc_info=True)
+            return {'success': False, 'error': str(e), 'processes': []}
+
+    def _get_process_step_status(self, service_order_id, process_step):
+        """Determine status of a specific process step"""
+        step_num = process_step['step']
+        step_name = process_step['name']
+        step_type = process_step['type']
+        
+        try:
+            # Check for records in relevant tables based on process type
+            if step_type == 'initial':
+                query = "SELECT id, created_at FROM scheduling_orders WHERE service_order_id = %s LIMIT 1"
+                result = db.execute_query(query, (service_order_id,))
+                status = 'completed' if result else 'not_started'
+                
+            elif step_type == 'service_advisor':
+                if 'VRC' in step_name:
+                    query = "SELECT id, created_at FROM vehicle_report_cards WHERE service_order_id = %s LIMIT 1"
+                else:
+                    query = "SELECT id, created_at FROM customer_info_sheets WHERE service_order_id = %s LIMIT 1"
+                result = db.execute_query(query, (service_order_id,))
+                status = 'completed' if result else 'not_started'
+                
+            elif step_type == 'job_controller':
+                query = "SELECT id, assignment_status FROM job_assignments WHERE service_order_id = %s LIMIT 1"
+                result = db.execute_query(query, (service_order_id,))
+                if result:
+                    assignment_status = result[0].get('assignment_status', '').lower()
+                    status = 'completed' if assignment_status == 'assigned' else 'in_progress'
+                else:
+                    status = 'not_started'
+                
+            elif step_type == 'technician':
+                query = """SELECT id, job_status FROM job_assignments 
+                          WHERE service_order_id = %s AND job_status IN ('started', 'in-progress', 'completed')
+                          LIMIT 1"""
+                result = db.execute_query(query, (service_order_id,))
+                if result:
+                    job_status = result[0].get('job_status', '').lower()
+                    if job_status == 'completed':
+                        status = 'completed'
+                    else:
+                        status = 'in_progress'
+                else:
+                    status = 'not_started'
+                
+            elif step_type == 'qc':
+                query = """SELECT id, inspection_status FROM qc_inspections 
+                          WHERE service_order_id = %s ORDER BY created_at DESC LIMIT 1"""
+                result = db.execute_query(query, (service_order_id,))
+                if result:
+                    status = result[0].get('inspection_status', 'pending').lower()
+                    if status == 'passed':
+                        status = 'completed'
+                    elif status == 'failed':
+                        status = 'in_progress'
+                else:
+                    status = 'not_started'
+                
+            elif step_type == 'wrapup':
+                query = "SELECT id, status FROM job_wrapups WHERE service_order_id = %s LIMIT 1"
+                result = db.execute_query(query, (service_order_id,))
+                if result:
+                    status = result[0].get('status', 'pending').lower()
+                    status = 'completed' if status == 'completed' else 'in_progress'
+                else:
+                    status = 'not_started'
+                
+            elif step_type == 'jockey':
+                query = """SELECT id, movement_status FROM vehicle_movements 
+                          WHERE service_order_id = %s ORDER BY created_at DESC LIMIT 1"""
+                result = db.execute_query(query, (service_order_id,))
+                if result:
+                    movement_status = result[0].get('movement_status', '').lower()
+                    status = 'completed' if movement_status == 'completed' else 'in_progress'
+                else:
+                    status = 'not_started'
+                
+            elif step_type == 'billing':
+                query = "SELECT id, status FROM invoices WHERE service_order_id = %s LIMIT 1"
+                result = db.execute_query(query, (service_order_id,))
+                if result:
+                    invoice_status = result[0].get('status', '').lower()
+                    if invoice_status == 'paid':
+                        status = 'completed'
+                    elif invoice_status == 'issued':
+                        status = 'in_progress'
+                    else:
+                        status = 'not_started'
+                else:
+                    status = 'not_started'
+                
+            elif step_type == 'cashier':
+                query = "SELECT id, status FROM daily_transactions WHERE service_order_id = %s LIMIT 1"
+                result = db.execute_query(query, (service_order_id,))
+                if result:
+                    status = 'completed'
+                else:
+                    status = 'not_started'
+                
+            elif step_type == 'security':
+                query = "SELECT id, access_type FROM gate_access_logs WHERE service_order_id = %s AND access_type = 'exit' LIMIT 1"
+                result = db.execute_query(query, (service_order_id,))
+                status = 'completed' if result else 'not_started'
+                
+            elif step_type == 'handover':
+                query = "SELECT id, status FROM vehicle_handovers WHERE service_order_id = %s LIMIT 1"
+                result = db.execute_query(query, (service_order_id,))
+                if result:
+                    handover_status = result[0].get('status', '').lower()
+                    status = 'completed' if handover_status == 'completed' else 'in_progress'
+                else:
+                    status = 'not_started'
+            else:
+                status = 'not_catered'
+            
+            return {
+                'step': step_num,
+                'name': step_name,
+                'type': step_type,
+                'status': status,
+                'status_display': self._format_status(status),
+                'icon': self._get_status_icon(status)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error checking process step {step_num}: {str(e)}", exc_info=True)
+            return {
+                'step': step_num,
+                'name': step_name,
+                'type': step_type,
+                'status': 'not_catered',
+                'status_display': 'Not Catered',
+                'icon': '⚠️',
+                'error': str(e)
+            }
+
+    @staticmethod
+    def _format_status(status):
+        """Format status for display"""
+        status_map = {
+            'completed': '✅ Completed',
+            'in_progress': '⏳ In Progress',
+            'not_started': '⭕ Not Started',
+            'skipped': '⏭️ Skipped',
+            'not_catered': '⚠️ Not Catered',
+            'pending': '⏳ Pending'
+        }
+        return status_map.get(status.lower(), status)
+
+    @staticmethod
+    def _get_status_icon(status):
+        """Get status icon emoji"""
+        icon_map = {
+            'completed': '✅',
+            'in_progress': '⏳',
+            'not_started': '⭕',
+            'skipped': '⏭️',
+            'not_catered': '⚠️',
+            'pending': '⏳'
+        }
+        return icon_map.get(status.lower(), '•')
+
 gatepass_service = GatepassService()

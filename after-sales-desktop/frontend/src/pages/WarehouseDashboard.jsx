@@ -4,6 +4,7 @@ import '../styles/enterprise-ui.css';
 import '../styles/dashboard-common.css';
 import { fetchJson } from '../utils/fetchJson';
 import { StatCard, EnterpriseCard, StatusBadge, EnterpriseTabs, LoadingSpinner, EmptyState } from '../components/EnterpriseComponents';
+import AnvilPicklist from '../components/AnvilPicklist';
 
 const WarehouseDashboard = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = React.useState('inventory');
@@ -17,6 +18,9 @@ const WarehouseDashboard = ({ user, onLogout }) => {
   const [showInventoryForm, setShowInventoryForm] = useState(false);
   const [inventoryAction, setInventoryAction] = useState('in');
   const [errorMessage, setErrorMessage] = useState('');
+  const [picklists, setPicklists] = useState([]);
+  const [selectedPicklist, setSelectedPicklist] = useState(null);
+  const [showPicklist, setShowPicklist] = useState(false);
 
   // Form states
   const [productForm, setProductForm] = useState({
@@ -96,6 +100,35 @@ const WarehouseDashboard = ({ user, onLogout }) => {
       }
     } catch (error) {
       console.error('Error loading history:', error);
+    }
+  };
+
+  const loadPicklists = async () => {
+    try {
+      const data = await fetchJson(`${API_BASE}/picklists`);
+      if (data.success) {
+        setPicklists(data.data || []);
+      }
+    } catch (error) {
+      console.error('Error loading picklists:', error);
+    }
+  };
+
+  const handlePicklistComplete = async (completedPicklist) => {
+    try {
+      const data = await fetchJson(`${API_BASE}/picklists/${completedPicklist.id}/complete`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(completedPicklist)
+      });
+      if (data.success) {
+        setShowPicklist(false);
+        setSelectedPicklist(null);
+        loadPicklists();
+      }
+    } catch (error) {
+      console.error('Error completing picklist:', error);
+      setErrorMessage('Failed to complete picklist');
     }
   };
 
@@ -247,6 +280,15 @@ const WarehouseDashboard = ({ user, onLogout }) => {
             onClick={() => setActiveTab('products')}
           >
             Products
+          </button>
+          <button 
+            className={`tab ${activeTab === 'picklist' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('picklist');
+              loadPicklists();
+            }}
+          >
+            Parts Picklist
           </button>
         </div>
 
@@ -623,6 +665,59 @@ const WarehouseDashboard = ({ user, onLogout }) => {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Parts Picklist Tab */}
+        {activeTab === 'picklist' && (
+          <div className="tab-content">
+            {!showPicklist ? (
+              <>
+                <div className="action-buttons">
+                  <h3>Active Parts Picklists</h3>
+                </div>
+                {picklists && picklists.length > 0 ? (
+                  <div className="picklists-list">
+                    {picklists.map(picklist => (
+                      <div key={picklist.id || picklist.picklistNumber} className="picklist-row">
+                        <div className="picklist-info">
+                          <h4>{picklist.picklistNumber}</h4>
+                          <p><strong>Job Order:</strong> {picklist.jobOrderNumber}</p>
+                          <p><strong>Customer:</strong> {picklist.customer}</p>
+                          <p><strong>Vehicle:</strong> {picklist.vehicle}</p>
+                          <p><strong>Status:</strong> <span className={`status-badge status-${picklist.status}`}>{picklist.status}</span></p>
+                        </div>
+                        <div className="picklist-items-count">
+                          <p>{picklist.items?.length || 0} items</p>
+                        </div>
+                        <button 
+                          className="btn-primary"
+                          onClick={() => {
+                            setSelectedPicklist(picklist);
+                            setShowPicklist(true);
+                          }}
+                        >
+                          Pick Items
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="empty-state">
+                    <p>No active picklists. Create one from the job controller.</p>
+                  </div>
+                )}
+              </>
+            ) : selectedPicklist && (
+              <AnvilPicklist 
+                partsRequest={selectedPicklist}
+                onClose={() => {
+                  setShowPicklist(false);
+                  setSelectedPicklist(null);
+                }}
+                onComplete={handlePicklistComplete}
+              />
+            )}
           </div>
         )}
       </div>

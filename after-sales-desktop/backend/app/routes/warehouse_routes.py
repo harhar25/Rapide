@@ -345,3 +345,97 @@ def get_parts_issuance_history():
         }), 200
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+# ==================== PICKLIST ROUTES ====================
+
+@warehouse_bp.route('/picklists', methods=['GET'])
+def get_picklists():
+    """Get all active picklists"""
+    try:
+        picklists = warehouse_service.get_active_picklists()
+        return jsonify({
+            'success': True,
+            'data': picklists,
+            'count': len(picklists)
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@warehouse_bp.route('/picklists/<int:picklist_id>', methods=['GET'])
+def get_picklist(picklist_id):
+    """Get specific picklist details"""
+    try:
+        picklist = warehouse_service.get_picklist_by_id(picklist_id)
+        if picklist:
+            return jsonify({'success': True, 'data': picklist}), 200
+        return jsonify({'success': False, 'error': 'Picklist not found'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@warehouse_bp.route('/picklists', methods=['POST'])
+def create_picklist():
+    """Create a new picklist from job controller request"""
+    try:
+        data = request.json
+        
+        required_fields = ['jobOrderNumber', 'customer', 'vehicle', 'items']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'success': False, 'error': f'{field} is required'}), 400
+        
+        picklist_id = warehouse_service.create_picklist(data)
+        
+        if picklist_id:
+            return jsonify({
+                'success': True,
+                'picklist_id': picklist_id,
+                'message': 'Picklist created successfully'
+            }), 201
+        else:
+            return jsonify({'success': False, 'error': 'Failed to create picklist'}), 500
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@warehouse_bp.route('/picklists/<int:picklist_id>/items/<int:item_id>', methods=['PUT'])
+def update_picked_item(picklist_id, item_id):
+    """Update picked quantity and location for an item"""
+    try:
+        data = request.json
+        
+        picked_qty = data.get('pickedQuantity', 0)
+        location = data.get('location', '')
+        notes = data.get('notes', '')
+        
+        success = warehouse_service.update_picked_item(picklist_id, item_id, picked_qty, location, notes)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Item pick updated'
+            }), 200
+        else:
+            return jsonify({'success': False, 'error': 'Failed to update pick'}), 500
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@warehouse_bp.route('/picklists/<int:picklist_id>/complete', methods=['PUT'])
+def complete_picklist(picklist_id):
+    """Mark a picklist as completed"""
+    try:
+        data = request.json
+        
+        success = warehouse_service.complete_picklist(picklist_id, data)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Picklist completed successfully'
+            }), 200
+        else:
+            return jsonify({'success': False, 'error': 'Failed to complete picklist'}), 500
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500

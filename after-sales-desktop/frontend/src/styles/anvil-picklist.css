@@ -1,0 +1,448 @@
+/* ========================================
+   Anvil-Style Warehouse Picklist Styles
+   ======================================== */
+
+.anvil-picklist-container {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 30px;
+  max-width: 1200px;
+  margin: 20px auto;
+}
+
+.picklist-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 3px solid #1a3a52;
+}
+
+.picklist-header h2 {
+  color: #1a3a52;
+  font-size: 24px;
+  margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+.progress-bar {
+  position: relative;
+  width: 150px;
+  height: 24px;
+  background: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.progress-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #5cb85c, #4cae4c);
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  position: relative;
+  z-index: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+}
+
+.header-actions button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.btn-preview {
+  background: #5cb85c;
+  color: white;
+}
+
+.btn-preview:hover {
+  background: #4cae4c;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(76, 174, 76, 0.3);
+}
+
+.btn-print {
+  background: #0275d8;
+  color: white;
+}
+
+.btn-print:hover {
+  background: #0259b3;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(2, 117, 216, 0.3);
+}
+
+.btn-close {
+  background: #e74c3c;
+  color: white;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-close:hover {
+  background: #c0392b;
+}
+
+/* Picklist Content */
+.picklist-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Info Section */
+.picklist-info-section {
+  background: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 20px;
+}
+
+.info-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 15px;
+}
+
+.info-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.info-card .label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.info-card .value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a3a52;
+}
+
+.info-card .value.priority-high {
+  color: #d9534f;
+}
+
+.info-card .value.priority-normal {
+  color: #0275d8;
+}
+
+.info-card .value.status-pending {
+  color: #999;
+}
+
+.info-card .value.status-in_progress {
+  color: #f0ad4e;
+}
+
+.info-card .value.status-completed {
+  color: #5cb85c;
+}
+
+/* Items Section */
+.picklist-items {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 20px;
+}
+
+.picklist-items h3 {
+  font-size: 16px;
+  color: #1a3a52;
+  margin-bottom: 20px;
+  font-weight: 600;
+}
+
+.items-container {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.pick-item {
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 16px;
+  background: #fafafa;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pick-item:hover {
+  border-color: #0275d8;
+  background: white;
+  box-shadow: 0 2px 8px rgba(2, 117, 216, 0.1);
+}
+
+.pick-item.complete {
+  border-color: #5cb85c;
+  background: #f0f8f0;
+}
+
+.item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.item-code {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0275d8;
+  font-family: 'Courier New', monospace;
+}
+
+.qty-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+}
+
+.qty-badge.pending {
+  background: #e74c3c;
+}
+
+.qty-badge.complete {
+  background: #5cb85c;
+}
+
+.item-details {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.item-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.item-location {
+  font-size: 12px;
+  color: #666;
+  margin: 0;
+}
+
+.item-location strong {
+  color: #1a3a52;
+}
+
+.item-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.control-group label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.qty-input,
+.location-input,
+.notes-input {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 13px;
+  background: white;
+  transition: all 0.2s ease;
+}
+
+.qty-input:focus,
+.location-input:focus,
+.notes-input:focus {
+  outline: none;
+  border-color: #0275d8;
+  box-shadow: 0 0 0 3px rgba(2, 117, 216, 0.1);
+}
+
+/* Footer */
+.picklist-footer {
+  display: flex;
+  gap: 15px;
+  padding-top: 20px;
+  border-top: 2px solid #e0e0e0;
+  justify-content: center;
+}
+
+.btn-complete,
+.btn-print-action {
+  padding: 12px 32px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-complete {
+  background: #5cb85c;
+  color: white;
+}
+
+.btn-complete:hover:not(:disabled) {
+  background: #4cae4c;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(92, 184, 92, 0.3);
+}
+
+.btn-complete:disabled {
+  background: #ddd;
+  color: #999;
+  cursor: not-allowed;
+}
+
+.btn-print-action {
+  background: #0275d8;
+  color: white;
+}
+
+.btn-print-action:hover {
+  background: #0259b3;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(2, 117, 216, 0.3);
+}
+
+/* ========================================
+   Print Styles
+   ======================================== */
+
+@media print {
+  body {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .anvil-picklist-container {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  .picklist-header,
+  .header-actions,
+  .btn-preview,
+  .btn-print,
+  .btn-close,
+  .picklist-content,
+  .picklist-footer {
+    display: none !important;
+  }
+}
+
+/* ========================================
+   Responsive Styles
+   ======================================== */
+
+@media (max-width: 968px) {
+  .picklist-header {
+    flex-direction: column;
+    gap: 15px;
+    align-items: flex-start;
+  }
+
+  .header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .progress-bar {
+    width: 100%;
+  }
+
+  .info-cards {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+
+  .item-controls {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .anvil-picklist-container {
+    padding: 15px;
+  }
+
+  .picklist-header h2 {
+    font-size: 18px;
+  }
+
+  .header-actions {
+    width: 100%;
+  }
+
+  .info-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .item-header {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .picklist-footer {
+    flex-direction: column;
+  }
+
+  .btn-complete,
+  .btn-print-action {
+    width: 100%;
+  }
+}
