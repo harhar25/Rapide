@@ -493,6 +493,13 @@ export default function BillingDashboard() {
   useEffect(() => {
     fetchInvoices();
     fetchServiceOrders();
+
+    const poll = setInterval(() => {
+      fetchInvoices();
+      fetchServiceOrders();
+    }, 5000);
+
+    return () => clearInterval(poll);
   }, []);
 
   const handlePrint = async (invoice) => {

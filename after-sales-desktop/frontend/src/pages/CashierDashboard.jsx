@@ -325,9 +325,17 @@ export default function CashierDashboard() {
 
   useAutoRefresh(['cashier', 'billing'], handleRealtimeUpdate);
 
+  // Reliable polling every 5 seconds so approved invoices appear promptly
   useEffect(() => {
     fetchPaymentQueue();
     fetchCompletedToday();
+
+    const poll = setInterval(() => {
+      fetchPaymentQueue();
+      fetchCompletedToday();
+    }, 5000);
+
+    return () => clearInterval(poll);
   }, []);
 
   const handleProcessPayment = async () => {

@@ -159,17 +159,17 @@ export function useAutoRefresh(modules, refreshFn, debounceMs = 500, pollingInte
 
   // Fallback polling when SSE fails
   useEffect(() => {
-    // Start fallback polling after a delay to allow SSE to connect first
+    // Start fallback polling quickly if SSE is unavailable
     const checkSSE = setTimeout(() => {
       if (sseUnavailable && !pollingRef.current) {
-        console.log('[Realtime] Using polling (every 3s)');
+        console.log('[Realtime] Using polling fallback');
         pollingRef.current = setInterval(() => {
           if (refreshFn) {
             refreshFn({ module: 'polling', action: 'refresh' });
           }
         }, pollingIntervalMs);
       }
-    }, 10000); // Wait 10 seconds before starting polling
+    }, 2000); // Wait 2 seconds before starting polling
 
     return () => {
       clearTimeout(checkSSE);
