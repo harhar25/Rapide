@@ -305,105 +305,103 @@ const JobControllerModern = ({ user, onLogout }) => {
     <div style={{ 
       height: '100vh', 
       overflow: 'hidden',
-      background: '#f8fafc',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      backgroundColor: '#f8fafc',
+      fontFamily: "'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif",
       display: 'flex',
       flexDirection: 'column'
     }}>
       
-      {/* ===== TOP HEADER BAR ===== */}
+      {/* ===== DARK HEADER BAR ===== */}
       <div style={{
-        background: '#fff',
-        padding: '16px 24px',
+        background: '#0f172a',
+        padding: '0 24px',
+        height: '54px',
         display: 'flex',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        borderBottom: '1px solid #e2e8f0',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+        justifyContent: 'space-between',
+        flexShrink: 0
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ 
-            width: '42px', height: '42px', 
-            background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)', 
-            borderRadius: '10px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '20px', color: 'white', fontWeight: 700
-          }}>JC</div>
-          <div>
-            <div style={{ color: '#1e293b', fontSize: '18px', fontWeight: 700 }}>Job Controller</div>
-            <div style={{ color: '#64748b', fontSize: '12px' }}>Live Operations Dashboard</div>
+          <div style={{ color: '#fff', fontSize: '15px', fontWeight: '700', letterSpacing: '1.5px', textTransform: 'uppercase' }}>JOB CONTROLLER</div>
+          <div style={{ width: '1px', height: '20px', backgroundColor: '#334155' }}></div>
+          <div style={{ color: '#94a3b8', fontSize: '12px' }}>
+            {new Date().toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
           </div>
         </div>
-
-        {/* Stats Pills */}
-        <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ color: '#64748b', fontSize: '13px' }}>Pending</span>
-            <span style={{ background: '#1e293b', color: '#fff', fontSize: '12px', fontWeight: 600, padding: '4px 10px', borderRadius: '6px', minWidth: '28px', textAlign: 'center' }}>{pendingOrders.length}</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ color: '#64748b', fontSize: '13px' }}>Active</span>
-            <span style={{ background: '#22c55e', color: '#fff', fontSize: '12px', fontWeight: 600, padding: '4px 10px', borderRadius: '6px', minWidth: '28px', textAlign: 'center' }}>{activeOrders.length}</span>
-          </div>
-          {partsRequests.filter(r => r.status === 'pending').length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ color: '#dc2626', fontSize: '13px', fontWeight: 500 }}>Parts Alert</span>
-              <span style={{ background: '#dc2626', color: '#fff', fontSize: '12px', fontWeight: 600, padding: '4px 10px', borderRadius: '6px', minWidth: '28px', textAlign: 'center' }}>{partsRequests.filter(r => r.status === 'pending').length}</span>
-            </div>
-          )}
-          {(qcPassedJobs.length + stoppedWrapups.length) > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ color: '#22c55e', fontSize: '13px', fontWeight: 500 }}>QC Done</span>
-              <span style={{ background: '#22c55e', color: '#fff', fontSize: '12px', fontWeight: 600, padding: '4px 10px', borderRadius: '6px', minWidth: '28px', textAlign: 'center' }}>{qcPassedJobs.length + stoppedWrapups.length}</span>
-            </div>
-          )}
-        </div>
-
-        {/* User & Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button 
             onClick={() => setRefreshKey(k => k+1)} 
-            style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#64748b', padding: '10px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '14px' }}
-          >↻</button>
-          <div style={{ color: '#475569', fontSize: '13px', fontWeight: 500 }}>{user?.name || 'Controller'}</div>
+            style={{ background: '#1e293b', border: '1px solid #334155', color: '#94a3b8', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: '600', letterSpacing: '0.5px' }}
+          >REFRESH</button>
+          <div style={{ width: '1px', height: '20px', backgroundColor: '#334155' }}></div>
+          <span style={{ color: '#94a3b8', fontSize: '12px' }}>{user?.name || 'Controller'}</span>
           <button 
             onClick={onLogout}
-            style={{ background: '#1e293b', border: 'none', color: 'white', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
-          >Logout</button>
+            style={{ background: '#334155', border: 'none', color: '#cbd5e1', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: '600', letterSpacing: '0.5px' }}
+          >LOGOUT</button>
         </div>
+      </div>
+
+      {/* ===== STATS STRIP ===== */}
+      <div style={{
+        display: 'flex',
+        borderBottom: '1px solid #e2e8f0',
+        backgroundColor: '#fff',
+        flexShrink: 0
+      }}>
+        {[
+          { label: 'PENDING', value: pendingOrders.length, color: '#d97706' },
+          { label: 'ACTIVE', value: activeOrders.length, color: '#059669' },
+          { label: 'PARTS ALERTS', value: partsRequests.filter(r => r.status === 'pending').length, color: '#dc2626' },
+          { label: 'QC DONE', value: qcPassedJobs.length + stoppedWrapups.length, color: '#3b82f6' },
+        ].map((stat, i) => (
+          <div key={stat.label} style={{
+            flex: 1,
+            padding: '12px 20px',
+            borderRight: i < 3 ? '1px solid #e2e8f0' : 'none',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: stat.value > 0 ? stat.color : '#cbd5e1', flexShrink: 0 }}></div>
+            <div>
+              <div style={{ fontSize: '10px', fontWeight: '700', color: '#94a3b8', letterSpacing: '0.8px' }}>{stat.label}</div>
+              <div style={{ fontSize: '20px', fontWeight: '700', color: '#0f172a', lineHeight: '1.2' }}>{stat.value}</div>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* ===== MAIN CONTENT ===== */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         
-        {/* ===== LEFT: SHOP FLOOR (Main Area) ===== */}
+        {/* ===== LEFT: SHOP FLOOR ===== */}
         <div style={{ flex: 1, padding: '20px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           
           {/* Selected Job Banner */}
           {selectedTicket && (
             <div style={{
-              background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)',
-              borderRadius: '12px',
-              padding: '16px 20px',
-              marginBottom: '20px',
+              background: '#0f172a',
+              borderRadius: '6px',
+              padding: '14px 20px',
+              marginBottom: '16px',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              boxShadow: '0 4px 20px rgba(59, 130, 246, 0.3)',
               flexShrink: 0
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div style={{ fontSize: '16px', fontWeight: 700, color: 'rgba(255,255,255,0.9)', background: 'rgba(255,255,255,0.15)', width: '40px', height: '40px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>SO</div>
+                <div style={{ color: '#d97706', fontSize: '10px', fontWeight: '700', letterSpacing: '1px', textTransform: 'uppercase' }}>READY TO ASSIGN</div>
+                <div style={{ width: '1px', height: '24px', backgroundColor: '#334155' }}></div>
                 <div>
-                  <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px' }}>Ready to Assign</div>
-                  <div style={{ color: '#fff', fontSize: '16px', fontWeight: 600 }}>{selectedTicket[4]} • {selectedTicket[3]}</div>
-                  <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>{selectedTicket[1]} • {selectedTicket[5]}</div>
+                  <div style={{ color: '#fff', fontSize: '14px', fontWeight: '600' }}>{selectedTicket[4]} — {selectedTicket[3]}</div>
+                  <div style={{ color: '#94a3b8', fontSize: '12px' }}>{selectedTicket[1]} — {selectedTicket[5]}</div>
                 </div>
               </div>
               <button 
                 onClick={() => setSelectedTicket(null)}
-                style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px' }}
-              >Cancel</button>
+                style={{ background: '#334155', border: 'none', color: '#cbd5e1', padding: '6px 16px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: '600', letterSpacing: '0.5px' }}
+              >CANCEL</button>
             </div>
           )}
 
@@ -416,15 +414,12 @@ const JobControllerModern = ({ user, onLogout }) => {
             {/* Section Header */}
             <div style={{ 
               display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
-              marginBottom: '16px', padding: '0 4px'
+              marginBottom: '14px', padding: '0 2px'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569', fontSize: '13px', fontWeight: 700 }}>T</div>
-                <div>
-                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#1e293b', letterSpacing: '-0.3px' }}>Shop Floor Technicians</div>
-                  <div style={{ fontSize: '11px', color: '#94a3b8' }}>
-                    {technicians.filter(t => !activeOrders.find(o => o[6] === t[1])).length} available · {technicians.filter(t => activeOrders.find(o => o[6] === t[1])).length} working
-                  </div>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a', letterSpacing: '0.5px', textTransform: 'uppercase' }}>Shop Floor Technicians</div>
+                <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                  {technicians.filter(t => !activeOrders.find(o => o[6] === t[1])).length} available — {technicians.filter(t => activeOrders.find(o => o[6] === t[1])).length} working
                 </div>
               </div>
             </div>
@@ -460,13 +455,9 @@ const JobControllerModern = ({ user, onLogout }) => {
               }
 
               const initials = techName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-              const avatarColors = [
-                ['#7c3aed', '#a78bfa'], ['#2563eb', '#60a5fa'], ['#059669', '#34d399'],
-                ['#d97706', '#fbbf24'], ['#dc2626', '#f87171'], ['#0891b2', '#22d3ee'],
-                ['#7c3aed', '#c084fc'], ['#be185d', '#f472b6']
-              ];
-              const colorIdx = techName.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % avatarColors.length;
-              const [avatarBg, avatarLight] = avatarColors[colorIdx];
+              const avatarColorList = ['#64748b', '#2563eb', '#059669', '#d97706', '#dc2626', '#0891b2', '#7c3aed', '#be185d'];
+              const colorIdx = techName.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % avatarColorList.length;
+              const avatarBg = currentJob ? borderAccent : avatarColorList[colorIdx];
 
               return (
                 <div 
@@ -474,36 +465,29 @@ const JobControllerModern = ({ user, onLogout }) => {
                   onClick={() => { if (selectedTicket && status === 'available') handleAssignToTech(tech); }}
                   style={{
                     background: '#fff',
-                    borderRadius: '14px',
-                    border: selectedTicket && status === 'available' ? '2px solid #22c55e' : '1px solid #e9ecef',
-                    padding: '0',
-                    transition: 'all 0.2s ease',
+                    borderRadius: '6px',
+                    border: selectedTicket && status === 'available' ? '2px solid #059669' : '1px solid #e2e8f0',
+                    borderLeft: currentJob ? `3px solid ${borderAccent}` : undefined,
                     cursor: selectedTicket && status === 'available' ? 'pointer' : 'default',
-                    overflow: 'hidden',
-                    boxShadow: currentJob 
-                      ? '0 2px 12px rgba(0,0,0,0.06)' 
-                      : '0 1px 4px rgba(0,0,0,0.04)',
-                    borderTop: `3px solid ${currentJob ? borderAccent : 'transparent'}`,
-                    position: 'relative'
+                    overflow: 'hidden'
                   }}
                 >
                   {/* Card Header */}
                   <div style={{ 
-                    padding: '16px 18px 12px', 
+                    padding: '14px 16px 10px', 
                     display: 'flex', 
                     alignItems: 'center', 
                     gap: '12px'
                   }}>
                     {/* Avatar */}
                     <div style={{
-                      width: '42px', height: '42px',
-                      borderRadius: '12px',
-                      background: `linear-gradient(135deg, ${avatarBg} 0%, ${avatarLight} 100%)`,
+                      width: '38px', height: '38px',
+                      borderRadius: '6px',
+                      backgroundColor: avatarBg,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: 'white', fontSize: '14px', fontWeight: 700,
+                      color: '#fff', fontSize: '13px', fontWeight: '700',
                       letterSpacing: '0.5px',
-                      flexShrink: 0,
-                      boxShadow: `0 2px 8px ${avatarBg}33`
+                      flexShrink: 0
                     }}>
                       {initials}
                     </div>
@@ -511,23 +495,18 @@ const JobControllerModern = ({ user, onLogout }) => {
                     {/* Name & Skill */}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ 
-                        fontSize: '14px', fontWeight: 700, color: '#0f172a',
+                        fontSize: '13px', fontWeight: '700', color: '#0f172a',
                         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
                       }}>{techName}</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
-                        {specialization ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                        {specialization && (
                           <span style={{
-                            fontSize: '10px', fontWeight: 600, 
-                            color: avatarBg, 
-                            background: `${avatarBg}12`,
-                            padding: '2px 8px', borderRadius: '6px',
+                            fontSize: '10px', fontWeight: '600', 
+                            color: '#64748b',
                             letterSpacing: '0.3px',
                             textTransform: 'uppercase'
                           }}>{specialization}</span>
-                        ) : (
-                          <span style={{ fontSize: '11px', color: '#cbd5e1' }}>No skill set</span>
                         )}
-                        <span style={{ fontSize: '10px', color: '#cbd5e1' }}>•</span>
                         <span style={{ fontSize: '10px', color: '#94a3b8' }}>ID: {tech[2] || techId}</span>
                       </div>
                     </div>
@@ -536,64 +515,62 @@ const JobControllerModern = ({ user, onLogout }) => {
                     <div style={{
                       background: statusBg,
                       color: statusColor,
-                      padding: '4px 10px',
-                      borderRadius: '8px',
+                      padding: '3px 8px',
+                      borderRadius: '4px',
                       fontSize: '10px',
-                      fontWeight: 700,
+                      fontWeight: '700',
                       textTransform: 'uppercase',
                       letterSpacing: '0.5px',
                       display: 'flex', alignItems: 'center', gap: '4px',
                       flexShrink: 0
                     }}>
-                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: statusColor, flexShrink: 0 }}></span>
+                      <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: statusColor, flexShrink: 0 }}></span>
                       {status}
                     </div>
                   </div>
 
                   {/* Content Area */}
                   {selectedTicket && status === 'available' ? (
-                    <div style={{ padding: '0 18px 16px' }}>
+                    <div style={{ padding: '0 16px 14px' }}>
                       <button 
                         onClick={(e) => { e.stopPropagation(); handleAssignToTech(tech); }}
                         style={{
                           width: '100%',
-                          padding: '11px',
-                          background: 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)',
+                          padding: '10px',
+                          backgroundColor: '#059669',
                           border: 'none',
-                          borderRadius: '10px',
-                          color: 'white',
-                          fontSize: '12px',
-                          fontWeight: 700,
+                          borderRadius: '4px',
+                          color: '#fff',
+                          fontSize: '11px',
+                          fontWeight: '700',
                           cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                          boxShadow: '0 2px 8px rgba(34,197,94,0.3)',
-                          letterSpacing: '0.3px'
+                          letterSpacing: '0.5px',
+                          textTransform: 'uppercase'
                         }}
                       >
-                        Assign This Job
+                        ASSIGN THIS JOB
                       </button>
                     </div>
                   ) : currentJob ? (
-                    <div style={{ padding: '0 18px 16px' }}>
+                    <div style={{ padding: '0 16px 14px' }}>
                       {/* Active Job Info */}
                       <div style={{ 
-                        background: '#f8fafc', borderRadius: '10px', 
-                        padding: '12px', marginBottom: '10px',
-                        border: '1px solid #f1f5f9'
+                        background: '#f8fafc', borderRadius: '4px', 
+                        padding: '10px 12px', marginBottom: '10px',
+                        border: '1px solid #e2e8f0'
                       }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                           <span style={{ 
-                            color: '#64748b', fontSize: '10px', fontWeight: 600,
-                            background: '#e2e8f0', padding: '2px 6px', borderRadius: '4px'
+                            color: '#94a3b8', fontSize: '10px', fontWeight: '700',
+                            letterSpacing: '0.5px'
                           }}>SO-{String(currentJob[0]).padStart(5, '0')}</span>
                           <span style={{ 
-                            color: '#0f172a', fontSize: '12px', fontWeight: 700,
-                            display: 'flex', alignItems: 'center', gap: '4px'
+                            color: '#0f172a', fontSize: '12px', fontWeight: '700'
                           }}>
                             <JobTimer startTime={currentJob[8]} endTime={currentJob[9]} />
                           </span>
                         </div>
-                        <div style={{ color: '#1e293b', fontSize: '13px', fontWeight: 600 }}>{currentJob[4]}</div>
+                        <div style={{ color: '#0f172a', fontSize: '12px', fontWeight: '600' }}>{currentJob[4]}</div>
                         <div style={{ color: '#94a3b8', fontSize: '11px', marginTop: '2px' }}>{currentJob[5]}</div>
                       </div>
 
@@ -603,50 +580,47 @@ const JobControllerModern = ({ user, onLogout }) => {
                           <button 
                             onClick={() => handleClockAction(currentJob[11], 'clock-out')}
                             style={{ 
-                              flex: 1, padding: '9px', 
-                              background: 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)', 
-                              border: 'none', borderRadius: '8px', color: 'white', 
-                              fontSize: '11px', fontWeight: 700, cursor: 'pointer',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
-                              boxShadow: '0 2px 6px rgba(220,38,38,0.25)'
+                              flex: 1, padding: '8px', 
+                              backgroundColor: '#dc2626', 
+                              border: 'none', borderRadius: '4px', color: '#fff', 
+                              fontSize: '11px', fontWeight: '700', cursor: 'pointer',
+                              letterSpacing: '0.3px', textTransform: 'uppercase'
                             }}
-                          >Stop Clock</button>
+                          >STOP CLOCK</button>
                         ) : (
                           <button 
                             onClick={() => handleClockAction(currentJob[11], 'clock-in')}
                             style={{ 
-                              flex: 1, padding: '9px', 
-                              background: 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)', 
-                              border: 'none', borderRadius: '8px', color: 'white', 
-                              fontSize: '11px', fontWeight: 700, cursor: 'pointer',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
-                              boxShadow: '0 2px 6px rgba(22,163,74,0.25)'
+                              flex: 1, padding: '8px', 
+                              backgroundColor: '#059669', 
+                              border: 'none', borderRadius: '4px', color: '#fff', 
+                              fontSize: '11px', fontWeight: '700', cursor: 'pointer',
+                              letterSpacing: '0.3px', textTransform: 'uppercase'
                             }}
-                          >Start Clock</button>
+                          >START CLOCK</button>
                         )}
                         <button 
                           onClick={() => handleOpenReq(currentJob, techId)}
                           style={{ 
-                            padding: '9px 14px', background: '#f1f5f9', 
-                            border: '1px solid #e2e8f0', borderRadius: '8px', 
-                            color: '#475569', fontSize: '12px', cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', gap: '4px'
+                            padding: '8px 14px', backgroundColor: '#f8fafc', 
+                            border: '1px solid #e2e8f0', borderRadius: '4px', 
+                            color: '#64748b', fontSize: '11px', fontWeight: '600', cursor: 'pointer',
+                            letterSpacing: '0.3px', textTransform: 'uppercase'
                           }}
                           title="Request Parts"
-                        >Parts</button>
+                        >PARTS</button>
                       </div>
                     </div>
                   ) : (
-                    /* Idle state - subtle divider */
+                    /* Idle state */
                     <div style={{ 
-                      padding: '0 18px 14px',
+                      padding: '0 16px 12px',
                       display: 'flex', alignItems: 'center', gap: '6px'
                     }}>
-                      <div style={{ 
+                      <span style={{ 
                         width: '6px', height: '6px', borderRadius: '50%', 
-                        background: '#22c55e',
-                        animation: 'pulse 2s infinite'
-                      }}></div>
+                        background: '#059669'
+                      }}></span>
                       <span style={{ fontSize: '11px', color: '#94a3b8' }}>Ready for assignment</span>
                     </div>
                   )}
@@ -659,103 +633,39 @@ const JobControllerModern = ({ user, onLogout }) => {
 
         {/* ===== RIGHT: SIDEBAR ===== */}
         <div style={{ 
-          width: '360px', 
+          width: '340px', 
           background: '#fff', 
           borderLeft: '1px solid #e2e8f0',
           display: 'flex',
           flexDirection: 'column'
         }}>
           {/* Sidebar Tabs */}
-          <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
-            <button 
-              onClick={() => setSidebarTab('pending')}
-              style={{ 
-                flex: 1, 
-                padding: '14px', 
-                background: sidebarTab === 'pending' ? '#fff' : 'transparent', 
-                border: 'none', 
-                borderBottom: sidebarTab === 'pending' ? '2px solid #1e293b' : '2px solid transparent',
-                color: sidebarTab === 'pending' ? '#1e293b' : '#64748b',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px'
-              }}
-            >
-              Queue
-              {pendingOrders.length > 0 && (
-                <span style={{ background: '#f59e0b', color: '#fff', padding: '2px 8px', borderRadius: '10px', fontSize: '11px' }}>{pendingOrders.length}</span>
-              )}
-            </button>
-            <button 
-              onClick={() => setSidebarTab('parts')}
-              style={{ 
-                flex: 1, 
-                padding: '14px', 
-                background: sidebarTab === 'parts' ? '#fff' : 'transparent', 
-                border: 'none', 
-                borderBottom: sidebarTab === 'parts' ? '2px solid #1e293b' : '2px solid transparent',
-                color: sidebarTab === 'parts' ? '#1e293b' : '#64748b',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px'
-              }}
-            >
-              Parts
-              {partsRequests.filter(r => r.status === 'pending').length > 0 && (
-                <span style={{ background: '#dc2626', color: '#fff', padding: '2px 8px', borderRadius: '10px', fontSize: '11px' }}>{partsRequests.filter(r => r.status === 'pending').length}</span>
-              )}
-            </button>
-            <button 
-              onClick={() => setSidebarTab('qc-done')}
-              style={{ 
-                flex: 1, 
-                padding: '14px', 
-                background: sidebarTab === 'qc-done' ? '#fff' : 'transparent', 
-                border: 'none', 
-                borderBottom: sidebarTab === 'qc-done' ? '2px solid #22c55e' : '2px solid transparent',
-                color: sidebarTab === 'qc-done' ? '#22c55e' : '#64748b',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px'
-              }}
-            >
-              QC Done
-              {(qcPassedJobs.length + stoppedWrapups.length) > 0 && (
-                <span style={{ background: '#22c55e', color: '#fff', padding: '2px 8px', borderRadius: '10px', fontSize: '11px' }}>{qcPassedJobs.length + stoppedWrapups.length}</span>
-              )}
-            </button>
-            <button 
-              onClick={() => setSidebarTab('history')}
-              style={{ 
-                flex: 1, 
-                padding: '14px', 
-                background: sidebarTab === 'history' ? '#fff' : 'transparent', 
-                border: 'none', 
-                borderBottom: sidebarTab === 'history' ? '2px solid #1e293b' : '2px solid transparent',
-                color: sidebarTab === 'history' ? '#1e293b' : '#64748b',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px'
-              }}
-            >
-              Delivered
-            </button>
+          <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', flexShrink: 0 }}>
+            {[
+              { key: 'pending', label: 'QUEUE', count: pendingOrders.length, countColor: '#d97706' },
+              { key: 'parts', label: 'PARTS', count: partsRequests.filter(r => r.status === 'pending').length, countColor: '#dc2626' },
+              { key: 'qc-done', label: 'QC', count: qcPassedJobs.length + stoppedWrapups.length, countColor: '#059669' },
+              { key: 'history', label: 'LOG', count: 0, countColor: null },
+            ].map(tab => (
+              <button key={tab.key}
+                onClick={() => setSidebarTab(tab.key)}
+                style={{
+                  flex: 1, padding: '12px 4px', background: sidebarTab === tab.key ? '#fff' : 'transparent',
+                  border: 'none', borderBottom: sidebarTab === tab.key ? '2px solid #0f172a' : '2px solid transparent',
+                  color: sidebarTab === tab.key ? '#0f172a' : '#94a3b8',
+                  fontSize: '11px', fontWeight: '700', cursor: 'pointer',
+                  letterSpacing: '0.5px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+                }}
+              >
+                {tab.label}
+                {tab.count > 0 && (
+                  <span style={{
+                    background: tab.countColor, color: '#fff', padding: '1px 6px',
+                    borderRadius: '3px', fontSize: '10px', fontWeight: '700', minWidth: '16px', textAlign: 'center'
+                  }}>{tab.count}</span>
+                )}
+              </button>
+            ))}
           </div>
 
           {/* Sidebar Content */}
@@ -763,13 +673,12 @@ const JobControllerModern = ({ user, onLogout }) => {
             
             {/* PENDING TAB */}
             {sidebarTab === 'pending' && (
-              <div style={{ padding: '12px' }}>
+              <div style={{ padding: '10px' }}>
                 {loading ? (
-                  <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Loading...</div>
+                  <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8', fontSize: '12px' }}>Loading...</div>
                 ) : pendingOrders.length === 0 ? (
                   <div style={{ padding: '40px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '14px', marginBottom: '8px', color: '#cbd5e1', fontWeight: 600 }}>—</div>
-                    <div style={{ color: '#64748b', fontSize: '13px' }}>No pending jobs</div>
+                    <div style={{ color: '#94a3b8', fontSize: '12px' }}>No pending jobs in queue</div>
                   </div>
                 ) : (
                   pendingOrders.map(order => (
@@ -777,32 +686,34 @@ const JobControllerModern = ({ user, onLogout }) => {
                       key={order[0]}
                       onClick={() => handleTicketSelect(order)}
                       style={{
-                        background: selectedTicket && selectedTicket[0] === order[0] ? '#1e293b' : '#f8fafc',
-                        borderRadius: '12px',
-                        padding: '14px 16px',
-                        marginBottom: '8px',
+                        background: selectedTicket && selectedTicket[0] === order[0] ? '#0f172a' : '#f8fafc',
+                        borderRadius: '4px',
+                        padding: '12px 14px',
+                        marginBottom: '6px',
                         cursor: 'pointer',
-                        border: selectedTicket && selectedTicket[0] === order[0] ? '1px solid #1e293b' : '1px solid #e2e8f0',
-                        transition: 'all 0.15s'
+                        border: selectedTicket && selectedTicket[0] === order[0] ? '1px solid #0f172a' : '1px solid #e2e8f0',
+                        transition: 'all 0.12s'
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
                         <div style={{ 
-                          color: selectedTicket && selectedTicket[0] === order[0] ? '#93c5fd' : '#2563eb', 
-                          fontSize: '11px', 
-                          fontWeight: 700 
+                          color: selectedTicket && selectedTicket[0] === order[0] ? '#93c5fd' : '#3b82f6', 
+                          fontSize: '10px', 
+                          fontWeight: '700',
+                          letterSpacing: '0.5px'
                         }}>SO #{order[0]}</div>
-                        <div style={{ color: selectedTicket && selectedTicket[0] === order[0] ? '#94a3b8' : '#94a3b8', fontSize: '10px' }}>{formatTime(order[6])}</div>
+                        <div style={{ color: '#94a3b8', fontSize: '10px' }}>{formatTime(order[6])}</div>
                       </div>
-                      <div style={{ color: selectedTicket && selectedTicket[0] === order[0] ? '#fff' : '#1e293b', fontSize: '14px', fontWeight: 500, marginBottom: '4px' }}>{order[4]} • {order[3]}</div>
-                      <div style={{ color: selectedTicket && selectedTicket[0] === order[0] ? '#cbd5e1' : '#64748b', fontSize: '12px', marginBottom: '6px' }}>{order[1]}</div>
+                      <div style={{ color: selectedTicket && selectedTicket[0] === order[0] ? '#fff' : '#0f172a', fontSize: '13px', fontWeight: '600', marginBottom: '3px' }}>{order[4]} — {order[3]}</div>
+                      <div style={{ color: selectedTicket && selectedTicket[0] === order[0] ? '#94a3b8' : '#64748b', fontSize: '11px', marginBottom: '6px' }}>{order[1]}</div>
                       <div style={{ 
                         display: 'inline-block',
                         background: selectedTicket && selectedTicket[0] === order[0] ? '#334155' : '#e2e8f0', 
                         color: selectedTicket && selectedTicket[0] === order[0] ? '#cbd5e1' : '#64748b', 
-                        padding: '4px 10px', 
-                        borderRadius: '6px', 
-                        fontSize: '11px' 
+                        padding: '3px 8px', 
+                        borderRadius: '3px', 
+                        fontSize: '10px',
+                        fontWeight: '600'
                       }}>{order[5]}</div>
                     </div>
                   ))
@@ -815,8 +726,7 @@ const JobControllerModern = ({ user, onLogout }) => {
               <div>
                 {partsRequests.length === 0 ? (
                   <div style={{ padding: '40px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '14px', marginBottom: '8px', color: '#cbd5e1', fontWeight: 600 }}>—</div>
-                    <div style={{ color: '#64748b', fontSize: '13px' }}>No parts requests</div>
+                    <div style={{ color: '#94a3b8', fontSize: '12px' }}>No parts requests</div>
                   </div>
                 ) : (
                   <>
@@ -949,9 +859,8 @@ const JobControllerModern = ({ user, onLogout }) => {
                 {/* Empty State */}
                 {qcPassedJobs.length === 0 && stoppedWrapups.length === 0 && (
                   <div style={{ padding: '40px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '14px', marginBottom: '8px', color: '#cbd5e1', fontWeight: 600 }}>—</div>
-                    <div style={{ color: '#64748b', fontSize: '13px' }}>No jobs ready for wrap-up</div>
-                    <div style={{ color: '#94a3b8', fontSize: '11px', marginTop: '4px' }}>QC-passed jobs will appear here</div>
+                    <div style={{ color: '#94a3b8', fontSize: '12px' }}>No jobs ready for wrap-up</div>
+                    <div style={{ color: '#94a3b8', fontSize: '10px', marginTop: '4px' }}>QC-passed jobs will appear here</div>
                   </div>
                 )}
               </div>
@@ -962,8 +871,7 @@ const JobControllerModern = ({ user, onLogout }) => {
               <div>
                 {completedPartsRequests.length === 0 ? (
                   <div style={{ padding: '40px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '14px', marginBottom: '8px', color: '#cbd5e1', fontWeight: 600 }}>—</div>
-                    <div style={{ color: '#64748b', fontSize: '13px' }}>No delivery history yet</div>
+                    <div style={{ color: '#94a3b8', fontSize: '12px' }}>No delivery history</div>
                   </div>
                 ) : (
                   <>
@@ -1005,8 +913,8 @@ const JobControllerModern = ({ user, onLogout }) => {
 
       {/* Parts Request Modal */}
       {showReqModal && (
-        <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:100, display:'flex', justifyContent:'center', alignItems:'center', backdropFilter:'blur(4px)'}}>
-          <div style={{background:'#fff', width:'480px', borderRadius:'16px', overflow:'hidden', maxHeight:'85vh', display:'flex', flexDirection:'column', border:'1px solid #e2e8f0', boxShadow:'0 25px 50px -12px rgba(0,0,0,0.25)'}}>
+        <div style={{position:'fixed', inset:0, background:'rgba(15,23,42,0.6)', zIndex:100, display:'flex', justifyContent:'center', alignItems:'center', backdropFilter:'blur(4px)'}}>
+          <div style={{background:'#fff', width:'480px', borderRadius:'8px', overflow:'hidden', maxHeight:'85vh', display:'flex', flexDirection:'column', boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}}>
             
             {/* Modal Header */}
             <div style={{padding:'20px 24px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0'}}>
