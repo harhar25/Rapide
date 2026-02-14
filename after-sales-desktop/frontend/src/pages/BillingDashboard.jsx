@@ -197,6 +197,40 @@ export default function BillingDashboard() {
     discount: '0',
     notes: ''
   });
+  const [orderDetails, setOrderDetails] = useState(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+
+  // Fetch billing details for a service order (service type, labor, parts with pricing)
+  const fetchBillingDetails = async (serviceOrderId) => {
+    if (!serviceOrderId) {
+      setOrderDetails(null);
+      return;
+    }
+    setLoadingDetails(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/billing/service-order/${serviceOrderId}/details`);
+      if (res.ok) {
+        const data = await res.json();
+        const details = data?.data || data;
+        setOrderDetails(details);
+        // Auto-fill the invoice form
+        setNewInvoice(prev => ({
+          ...prev,
+          service_order_id: String(serviceOrderId),
+          customer_name: details.customer_name || prev.customer_name,
+          plate_number: details.plate_number || prev.plate_number,
+          vehicle_model: details.vehicle_model || prev.vehicle_model,
+          labor_cost: String(details.labor_cost || 0),
+          parts_cost: String(details.parts_cost || 0),
+          notes: details.service_type ? `Service: ${details.service_type}` : prev.notes
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to fetch billing details:', err);
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -390,6 +424,7 @@ export default function BillingDashboard() {
           discount: '0',
           notes: ''
         });
+        setOrderDetails(null);
         fetchInvoices();
         fetchServiceOrders();
       } else {
@@ -583,17 +618,21 @@ export default function BillingDashboard() {
                   <select
                     value={newInvoice.service_order_id}
                     onChange={e => {
-                      const order = serviceOrders.find(o => o.id.toString() === e.target.value);
+                      const val = e.target.value;
+                      const order = serviceOrders.find(o => o.id.toString() === val);
                       if (order) {
                         setNewInvoice({
                           ...newInvoice,
-                          service_order_id: e.target.value,
+                          service_order_id: val,
                           customer_name: order.customer_name || '',
-                          plate_number: order.plate_number || '',
+                          plate_number: order.plate_no || '',
                           vehicle_model: order.vehicle_model || ''
                         });
+                        // Auto-fetch billing details (service type, parts, pricing)
+                        fetchBillingDetails(val);
                       } else {
-                        setNewInvoice({ ...newInvoice, service_order_id: e.target.value });
+                        setNewInvoice({ ...newInvoice, service_order_id: val });
+                        setOrderDetails(null);
                       }
                     }}
                     style={{
@@ -654,6 +693,62 @@ export default function BillingDashboard() {
                   style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '14px', boxSizing: 'border-box' }}
                 />
               </div>
+
+              {/* Auto-populated Service Info */}
+              {loadingDetails && (
+                <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#e8f4fd', borderRadius: '8px', textAlign: 'center', color: '#007bff', fontSize: '13px' }}>
+                  ⏳ Loading service details...
+                </div>
+              )}
+
+              {orderDetails && !loadingDetails && (
+                <div style={{ marginTop: '16px', padding: '16px', backgroundColor: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#166534', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    ✅ Auto-populated from Service Order
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '13px' }}>
+                    <div><span style={{ color: '#666' }}>Service Type:</span> <strong>{orderDetails.service_type || 'General'}</strong></div>
+                    <div><span style={{ color: '#666' }}>Technician:</span> <strong>{orderDetails.technician_name || 'N/A'}</strong></div>
+                    <div><span style={{ color: '#666' }}>Labor Hours:</span> <strong>{orderDetails.labor_hours || '-'}h</strong></div>
+                    {orderDetails.service_catalog && (
+                      <div><span style={{ color: '#666' }}>Catalog Price:</span> <strong>{formatCurrency(orderDetails.service_catalog.base_price)}</strong></div>
+                    )}
+                  </div>
+
+                  {/* Parts breakdown */}
+                  {orderDetails.parts && orderDetails.parts.length > 0 && (
+                    <div style={{ marginTop: '12px', borderTop: '1px solid #bbf7d0', paddingTop: '12px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: '600', color: '#166534', marginBottom: '8px' }}>📦 Parts Requested from Warehouse</div>
+                      <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ backgroundColor: '#dcfce7' }}>
+                            <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: '600' }}>Part</th>
+                            <th style={{ textAlign: 'center', padding: '6px 8px', fontWeight: '600' }}>Qty</th>
+                            <th style={{ textAlign: 'right', padding: '6px 8px', fontWeight: '600' }}>Unit Price</th>
+                            <th style={{ textAlign: 'right', padding: '6px 8px', fontWeight: '600' }}>Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {orderDetails.parts.map((part, i) => (
+                            <tr key={i} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                              <td style={{ padding: '6px 8px' }}>{part.part_name || 'Unknown'} <span style={{ color: '#999', fontSize: '11px' }}>{part.product_code || ''}</span></td>
+                              <td style={{ padding: '6px 8px', textAlign: 'center' }}>{part.quantity}</td>
+                              <td style={{ padding: '6px 8px', textAlign: 'right' }}>{formatCurrency(part.price || 0)}</td>
+                              <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: '500' }}>{formatCurrency(part.line_total || 0)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr style={{ backgroundColor: '#dcfce7' }}>
+                            <td colSpan="3" style={{ padding: '6px 8px', fontWeight: '600' }}>Parts Subtotal</td>
+                            <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: '700' }}>{formatCurrency(orderDetails.parts_cost)}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginTop: '20px' }}>
                 <div>
@@ -1128,6 +1223,8 @@ export default function BillingDashboard() {
                               discount: '0',
                               notes: ''
                             });
+                            // Auto-fetch billing details
+                            fetchBillingDetails(so.id);
                             setShowCreateModal(true);
                           }}
                           style={{

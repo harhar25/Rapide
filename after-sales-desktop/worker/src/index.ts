@@ -1775,6 +1775,99 @@ export default {
       }
     }
 
+    // GET /api/billing/service-order/:id/details - fetch service type, labor, and parts for auto-populating invoice
+    {
+      const m = url.pathname.match(/^\/api\/billing\/service-order\/(\d+)\/details$/);
+      if (m && request.method === 'GET') {
+        const soId = toInt(m[1], null);
+        if (!soId) return fail(request, 400, 'Invalid service order ID');
+
+        // 1. Get service order info
+        const order = await env.DB.prepare(
+          `SELECT so.id, so.service_type, so.customer_id,
+                  c.name as customer_name,
+                  COALESCE(so.vehicle_plate_no, c.plate_no) as plate_number,
+                  c.vehicle_model
+           FROM service_orders so
+           LEFT JOIN customers c ON c.id = so.customer_id
+           WHERE so.id = ?1`
+        ).bind(soId).first<any>();
+
+        if (!order) return fail(request, 404, 'Service order not found');
+
+        // 2. Get service catalog price for this service type
+        let serviceCatalogMatch: any = null;
+        if (order.service_type) {
+          serviceCatalogMatch = await env.DB.prepare(
+            `SELECT service_name, category, base_price, labor_hours, description
+             FROM service_catalog
+             WHERE service_name = ?1 AND status = 'active'
+             LIMIT 1`
+          ).bind(order.service_type).first<any>();
+
+          // Fallback: fuzzy match
+          if (!serviceCatalogMatch) {
+            serviceCatalogMatch = await env.DB.prepare(
+              `SELECT service_name, category, base_price, labor_hours, description
+               FROM service_catalog
+               WHERE LOWER(service_name) LIKE LOWER(?1) AND status = 'active'
+               LIMIT 1`
+            ).bind(`%${order.service_type}%`).first<any>();
+          }
+        }
+
+        // 3. Get labor hours from job wrapup/assignment
+        const laborData = await env.DB.prepare(
+          `SELECT jw.total_labor_hours, t.name as technician_name
+           FROM job_wrapups jw
+           LEFT JOIN technicians t ON t.id = jw.technician_id
+           WHERE jw.service_order_id = ?1
+           LIMIT 1`
+        ).bind(soId).first<any>();
+
+        // 4. Get parts requested with pricing from warehouse
+        const partsRs = await env.DB.prepare(
+          `SELECT
+             pri.id,
+             wp.product_name as part_name,
+             wp.product_code,
+             pri.quantity_requested as quantity,
+             wp.unit_price as price,
+             (pri.quantity_requested * COALESCE(wp.unit_price, 0)) as line_total,
+             pri.status,
+             pr.status as request_status
+           FROM parts_request_items pri
+           JOIN parts_requests pr ON pr.id = pri.parts_request_id
+           LEFT JOIN warehouse_products wp ON wp.id = pri.product_id
+           WHERE pr.service_order_id = ?1`
+        ).bind(soId).all<any>();
+
+        const parts = partsRs.results ?? [];
+        const totalPartsCost = parts.reduce((sum: number, p: any) => sum + (p.line_total || 0), 0);
+
+        // 5. Calculate labor cost
+        const laborHours = laborData?.total_labor_hours || serviceCatalogMatch?.labor_hours || 1;
+        const laborRate = serviceCatalogMatch?.base_price ? (serviceCatalogMatch.base_price / (serviceCatalogMatch.labor_hours || 1)) : 500;
+        const laborCost = serviceCatalogMatch?.base_price || (laborHours * laborRate);
+
+        return ok(request, {
+          service_order_id: soId,
+          service_type: order.service_type || 'General Service',
+          customer_name: order.customer_name,
+          plate_number: order.plate_number,
+          vehicle_model: order.vehicle_model,
+          service_catalog: serviceCatalogMatch || null,
+          labor_hours: laborHours,
+          labor_rate: laborRate,
+          labor_cost: laborCost,
+          technician_name: laborData?.technician_name || null,
+          parts,
+          parts_cost: totalPartsCost,
+          suggested_total: laborCost + totalPartsCost
+        });
+      }
+    }
+
     if (url.pathname === '/api/billing/invoices' && request.method === 'POST') {
       const data = await readJson<any>(request);
       if (!data) return fail(request, 400, 'Invalid JSON');
