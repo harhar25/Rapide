@@ -215,7 +215,7 @@ const ReceiptPrintTemplate = React.forwardRef(({ payment, companyName = "Rapide 
   );
 });
 
-export default function CashierDashboard() {
+export default function CashierDashboard({ user, onLogout }) {
   const [paymentQueue, setPaymentQueue] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('cash');
@@ -748,6 +748,17 @@ export default function CashierDashboard() {
             }}>
             History
           </button>
+          {onLogout && (
+            <button onClick={onLogout}
+              style={{
+                padding: '7px 16px', backgroundColor: 'rgba(220,38,38,0.15)',
+                color: '#fca5a5', border: '1px solid rgba(220,38,38,0.3)',
+                borderRadius: '4px', cursor: 'pointer', fontWeight: '600', fontSize: '12px',
+                letterSpacing: '0.5px'
+              }}>
+              LOGOUT
+            </button>
+          )}
         </div>
       </div>
 
