@@ -14,6 +14,11 @@ const InvoicePrintTemplate = React.forwardRef(({ invoice, companyInfo }, ref) =>
 
   if (!invoice) return null;
 
+  const parts = invoice._parts || [];
+  const serviceType = invoice._service_type || invoice.service_type || '';
+  const technicianName = invoice._technician_name || '';
+  const laborHours = invoice._labor_hours || invoice.labor_hours || '';
+
   return (
     <div ref={ref} style={{
       width: '210mm',
@@ -26,113 +31,146 @@ const InvoicePrintTemplate = React.forwardRef(({ invoice, companyInfo }, ref) =>
       boxSizing: 'border-box'
     }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '30px', borderBottom: '3px solid #007bff', paddingBottom: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px', borderBottom: '3px solid #1a1a2e', paddingBottom: '20px' }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: '28px', color: '#007bff', fontWeight: '700' }}>INVOICE</h1>
-          <p style={{ margin: '5px 0 0 0', color: '#666', fontSize: '11px' }}>After-Sales Service Center</p>
+          <h1 style={{ margin: 0, fontSize: '28px', color: '#1a1a2e', fontWeight: '800', letterSpacing: '-0.5px' }}>INVOICE</h1>
+          <p style={{ margin: '5px 0 0 0', color: '#666', fontSize: '11px' }}>Rapide After-Sales Service Center</p>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: '24px', fontWeight: '700', color: '#333' }}>#{invoice.invoice_number || invoice.id}</div>
-          <div style={{ color: '#666', marginTop: '5px' }}>
+          <div style={{ fontSize: '22px', fontWeight: '700', color: '#333' }}>#{invoice.invoice_number || invoice.id}</div>
+          <div style={{ color: '#666', marginTop: '5px', fontSize: '11px' }}>
             Date: {new Date(invoice.created_at).toLocaleDateString('en-PH', { 
               year: 'numeric', month: 'long', day: 'numeric' 
             })}
           </div>
           <div style={{
-            marginTop: '10px',
-            padding: '4px 12px',
+            marginTop: '8px',
+            padding: '4px 14px',
             backgroundColor: invoice.status === 'paid' ? '#d4edda' : invoice.status === 'approved' ? '#fff3cd' : '#e9ecef',
             color: invoice.status === 'paid' ? '#155724' : invoice.status === 'approved' ? '#856404' : '#6c757d',
             borderRadius: '4px',
             display: 'inline-block',
-            fontWeight: '600',
+            fontWeight: '700',
             textTransform: 'uppercase',
             fontSize: '10px'
           }}>
-            {invoice.status}
+            {invoice.status === 'approved' ? 'FOR PAYMENT' : invoice.status}
           </div>
         </div>
       </div>
 
-      {/* Bill To / Service Order */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '30px' }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: '10px', color: '#666', textTransform: 'uppercase', marginBottom: '8px', fontWeight: '600' }}>Bill To</div>
-          <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '4px' }}>{invoice.customer_name || 'N/A'}</div>
-          <div style={{ color: '#666' }}>{invoice.customer_address || ''}</div>
-          <div style={{ color: '#666' }}>{invoice.customer_phone || ''}</div>
+      {/* Bill To / Vehicle / Service Info */}
+      <div style={{ display: 'flex', gap: '20px', marginBottom: '24px' }}>
+        <div style={{ flex: 1, padding: '14px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
+          <div style={{ fontSize: '9px', color: '#999', textTransform: 'uppercase', marginBottom: '6px', fontWeight: '700', letterSpacing: '0.5px' }}>Bill To</div>
+          <div style={{ fontSize: '15px', fontWeight: '700', marginBottom: '2px' }}>{invoice.customer_name || 'N/A'}</div>
+          <div style={{ color: '#666', fontSize: '11px' }}>{invoice.customer_address || ''}</div>
+          <div style={{ color: '#666', fontSize: '11px' }}>{invoice.customer_phone || ''}</div>
         </div>
-        <div style={{ flex: 1, textAlign: 'right' }}>
-          <div style={{ fontSize: '10px', color: '#666', textTransform: 'uppercase', marginBottom: '8px', fontWeight: '600' }}>Vehicle Details</div>
-          <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '4px' }}>{invoice.plate_number || 'N/A'}</div>
-          <div style={{ color: '#666' }}>{invoice.vehicle_model || ''}</div>
-          <div style={{ color: '#666' }}>Service Order: #{invoice.service_order_id || 'N/A'}</div>
+        <div style={{ flex: 1, padding: '14px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
+          <div style={{ fontSize: '9px', color: '#999', textTransform: 'uppercase', marginBottom: '6px', fontWeight: '700', letterSpacing: '0.5px' }}>Vehicle Details</div>
+          <div style={{ fontSize: '15px', fontWeight: '700', marginBottom: '2px' }}>{invoice.plate_number || 'N/A'}</div>
+          <div style={{ color: '#666', fontSize: '11px' }}>{invoice.vehicle_model || ''}</div>
+          <div style={{ color: '#666', fontSize: '11px' }}>SO #{invoice.service_order_id || 'N/A'}</div>
+        </div>
+        <div style={{ flex: 1, padding: '14px', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
+          <div style={{ fontSize: '9px', color: '#999', textTransform: 'uppercase', marginBottom: '6px', fontWeight: '700', letterSpacing: '0.5px' }}>Service Info</div>
+          <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '2px' }}>{serviceType || 'General Service'}</div>
+          {technicianName && <div style={{ color: '#666', fontSize: '11px' }}>Tech: {technicianName}</div>}
+          {laborHours && <div style={{ color: '#666', fontSize: '11px' }}>Labor: {laborHours}h</div>}
         </div>
       </div>
 
-      {/* Service Summary Table */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '30px' }}>
+      {/* Itemized Table */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '6px' }}>
         <thead>
-          <tr style={{ backgroundColor: '#f8f9fa' }}>
-            <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #dee2e6', fontSize: '11px', fontWeight: '600' }}>Description</th>
-            <th style={{ padding: '12px', textAlign: 'right', borderBottom: '2px solid #dee2e6', fontSize: '11px', fontWeight: '600', width: '120px' }}>Amount</th>
+          <tr style={{ backgroundColor: '#1a1a2e' }}>
+            <th style={{ padding: '10px 12px', textAlign: 'left', color: '#fff', fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>#</th>
+            <th style={{ padding: '10px 12px', textAlign: 'left', color: '#fff', fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Description</th>
+            <th style={{ padding: '10px 12px', textAlign: 'center', color: '#fff', fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', width: '60px' }}>Qty</th>
+            <th style={{ padding: '10px 12px', textAlign: 'right', color: '#fff', fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', width: '110px' }}>Unit Price</th>
+            <th style={{ padding: '10px 12px', textAlign: 'right', color: '#fff', fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', width: '110px' }}>Amount</th>
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td style={{ padding: '12px', borderBottom: '1px solid #eee' }}>
-              <div style={{ fontWeight: '500' }}>Labor Charges</div>
-              <div style={{ fontSize: '11px', color: '#666' }}>Service and repair labor</div>
+          {/* Labor row */}
+          <tr style={{ backgroundColor: '#f8f9fa' }}>
+            <td style={{ padding: '10px 12px', borderBottom: '1px solid #eee', fontSize: '11px', color: '#999' }}>1</td>
+            <td style={{ padding: '10px 12px', borderBottom: '1px solid #eee' }}>
+              <div style={{ fontWeight: '600', fontSize: '12px' }}>Service Labor — {serviceType || 'General Service'}</div>
+              <div style={{ fontSize: '10px', color: '#888' }}>{technicianName ? `Technician: ${technicianName}` : 'Service and repair labor'}{laborHours ? ` · ${laborHours}h` : ''}</div>
             </td>
-            <td style={{ padding: '12px', borderBottom: '1px solid #eee', textAlign: 'right', fontWeight: '500' }}>
-              {formatCurrency(invoice.labor_cost)}
-            </td>
+            <td style={{ padding: '10px 12px', borderBottom: '1px solid #eee', textAlign: 'center', fontSize: '12px' }}>1</td>
+            <td style={{ padding: '10px 12px', borderBottom: '1px solid #eee', textAlign: 'right', fontSize: '12px' }}>{formatCurrency(invoice.labor_cost)}</td>
+            <td style={{ padding: '10px 12px', borderBottom: '1px solid #eee', textAlign: 'right', fontWeight: '600', fontSize: '12px' }}>{formatCurrency(invoice.labor_cost)}</td>
           </tr>
-          <tr>
-            <td style={{ padding: '12px', borderBottom: '1px solid #eee' }}>
-              <div style={{ fontWeight: '500' }}>Parts & Materials</div>
-              <div style={{ fontSize: '11px', color: '#666' }}>Replacement parts and consumables</div>
-            </td>
-            <td style={{ padding: '12px', borderBottom: '1px solid #eee', textAlign: 'right', fontWeight: '500' }}>
-              {formatCurrency(invoice.parts_cost)}
-            </td>
-          </tr>
-          {invoice.discount > 0 && (
+
+          {/* Itemized parts rows */}
+          {parts.length > 0 ? parts.map((part, i) => (
+            <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#fff' : '#fafafa' }}>
+              <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0', fontSize: '11px', color: '#999' }}>{i + 2}</td>
+              <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
+                <div style={{ fontWeight: '500', fontSize: '12px' }}>{part.part_name || 'Part'}</div>
+                {part.product_code && <div style={{ fontSize: '10px', color: '#999' }}>Code: {part.product_code}</div>}
+              </td>
+              <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0', textAlign: 'center', fontSize: '12px' }}>{part.quantity || 1}</td>
+              <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0', textAlign: 'right', fontSize: '12px' }}>{formatCurrency(part.price || 0)}</td>
+              <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0', textAlign: 'right', fontWeight: '500', fontSize: '12px' }}>{formatCurrency(part.line_total || (part.quantity || 1) * (part.price || 0))}</td>
+            </tr>
+          )) : (
             <tr>
-              <td style={{ padding: '12px', borderBottom: '1px solid #eee' }}>
-                <div style={{ fontWeight: '500', color: '#28a745' }}>Discount</div>
+              <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0', fontSize: '11px', color: '#999' }}>2</td>
+              <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
+                <div style={{ fontWeight: '500', fontSize: '12px' }}>Parts & Materials</div>
+                <div style={{ fontSize: '10px', color: '#888' }}>Replacement parts and consumables</div>
               </td>
-              <td style={{ padding: '12px', borderBottom: '1px solid #eee', textAlign: 'right', fontWeight: '500', color: '#dc3545' }}>
-                -{formatCurrency(invoice.discount)}
-              </td>
+              <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0', textAlign: 'center' }}>—</td>
+              <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0', textAlign: 'right' }}>—</td>
+              <td style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0', textAlign: 'right', fontWeight: '500', fontSize: '12px' }}>{formatCurrency(invoice.parts_cost)}</td>
             </tr>
           )}
         </tbody>
-        <tfoot>
-          <tr style={{ backgroundColor: '#f8f9fa' }}>
-            <td style={{ padding: '16px 12px', fontWeight: '700', fontSize: '14px' }}>TOTAL AMOUNT</td>
-            <td style={{ padding: '16px 12px', textAlign: 'right', fontWeight: '700', fontSize: '18px', color: '#007bff' }}>
-              {formatCurrency(invoice.total_amount)}
-            </td>
-          </tr>
-        </tfoot>
       </table>
+
+      {/* Totals box */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '24px' }}>
+        <div style={{ width: '280px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #eee' }}>
+            <span style={{ color: '#666', fontSize: '12px' }}>Labor Subtotal</span>
+            <span style={{ fontWeight: '500', fontSize: '12px' }}>{formatCurrency(invoice.labor_cost)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #eee' }}>
+            <span style={{ color: '#666', fontSize: '12px' }}>Parts Subtotal ({parts.length || '—'} items)</span>
+            <span style={{ fontWeight: '500', fontSize: '12px' }}>{formatCurrency(invoice.parts_cost)}</span>
+          </div>
+          {invoice.discount > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #eee' }}>
+              <span style={{ color: '#dc3545', fontSize: '12px' }}>Discount</span>
+              <span style={{ fontWeight: '500', fontSize: '12px', color: '#dc3545' }}>-{formatCurrency(invoice.discount)}</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', backgroundColor: '#1a1a2e', borderRadius: '6px', marginTop: '8px', paddingLeft: '12px', paddingRight: '12px' }}>
+            <span style={{ fontWeight: '800', fontSize: '14px', color: '#fff' }}>TOTAL DUE</span>
+            <span style={{ fontWeight: '800', fontSize: '18px', color: '#fff' }}>{formatCurrency(invoice.total_amount)}</span>
+          </div>
+        </div>
+      </div>
 
       {/* Payment Info (if paid) */}
       {invoice.status === 'paid' && (
-        <div style={{ backgroundColor: '#d4edda', padding: '16px', borderRadius: '8px', marginBottom: '30px' }}>
+        <div style={{ backgroundColor: '#d4edda', padding: '14px 16px', borderRadius: '6px', marginBottom: '24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <div style={{ fontWeight: '600', color: '#155724', marginBottom: '4px' }}>✓ PAID</div>
+              <div style={{ fontWeight: '700', color: '#155724', marginBottom: '2px', fontSize: '13px' }}>✓ PAID</div>
               <div style={{ fontSize: '11px', color: '#155724' }}>
-                Payment received on {new Date(invoice.paid_at).toLocaleDateString('en-PH', {
+                {new Date(invoice.paid_at).toLocaleDateString('en-PH', {
                   year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
                 })}
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '11px', color: '#155724' }}>Payment Method</div>
-              <div style={{ fontWeight: '600', color: '#155724', textTransform: 'uppercase' }}>
+              <div style={{ fontSize: '10px', color: '#155724' }}>Payment Method</div>
+              <div style={{ fontWeight: '700', color: '#155724', textTransform: 'uppercase', fontSize: '13px' }}>
                 {invoice.payment_method || 'Cash'}
               </div>
             </div>
@@ -142,9 +180,9 @@ const InvoicePrintTemplate = React.forwardRef(({ invoice, companyInfo }, ref) =>
 
       {/* Notes */}
       {invoice.notes && (
-        <div style={{ marginBottom: '30px' }}>
-          <div style={{ fontSize: '10px', color: '#666', textTransform: 'uppercase', marginBottom: '8px', fontWeight: '600' }}>Notes</div>
-          <div style={{ color: '#666', fontSize: '11px', padding: '12px', backgroundColor: '#f8f9fa', borderRadius: '4px' }}>
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{ fontSize: '9px', color: '#999', textTransform: 'uppercase', marginBottom: '6px', fontWeight: '700', letterSpacing: '0.5px' }}>Notes</div>
+          <div style={{ color: '#666', fontSize: '11px', padding: '10px 12px', backgroundColor: '#f8f9fa', borderRadius: '4px' }}>
             {invoice.notes}
           </div>
         </div>
@@ -152,14 +190,14 @@ const InvoicePrintTemplate = React.forwardRef(({ invoice, companyInfo }, ref) =>
 
       {/* Footer */}
       <div style={{ 
-        borderTop: '1px solid #eee', 
-        paddingTop: '20px', 
+        borderTop: '2px solid #1a1a2e', 
+        paddingTop: '16px', 
         marginTop: 'auto',
         display: 'flex',
         justifyContent: 'space-between'
       }}>
         <div style={{ fontSize: '10px', color: '#999' }}>
-          <div>Thank you for your business!</div>
+          <div style={{ fontWeight: '600' }}>Thank you for your business!</div>
           <div style={{ marginTop: '4px' }}>For inquiries, please contact our service center.</div>
         </div>
         <div style={{ fontSize: '10px', color: '#999', textAlign: 'right' }}>
@@ -170,6 +208,187 @@ const InvoicePrintTemplate = React.forwardRef(({ invoice, companyInfo }, ref) =>
     </div>
   );
 });
+
+// Invoice Detail Modal Component with itemized parts
+function InvoiceDetailModal({ invoice, onClose, onPrint, onApprove, formatCurrency, formatDate, getStatusBadge, apiBase }) {
+  const [parts, setParts] = useState([]);
+  const [serviceType, setServiceType] = useState('');
+  const [techName, setTechName] = useState('');
+  const [laborHours, setLaborHours] = useState('');
+  const [loadingParts, setLoadingParts] = useState(false);
+
+  useEffect(() => {
+    if (invoice?.service_order_id) {
+      setLoadingParts(true);
+      fetch(`${apiBase}/api/billing/service-order/${invoice.service_order_id}/details`)
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data) {
+            const d = data?.data || data;
+            setParts(d.parts || []);
+            setServiceType(d.service_type || '');
+            setTechName(d.technician_name || '');
+            setLaborHours(d.labor_hours || '');
+          }
+        })
+        .catch(() => {})
+        .finally(() => setLoadingParts(false));
+    }
+  }, [invoice?.service_order_id, apiBase]);
+
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 999
+    }} onClick={onClose}>
+      <div style={{
+        backgroundColor: '#fff', borderRadius: '12px', width: '100%',
+        maxWidth: '580px', maxHeight: '90vh', overflow: 'auto'
+      }} onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '18px', color: '#1a1a2e' }}>Invoice #{invoice.invoice_number || invoice.id}</h3>
+            <div style={{ marginTop: '6px' }}>{getStatusBadge(invoice.status)}</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '24px', color: '#999', cursor: 'pointer' }}>&times;</button>
+        </div>
+
+        <div style={{ padding: '24px' }}>
+          {/* Info grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+            <div>
+              <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Customer</div>
+              <div style={{ fontSize: '15px', fontWeight: '600' }}>{invoice.customer_name || 'N/A'}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Plate Number</div>
+              <div style={{ fontSize: '15px', fontWeight: '600' }}>{invoice.plate_number || 'N/A'}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Service Type</div>
+              <div style={{ fontSize: '14px', fontWeight: '500' }}>{serviceType || invoice.service_type || 'N/A'}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Service Order</div>
+              <div style={{ fontSize: '14px' }}>#{invoice.service_order_id || 'N/A'}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Created</div>
+              <div style={{ fontSize: '14px' }}>{formatDate(invoice.created_at)}</div>
+            </div>
+            {techName && (
+              <div>
+                <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Technician</div>
+                <div style={{ fontSize: '14px' }}>{techName}</div>
+              </div>
+            )}
+          </div>
+
+          {/* Cost breakdown */}
+          <div style={{ borderTop: '1px solid #eee', paddingTop: '16px' }}>
+            {/* Labor */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f5f5f5' }}>
+              <span style={{ color: '#444', fontWeight: '500' }}>Service Labor{serviceType ? ` — ${serviceType}` : ''}</span>
+              <span style={{ fontWeight: '600' }}>{formatCurrency(invoice.labor_cost)}</span>
+            </div>
+            {laborHours && (
+              <div style={{ fontSize: '11px', color: '#888', padding: '4px 0 8px 0' }}>
+                {laborHours} hour(s) of labor
+              </div>
+            )}
+
+            {/* Parts header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0 6px 0' }}>
+              <span style={{ color: '#444', fontWeight: '600', fontSize: '13px' }}>Warehouse Parts</span>
+              <span style={{ color: '#888', fontSize: '12px' }}>{parts.length} item(s)</span>
+            </div>
+
+            {loadingParts ? (
+              <div style={{ textAlign: 'center', padding: '12px', color: '#999', fontSize: '12px' }}>Loading parts...</div>
+            ) : parts.length > 0 ? (
+              <div style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', padding: '8px 12px', marginBottom: '8px' }}>
+                {parts.map((part, i) => (
+                  <div key={i} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '8px 0',
+                    borderBottom: i < parts.length - 1 ? '1px solid #eee' : 'none'
+                  }}>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: '500' }}>{part.part_name}</div>
+                      <div style={{ fontSize: '11px', color: '#999' }}>
+                        {part.product_code ? `${part.product_code} · ` : ''}{part.quantity}x @ {formatCurrency(part.price || 0)}
+                      </div>
+                    </div>
+                    <div style={{ fontWeight: '600', fontSize: '13px' }}>
+                      {formatCurrency(part.line_total || (part.quantity || 1) * (part.price || 0))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ padding: '8px 0 8px 12px', color: '#999', fontSize: '12px', fontStyle: 'italic' }}>No itemized parts available</div>
+            )}
+
+            {/* Parts subtotal */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderTop: '1px solid #eee' }}>
+              <span style={{ color: '#666' }}>Parts Subtotal</span>
+              <span style={{ fontWeight: '500' }}>{formatCurrency(invoice.parts_cost)}</span>
+            </div>
+
+            {/* Discount */}
+            {invoice.discount > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0' }}>
+                <span style={{ color: '#666' }}>Discount</span>
+                <span style={{ fontWeight: '500', color: '#dc3545' }}>-{formatCurrency(invoice.discount)}</span>
+              </div>
+            )}
+
+            {/* Grand total */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px 0', borderTop: '2px solid #1a1a2e', marginTop: '8px' }}>
+              <span style={{ fontSize: '16px', fontWeight: '700' }}>Total</span>
+              <span style={{ fontSize: '22px', fontWeight: '800', color: '#28a745' }}>{formatCurrency(invoice.total_amount)}</span>
+            </div>
+          </div>
+
+          {/* Notes */}
+          {invoice.notes && (
+            <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
+              <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>Notes</div>
+              <div style={{ fontSize: '13px', color: '#333' }}>{invoice.notes}</div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer buttons */}
+        <div style={{ padding: '16px 24px', borderTop: '1px solid #eee', display: 'flex', gap: '12px' }}>
+          <button
+            onClick={() => onPrint(invoice)}
+            style={{
+              flex: 1, padding: '12px', backgroundColor: '#17a2b8', color: '#fff',
+              border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+            }}
+          >
+            🖨️ Print Invoice
+          </button>
+          {(invoice.status === 'pending' || invoice.status === 'draft') && (
+            <button
+              onClick={() => onApprove(invoice)}
+              style={{
+                flex: 1, padding: '12px', backgroundColor: '#28a745', color: '#fff',
+                border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer'
+              }}
+            >
+              ✓ Approve & Send
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function BillingDashboard() {
   const [activeTab, setActiveTab] = useState('ready-for-billing');
@@ -276,8 +495,25 @@ export default function BillingDashboard() {
     fetchServiceOrders();
   }, []);
 
-  const handlePrint = (invoice) => {
-    setShowPrintPreview(invoice);
+  const handlePrint = async (invoice) => {
+    // Fetch parts details for this invoice's service order
+    let enrichedInvoice = { ...invoice };
+    if (invoice.service_order_id) {
+      try {
+        const res = await fetch(`${API_BASE}/api/billing/service-order/${invoice.service_order_id}/details`);
+        if (res.ok) {
+          const data = await res.json();
+          const details = data?.data || data;
+          enrichedInvoice._parts = details.parts || [];
+          enrichedInvoice._service_type = details.service_type || '';
+          enrichedInvoice._technician_name = details.technician_name || '';
+          enrichedInvoice._labor_hours = details.labor_hours || '';
+        }
+      } catch (err) {
+        console.error('Failed to fetch parts for print:', err);
+      }
+    }
+    setShowPrintPreview(enrichedInvoice);
   };
 
   const executePrint = () => {
@@ -859,128 +1095,16 @@ export default function BillingDashboard() {
 
       {/* Invoice Detail Modal */}
       {selectedInvoice && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 999
-        }} onClick={() => setSelectedInvoice(null)}>
-          <div style={{
-            backgroundColor: '#fff',
-            borderRadius: '12px',
-            width: '100%',
-            maxWidth: '500px',
-            maxHeight: '90vh',
-            overflow: 'auto'
-          }} onClick={e => e.stopPropagation()}>
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '18px', color: '#1a1a2e' }}>Invoice #{selectedInvoice.invoice_number || selectedInvoice.id}</h3>
-                <div style={{ marginTop: '6px' }}>{getStatusBadge(selectedInvoice.status)}</div>
-              </div>
-              <button
-                onClick={() => setSelectedInvoice(null)}
-                style={{ background: 'none', border: 'none', fontSize: '24px', color: '#999', cursor: 'pointer' }}
-              >
-                ×
-              </button>
-            </div>
-            
-            <div style={{ padding: '24px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
-                <div>
-                  <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Customer</div>
-                  <div style={{ fontSize: '15px', fontWeight: '600' }}>{selectedInvoice.customer_name || 'N/A'}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Plate Number</div>
-                  <div style={{ fontSize: '15px', fontWeight: '600' }}>{selectedInvoice.plate_number || 'N/A'}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Created</div>
-                  <div style={{ fontSize: '14px' }}>{formatDate(selectedInvoice.created_at)}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px', textTransform: 'uppercase' }}>Service Order</div>
-                  <div style={{ fontSize: '14px' }}>#{selectedInvoice.service_order_id || 'N/A'}</div>
-                </div>
-              </div>
-
-              <div style={{ borderTop: '1px solid #eee', paddingTop: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0' }}>
-                  <span style={{ color: '#666' }}>Labor Cost</span>
-                  <span style={{ fontWeight: '500' }}>{formatCurrency(selectedInvoice.labor_cost)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0' }}>
-                  <span style={{ color: '#666' }}>Parts Cost</span>
-                  <span style={{ fontWeight: '500' }}>{formatCurrency(selectedInvoice.parts_cost)}</span>
-                </div>
-                {selectedInvoice.discount > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0' }}>
-                    <span style={{ color: '#666' }}>Discount</span>
-                    <span style={{ fontWeight: '500', color: '#dc3545' }}>-{formatCurrency(selectedInvoice.discount)}</span>
-                  </div>
-                )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px 0', borderTop: '2px solid #eee', marginTop: '8px' }}>
-                  <span style={{ fontSize: '16px', fontWeight: '600' }}>Total</span>
-                  <span style={{ fontSize: '22px', fontWeight: '700', color: '#28a745' }}>{formatCurrency(selectedInvoice.total_amount)}</span>
-                </div>
-              </div>
-
-              {selectedInvoice.notes && (
-                <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
-                  <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>Notes</div>
-                  <div style={{ fontSize: '13px', color: '#333' }}>{selectedInvoice.notes}</div>
-                </div>
-              )}
-            </div>
-
-            <div style={{ padding: '16px 24px', borderTop: '1px solid #eee', display: 'flex', gap: '12px' }}>
-              <button
-                onClick={() => handlePrint(selectedInvoice)}
-                style={{
-                  flex: 1,
-                  padding: '12px',
-                  backgroundColor: '#17a2b8',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px'
-                }}
-              >
-                🖨️ Print Invoice
-              </button>
-              {(selectedInvoice.status === 'pending' || selectedInvoice.status === 'draft') && (
-                <button
-                  onClick={() => handleApprove(selectedInvoice)}
-                  style={{
-                    flex: 1,
-                    padding: '12px',
-                    backgroundColor: '#28a745',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontWeight: '600',
-                    cursor: 'pointer'
-                  }}
-                >
-                  ✓ Approve & Send
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+        <InvoiceDetailModal
+          invoice={selectedInvoice}
+          onClose={() => setSelectedInvoice(null)}
+          onPrint={handlePrint}
+          onApprove={handleApprove}
+          formatCurrency={formatCurrency}
+          formatDate={formatDate}
+          getStatusBadge={getStatusBadge}
+          apiBase={API_BASE}
+        />
       )}
 
       {/* Header */}
