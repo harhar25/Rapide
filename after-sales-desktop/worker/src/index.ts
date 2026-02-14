@@ -1825,7 +1825,7 @@ export default {
            LIMIT 1`
         ).bind(soId).first<any>();
 
-        // 4. Get parts requested with pricing from warehouse
+        // 4. Get parts requested with pricing from warehouse (normalized tables)
         const partsRs = await env.DB.prepare(
           `SELECT
              pri.id,
@@ -1842,7 +1842,43 @@ export default {
            WHERE pr.service_order_id = ?1`
         ).bind(soId).all<any>();
 
-        const parts = partsRs.results ?? [];
+        let parts = partsRs.results ?? [];
+
+        // Fallback: also check car_jockey_parts_requests (stores items as JSON in document_data)
+        if (parts.length === 0) {
+          try {
+            const cjReqs = await env.DB.prepare(
+              `SELECT document_data FROM car_jockey_parts_requests WHERE service_order_id = ?1 ORDER BY created_at DESC`
+            ).bind(soId).all<any>();
+            for (const req of (cjReqs.results ?? [])) {
+              try {
+                const items = JSON.parse(req.document_data || '[]');
+                for (const item of items) {
+                  // Try to look up product price from warehouse_products
+                  let wp: any = null;
+                  if (item.product_id) {
+                    wp = await env.DB.prepare('SELECT product_name, product_code, unit_price FROM warehouse_products WHERE id = ?1').bind(item.product_id).first<any>();
+                  } else if (item.product_name || item.part_name || item.name) {
+                    const searchName = item.product_name || item.part_name || item.name;
+                    wp = await env.DB.prepare('SELECT product_name, product_code, unit_price FROM warehouse_products WHERE LOWER(product_name) LIKE LOWER(?1) LIMIT 1').bind(`%${searchName}%`).first<any>();
+                  }
+                  const qty = item.quantity || item.qty || 1;
+                  const price = wp?.unit_price || item.price || item.unit_price || 0;
+                  parts.push({
+                    part_name: wp?.product_name || item.product_name || item.part_name || item.name || 'Unknown Part',
+                    product_code: wp?.product_code || item.product_code || '',
+                    quantity: qty,
+                    price: price,
+                    line_total: qty * price,
+                    status: 'delivered',
+                    request_status: 'completed'
+                  });
+                }
+              } catch (_) { /* skip malformed JSON */ }
+            }
+          } catch (_) { /* car_jockey_parts_requests table may not exist */ }
+        }
+
         const totalPartsCost = parts.reduce((sum: number, p: any) => sum + (p.line_total || 0), 0);
 
         // 5. Calculate labor cost

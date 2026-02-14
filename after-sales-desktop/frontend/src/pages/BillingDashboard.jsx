@@ -952,7 +952,7 @@ export default function BillingDashboard() {
                   </div>
 
                   {/* Parts breakdown */}
-                  {orderDetails.parts && orderDetails.parts.length > 0 && (
+                  {orderDetails.parts && orderDetails.parts.length > 0 ? (
                     <div style={{ marginTop: '12px', borderTop: '1px solid #bbf7d0', paddingTop: '12px' }}>
                       <div style={{ fontSize: '12px', fontWeight: '600', color: '#166534', marginBottom: '8px' }}>📦 Parts Requested from Warehouse</div>
                       <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
@@ -981,6 +981,12 @@ export default function BillingDashboard() {
                           </tr>
                         </tfoot>
                       </table>
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: '12px', borderTop: '1px solid #bbf7d0', paddingTop: '12px' }}>
+                      <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        📦 No parts requested from warehouse for this service order
+                      </div>
                     </div>
                   )}
                 </div>
