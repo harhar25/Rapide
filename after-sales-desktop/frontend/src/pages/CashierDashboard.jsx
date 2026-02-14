@@ -234,7 +234,8 @@ export default function CashierDashboard() {
 
   const fetchPaymentQueue = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/billing/invoices?status=pending`);
+      // Fetch approved/issued invoices (sent to cashier by billing)
+      const res = await fetch(`${API_BASE}/api/billing/invoices?status=approved`);
       if (res.ok) {
         const data = await res.json();
         const list = data?.data?.invoices || data?.invoices || [];
