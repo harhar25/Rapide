@@ -22,6 +22,7 @@ const ReceiptPrintTemplate = React.forwardRef(({ payment, companyName = "Rapide 
   const discount = Number(payment.discount || 0);
   const subtotal = laborCost + partsCost;
   const total = Number(payment.total_amount || subtotal - discount);
+  const parts = payment._parts || [];
 
   return (
     <div ref={ref} style={{
@@ -88,14 +89,27 @@ const ReceiptPrintTemplate = React.forwardRef(({ payment, companyName = "Rapide 
               <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: '700' }}>{formatCurrency(laborCost)}</td>
             </tr>
           )}
-          {partsCost > 0 && (
+          {/* Itemized parts rows */}
+          {parts.length > 0 ? (
+            parts.map((part, idx) => (
+              <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                <td style={{ padding: '8px 12px', fontWeight: '500' }}>
+                  {part.part_name || part.product_name || 'Part'}
+                  {part.product_code ? <span style={{ color: '#94a3b8', fontSize: '9px', marginLeft: '6px' }}>({part.product_code})</span> : null}
+                </td>
+                <td style={{ padding: '8px 12px', textAlign: 'center' }}>{part.quantity || 1}</td>
+                <td style={{ padding: '8px 12px', textAlign: 'right' }}>{formatCurrency(part.price || part.unit_price || 0)}</td>
+                <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: '700' }}>{formatCurrency(part.line_total || (part.quantity || 1) * (part.price || part.unit_price || 0))}</td>
+              </tr>
+            ))
+          ) : partsCost > 0 ? (
             <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
               <td style={{ padding: '8px 12px', fontWeight: '500' }}>Parts & Components</td>
               <td style={{ padding: '8px 12px', textAlign: 'center' }}>-</td>
               <td style={{ padding: '8px 12px', textAlign: 'right' }}>-</td>
               <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: '700' }}>{formatCurrency(partsCost)}</td>
             </tr>
-          )}
+          ) : null}
           {Number(payment.materials_cost) > 0 && (
             <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
               <td style={{ padding: '8px 12px', fontWeight: '500' }}>Materials & Supplies</td>
@@ -368,13 +382,28 @@ export default function CashierDashboard() {
       if (res.ok) {
         const changeAmount = paymentMethod === 'cash' ? Math.max(0, amount - selectedOrder.total_amount) : 0;
         showToast('Payment processed successfully!');
+        
+        // Fetch parts details for the billing statement
+        let partsData = [];
+        if (selectedOrder.service_order_id) {
+          try {
+            const detailsRes = await fetch(`${API_BASE}/api/billing/service-order/${selectedOrder.service_order_id}/details`);
+            if (detailsRes.ok) {
+              const detailsJson = await detailsRes.json();
+              const details = detailsJson?.data || detailsJson;
+              partsData = details.parts || [];
+            }
+          } catch (_) {}
+        }
+
         setShowReceipt({
           ...selectedOrder,
           payment_method: paymentMethod,
           amount_received: amount,
           change_amount: changeAmount,
           reference_number: referenceNumber,
-          processed_by: 'Cashier'
+          processed_by: 'Cashier',
+          _parts: partsData
         });
         setSelectedOrder(null);
         setAmountReceived('');
@@ -430,10 +459,23 @@ export default function CashierDashboard() {
     }, 250);
   };
 
-  const handlePrintReceipt = (payment) => {
+  const handlePrintReceipt = async (payment) => {
+    // Fetch parts details for the billing statement
+    let partsData = [];
+    if (payment.service_order_id) {
+      try {
+        const res = await fetch(`${API_BASE}/api/billing/service-order/${payment.service_order_id}/details`);
+        if (res.ok) {
+          const data = await res.json();
+          const details = data?.data || data;
+          partsData = details.parts || [];
+        }
+      } catch (_) {}
+    }
     setShowReceipt({
       ...payment,
-      payment_method: payment.payment_method || 'cash'
+      payment_method: payment.payment_method || 'cash',
+      _parts: partsData
     });
   };
 
