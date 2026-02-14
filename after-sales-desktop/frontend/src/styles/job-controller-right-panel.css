@@ -1,0 +1,152 @@
+
+/* --- CLEAN MODERN RIGHT PANEL --- */
+
+.pulse-feed-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.pulse-section-title {
+    padding: 16px 20px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: #fff;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.pulse-list {
+    flex: 1;
+    overflow-y: auto;
+    background: #ffffff;
+    scrollbar-width: thin;
+}
+
+/* Item Card Style - Clean */
+.pulse-card {
+    padding: 16px 20px;
+    border-bottom: 1px solid #f8fafc;
+    transition: background 0.2s;
+    position: relative;
+}
+
+.pulse-card:hover {
+    background: #f8fafc;
+}
+
+.pulse-card:last-child {
+    border-bottom: none;
+}
+
+/* Variant: Action Needed */
+.pulse-card.action-needed {
+    background: #fff1f2; /* Very light red */
+    border-left: 4px solid #ef4444;
+}
+
+.pulse-card.action-needed:hover {
+    background: #ffe4e6;
+}
+
+/* Variant: Warehouse Status */
+.pulse-card.warehouse-tracking {
+    border-left: 4px solid #3b82f6;
+}
+
+/* Variant: Print Item */
+.pulse-card.print-item {
+    border-left: 4px solid transparent; /* Align with others */
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.pulse-card.print-item:hover {
+    border-left-color: #cbd5e1;
+}
+
+/* Typography elements */
+.pulse-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+}
+
+.pulse-card-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #1e293b;
+    display: block;
+}
+
+.pulse-card-subtitle {
+    font-size: 0.8rem;
+    color: #64748b;
+    display: block;
+    margin-top: 2px;
+}
+
+.pulse-card-time {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    white-space: nowrap;
+}
+
+/* Item List inside Card */
+.pulse-card-items {
+    background: rgba(241, 245, 249, 0.5);
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-top: 8px;
+}
+
+.pulse-item-row {
+    font-size: 0.85rem;
+    color: #334155;
+    display: flex;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+.pulse-item-row:last-child { margin-bottom: 0; }
+.pulse-item-qty { font-weight: 700; color: #475569; min-width: 24px; }
+
+/* Status Badges */
+.status-pill {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 12px;
+}
+.status-pill.warehouse { background: #e0f2fe; color: #0284c7; }
+.status-pill.printing { background: #f1f5f9; color: #475569; }
+
+/* Actions */
+.pulse-card-actions {
+    margin-top: 12px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.btn-approve-xl {
+    width: 100%;
+    padding: 8px;
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+.btn-approve-xl:hover { background: #dc2626; }

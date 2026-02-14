@@ -1,9 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import '../styles/car-jockey-dashboard.css';
 import '../styles/enterprise-ui.css';
 import '../styles/dashboard-common.css';
 import { fetchJson } from '../utils/fetchJson';
-import { StatCard, EnterpriseCard, StatusBadge, EnterpriseTabs, ActionBar, LoadingSpinner, EmptyState } from '../components/EnterpriseComponents';
+import { useAutoRefresh } from '../hooks/useRealtimeUpdates';
+import { 
+  StatCard, 
+  EnterpriseCard, 
+  StatusBadge, 
+  EnterpriseTabs, 
+  ActionBar, 
+  LoadingSpinner, 
+  EmptyState,
+  EnterpriseTable,
+  EnterpriseButton,
+  EnterpriseFormGroup,
+  ModuleLayout,
+  Modal
+} from '../components/EnterpriseComponents';
 
 export default function CarJockeyDashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('pending');
@@ -71,9 +85,16 @@ export default function CarJockeyDashboard({ user, onLogout }) {
   useEffect(() => {
     loadAllData();
     loadWarehouseInventory();
-    const interval = setInterval(loadAllData, 30000);
+    const interval = setInterval(loadAllData, 3000); // Refresh every 3s
     return () => clearInterval(interval);
   }, []);
+
+  // --- REAL-TIME UPDATES ---
+  const handleRealtimeUpdate = useCallback(() => {
+    loadAllData();
+  }, []);
+
+  useAutoRefresh(['car-jockey', 'job-controller', 'foreman-qc'], handleRealtimeUpdate);
 
   const loadAllData = async () => {
     setLoading(true);
@@ -375,364 +396,280 @@ export default function CarJockeyDashboard({ user, onLogout }) {
     }
   };
 
+  const moduleStats = summary ? [
+    { label: 'Total Movements', value: summary.total_movements, icon: '📊' },
+    { label: 'In Progress', value: summary.active_movements, icon: '🚙' },
+    { label: 'Completed', value: summary.completed_movements, icon: '✓' },
+    { label: 'Currently Parked', value: summary.currently_parked, icon: '🅿️' },
+    { label: 'Parking Revenue', value: formatMoney(summary.parking_revenue), icon: '💰' },
+    { label: 'Avg Mileage', value: `${Number(summary.avg_mileage_traveled || 0).toFixed(0)} km`, icon: '📏' }
+  ] : [];
+
+  const tabs = [
+    { id: 'pending', label: 'Pending Vehicles', icon: '📋' },
+    { id: 'active', label: 'Active Movements', icon: '🚙' },
+    { id: 'parked', label: 'Parked Vehicles', icon: '🅿️' }
+  ];
+
+  const pendingColumns = [
+    { header: 'SO #', accessor: (v) => <strong>{v.so_id}</strong> },
+    { header: 'Customer', accessor: 'customer_name' },
+    { header: 'Plate No', accessor: (v) => <strong>{v.plate_no}</strong> },
+    { header: 'Model', accessor: 'model' },
+    { header: 'Year', accessor: 'year' },
+    { header: 'Status', accessor: (v) => <StatusBadge status={v.status}>{v.status}</StatusBadge> },
+    { header: 'Actions', accessor: (v) => (
+      <EnterpriseButton variant="primary" size="sm" onClick={() => handleStartMovement(v)}>
+        Start Movement
+      </EnterpriseButton>
+    )}
+  ];
+
+  const activeColumns = [
+    { header: 'SO #', accessor: 'so_no' },
+    { header: 'Type', accessor: (m) => <span className="badge-type">{m.type}</span> },
+    { header: 'Customer', accessor: 'customer' },
+    { header: 'Plate', accessor: 'plate_no' },
+    { header: 'Movement', accessor: (m) => <span>{m.from} → <strong>{m.to}</strong></span> },
+    { header: 'Fuel', accessor: (m) => `${m.fuel_start}L → ${m.fuel_end}L` },
+    { header: 'Started', accessor: (m) => new Date(m.started_at).toLocaleString() },
+    { header: 'Actions', accessor: (m) => {
+        if (m.type === 'check-out') return <span className="status-complete">✓ Checked Out</span>;
+        return (
+          <div style={{ display: 'flex', gap: '5px' }}>
+            <EnterpriseButton size="sm" onClick={() => handleCompleteMovement(m)}>Complete</EnterpriseButton>
+            <EnterpriseButton size="sm" variant="secondary" onClick={() => handleParkVehicle(m)}>Park</EnterpriseButton>
+            <EnterpriseButton size="sm" style={{ backgroundColor: '#2196F3', borderColor: '#2196F3' }} onClick={() => handleRequestParts(m)}>Parts</EnterpriseButton>
+          </div>
+        );
+    }}
+  ];
+
+  const parkedColumns = [
+    { header: 'SO #', accessor: 'so_no' },
+    { header: 'Customer', accessor: 'customer' },
+    { header: 'Plate', accessor: 'plate_no' },
+    { header: 'Slot', accessor: 'slot' },
+    { header: 'Zone', accessor: 'zone' },
+    { header: 'Parked At', accessor: (p) => new Date(p.parked_at).toLocaleString() },
+    { header: 'Duration (hrs)', accessor: (p) => p.duration_hrs?.toFixed(1) || '-' },
+    { header: 'Fee', accessor: (p) => formatMoney(p.fee) },
+    { header: 'Actions', accessor: (p) => (
+      <EnterpriseButton variant="danger" size="sm" onClick={() => handleReleaseParking(p)}>Release</EnterpriseButton>
+    )}
+  ];
+
   return (
-    <div className="dashboard-container">
-      <div className="dashboard-wrapper">
-        {/* Enterprise Header */}
-        <div className="dashboard-header">
-          <div className="dashboard-header-content">
-            <div className="dashboard-title-section">
-              <h1 className="dashboard-title">
-                <span className="dashboard-title-icon">🚗</span>
-                Car Jockey Operations
-              </h1>
-              <p className="dashboard-subtitle">Vehicle Movement & Parking Management</p>
-            </div>
-            <div className="dashboard-actions">
-              <button onClick={loadAllData} className="btn-enterprise btn-secondary btn-sm" disabled={loading}>
-                {loading ? <LoadingSpinner size={16} /> : '🔄'} Refresh
-              </button>
-              {user?.role !== 'admin' && (
-                <button onClick={onLogout} className="btn-enterprise btn-secondary btn-sm">Logout</button>
-              )}
-            </div>
-          </div>
+    <ModuleLayout
+      title="Car Jockey Operations"
+      description="Vehicle Movement & Parking Management"
+      icon="🚗"
+      user={user}
+      onLogout={onLogout}
+      stats={moduleStats}
+      actions={
+        <EnterpriseButton variant="secondary" onClick={loadAllData} disabled={loading}>
+           {loading ? 'Refreshing...' : 'Refresh'}
+        </EnterpriseButton>
+      }
+    >
+      {errorMessage && (
+        <div className="alert alert-error" style={{ marginBottom: 'var(--spacing-6)' }}>
+          <span>✗</span>
+          <div>{errorMessage}</div>
         </div>
-
-        {/* Messages */}
-        {errorMessage && (
-          <div className="alert alert-error" style={{ marginBottom: 'var(--spacing-6)' }}>
-            <span>✗</span>
-            <div>{errorMessage}</div>
-          </div>
-        )}
-        {successMessage && (
-          <div className="alert alert-success" style={{ marginBottom: 'var(--spacing-6)' }}>
-            <span>✓</span>
-            <div>{successMessage}</div>
-          </div>
-        )}
-
-        {/* Enterprise Summary Cards */}
-        {summary && (
-          <div className="summary-grid stagger-children">
-            <StatCard 
-              value={summary.total_movements} 
-              label="Total Movements"
-              icon="📊"
-            />
-            <StatCard 
-              value={summary.active_movements} 
-              label="In Progress"
-              icon="🚙"
-            />
-            <StatCard 
-              value={summary.completed_movements} 
-              label="Completed"
-              icon="✓"
-            />
-            <StatCard 
-              value={summary.currently_parked} 
-              label="Currently Parked"
-              icon="🅿️"
-            />
-            <StatCard 
-              value={formatMoney(summary.parking_revenue)} 
-              label="Parking Revenue"
-              icon="💰"
-            />
-            <StatCard 
-              value={`${Number(summary.avg_mileage_traveled || 0).toFixed(0)} km`}
-              label="Avg Mileage"
-              icon="📏"
-            />
-          </div>
-        )}
-
-        {/* Enterprise Tabs */}
-        <EnterpriseTabs
-          tabs={[
-            { id: 'pending', label: 'Pending Vehicles', icon: '📋' },
-            { id: 'active', label: 'Active Movements', icon: '🚙' },
-            { id: 'parked', label: 'Parked Vehicles', icon: '🅿️' }
-          ]}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-        />
-
-        {/* Content */}
-        <div className="content-section">
-          <div className="section-body">
-            {/* Pending Vehicles Tab */}
-            {activeTab === 'pending' && (
-              <div className="enterprise-table">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>SO #</th>
-                      <th>Customer</th>
-                      <th>Plate No</th>
-                      <th>Model</th>
-                      <th>Year</th>
-                      <th>Status</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pendingVehicles.length === 0 ? (
-                      <tr><td colSpan="7"><EmptyState icon="🚗" title="No Pending Vehicles" description="All vehicles have been processed" /></td></tr>
-                    ) : (
-                      pendingVehicles.map((v, idx) => (
-                        <tr key={idx}>
-                          <td><strong>{v.so_id}</strong></td>
-                          <td>{v.customer_name}</td>
-                          <td><strong>{v.plate_no}</strong></td>
-                          <td>{v.model}</td>
-                          <td>{v.year}</td>
-                          <td><StatusBadge status={v.status}>{v.status}</StatusBadge></td>
-                          <td>
-                            <button 
-                              className="btn-enterprise btn-primary btn-sm"
-                              onClick={() => handleStartMovement(v)}
-                            >
-                              Start Movement
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-        {/* Active Movements Tab */}
-        {activeTab === 'active' && (
-          <div className="tab-content">
-            <div className="movements-grid">
-              {activeMovements.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px' }}>No active movements</div>
-              ) : (
-                activeMovements.map((m, idx) => (
-                  <div key={idx} className="movement-card">
-                    <div className="card-header">
-                      <h3>{m.so_no}</h3>
-                      <span className="badge-type">{m.type}</span>
-                    </div>
-                    <div className="card-body">
-                      <p><strong>Customer:</strong> {m.customer}</p>
-                      <p><strong>Plate:</strong> {m.plate_no}</p>
-                      <p><strong>From:</strong> {m.from} → <strong>To:</strong> {m.to}</p>
-                      <p><strong>Fuel:</strong> {m.fuel_start}L → {m.fuel_end}L</p>
-                      <p><strong>Mileage:</strong> {m.mileage_start} → {m.mileage_end} km</p>
-                      <p><strong>Started:</strong> {new Date(m.started_at).toLocaleString()}</p>
-                    </div>
-                    <div className="card-footer">
-                      {m.type !== 'check-out' ? (
-                        <>
-                          <button 
-                            className="btn-action btn-complete"
-                            onClick={() => handleCompleteMovement(m)}
-                          >
-                            Complete
-                          </button>
-                          <button 
-                            className="btn-action btn-park"
-                            onClick={() => handleParkVehicle(m)}
-                          >
-                            Park Vehicle
-                          </button>
-                          <button 
-                            className="btn-action btn-request"
-                            onClick={() => handleRequestParts(m)}
-                            style={{ backgroundColor: '#2196F3' }}
-                          >
-                            Request Parts
-                          </button>
-                        </>
-                      ) : (
-                        <span className="status-complete">✓ Checked Out</span>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Parked Vehicles Tab */}
-        {activeTab === 'parked' && (
-          <div className="tab-content">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>SO #</th>
-                  <th>Customer</th>
-                  <th>Plate</th>
-                  <th>Slot</th>
-                  <th>Zone</th>
-                  <th>Parked At</th>
-                  <th>Duration (hrs)</th>
-                  <th>Fee</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {parkedVehicles.length === 0 ? (
-                  <tr><td colSpan="9" style={{ textAlign: 'center' }}>No parked vehicles</td></tr>
-                ) : (
-                  parkedVehicles.map((p, idx) => (
-                    <tr key={idx}>
-                      <td>{p.so_no}</td>
-                      <td>{p.customer}</td>
-                      <td>{p.plate_no}</td>
-                      <td>{p.slot}</td>
-                      <td>{p.zone}</td>
-                      <td>{new Date(p.parked_at).toLocaleString()}</td>
-                      <td>{p.duration_hrs?.toFixed(1) || '-'}</td>
-                      <td>{formatMoney(p.fee)}</td>
-                      <td>
-                        <button 
-                          className="btn-action btn-release"
-                          onClick={() => handleReleaseParking(p)}
-                        >
-                          Release
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-          </div>
-        </div>
-
-      {/* Modals */}
-      {showMovementModal && (
-        <div className="modal-overlay" onClick={() => setShowMovementModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <h2>Start Vehicle Movement</h2>
-            <form>
-              <label>Movement Type:
-                <select 
-                  value={movementForm.movement_type}
-                  onChange={(e) => setMovementForm({...movementForm, movement_type: e.target.value})}
-                >
-                  <option value="check-in">Check-In</option>
-                  <option value="parking">Parking</option>
-                  <option value="retrieval">Retrieval</option>
-                  <option value="check-out">Check-Out</option>
-                </select>
-              </label>
-              <label>From Location:
-                <input 
-                  type="text"
-                  value={movementForm.from_location}
-                  onChange={(e) => setMovementForm({...movementForm, from_location: e.target.value})}
-                  placeholder="e.g., Service Bay"
-                />
-              </label>
-              <label>To Location:
-                <input 
-                  type="text"
-                  value={movementForm.to_location}
-                  onChange={(e) => setMovementForm({...movementForm, to_location: e.target.value})}
-                  placeholder="e.g., Parking Zone A"
-                />
-              </label>
-              <label>Vehicle Condition:
-                <input 
-                  type="text"
-                  value={movementForm.vehicle_condition}
-                  onChange={(e) => setMovementForm({...movementForm, vehicle_condition: e.target.value})}
-                  placeholder="e.g., Good, Excellent"
-                />
-              </label>
-              <label>Fuel Level (%):
-                <input 
-                  type="number"
-                  value={movementForm.fuel_level}
-                  onChange={(e) => setMovementForm({...movementForm, fuel_level: parseInt(e.target.value)})}
-                  min="0" max="100"
-                />
-              </label>
-              <label>Current Mileage:
-                <input 
-                  type="number"
-                  value={movementForm.mileage}
-                  onChange={(e) => setMovementForm({...movementForm, mileage: parseInt(e.target.value)})}
-                />
-              </label>
-              <div className="modal-buttons">
-                <button type="button" className="btn-cancel" onClick={() => setShowMovementModal(false)}>Cancel</button>
-                <button type="button" className="btn-submit" onClick={handleSubmitMovement}>Start Movement</button>
-              </div>
-            </form>
-          </div>
+      )}
+      {successMessage && (
+        <div className="alert alert-success" style={{ marginBottom: 'var(--spacing-6)' }}>
+          <span>✓</span>
+          <div>{successMessage}</div>
         </div>
       )}
 
-      {showCompleteModal && (
-        <div className="modal-overlay" onClick={() => setShowCompleteModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <h2>Complete Vehicle Movement</h2>
-            <form>
-              <label>Final Vehicle Condition:
+      <EnterpriseTabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+      
+      <div style={{ marginTop: '20px' }}>
+        {activeTab === 'pending' && (
+           <EnterpriseCard title="Pending Vehicles" subtitle="Vehicles waiting for movement">
+              {pendingVehicles.length > 0 ? (
+                 <EnterpriseTable columns={pendingColumns} data={pendingVehicles} />
+              ) : (
+                 <EmptyState icon="🚗" title="No Pending Vehicles" description="All vehicles have been processed" />
+              )}
+           </EnterpriseCard>
+        )}
+
+        {activeTab === 'active' && (
+           <EnterpriseCard title="Active Movements" subtitle="Ongoing vehicle movements">
+              {activeMovements.length > 0 ? (
+                 <EnterpriseTable columns={activeColumns} data={activeMovements} />
+              ) : (
+                 <EmptyState icon="🚙" title="No Active Movements" description="No vehicles are currently moving." />
+              )}
+           </EnterpriseCard>
+        )}
+
+        {activeTab === 'parked' && (
+           <EnterpriseCard title="Parked Vehicles" subtitle="Vehicles currently in parking">
+              {parkedVehicles.length > 0 ? (
+                 <EnterpriseTable columns={parkedColumns} data={parkedVehicles} />
+              ) : (
+                 <EmptyState icon="🅿️" title="No Parked Vehicles" description="Parking lot is empty." />
+              )}
+           </EnterpriseCard>
+        )}
+      </div>
+
+      {/* Modals */}
+      <Modal
+        isOpen={showMovementModal}
+        onClose={() => setShowMovementModal(false)}
+        title="Start Vehicle Movement"
+      >
+        <div className="p-3">
+          <EnterpriseFormGroup label="Movement Type">
+            <select 
+              value={movementForm.movement_type}
+              onChange={(e) => setMovementForm({...movementForm, movement_type: e.target.value})}
+              className="enterprise-select"
+            >
+              <option value="check-in">Check-In</option>
+              <option value="parking">Parking</option>
+              <option value="retrieval">Retrieval</option>
+              <option value="check-out">Check-Out</option>
+            </select>
+          </EnterpriseFormGroup>
+
+          <EnterpriseFormGroup label="From Location">
+            <input 
+              type="text"
+              value={movementForm.from_location}
+              onChange={(e) => setMovementForm({...movementForm, from_location: e.target.value})}
+              placeholder="e.g., Service Bay"
+              className="enterprise-input"
+            />
+          </EnterpriseFormGroup>
+
+          <EnterpriseFormGroup label="To Location">
+            <input 
+              type="text"
+              value={movementForm.to_location}
+              onChange={(e) => setMovementForm({...movementForm, to_location: e.target.value})}
+              placeholder="e.g., Parking Zone A"
+              className="enterprise-input"
+            />
+          </EnterpriseFormGroup>
+
+          <EnterpriseFormGroup label="Vehicle Condition">
+            <input 
+              type="text"
+              value={movementForm.vehicle_condition}
+              onChange={(e) => setMovementForm({...movementForm, vehicle_condition: e.target.value})}
+              placeholder="e.g., Good, Excellent"
+              className="enterprise-input"
+            />
+          </EnterpriseFormGroup>
+
+          <div className="grid-2-col">
+            <EnterpriseFormGroup label="Fuel Level (%)">
+              <input 
+                type="number"
+                value={movementForm.fuel_level}
+                onChange={(e) => setMovementForm({...movementForm, fuel_level: parseInt(e.target.value)})}
+                min="0" max="100"
+                className="enterprise-input"
+              />
+            </EnterpriseFormGroup>
+            <EnterpriseFormGroup label="Current Mileage">
+              <input 
+                type="number"
+                value={movementForm.mileage}
+                onChange={(e) => setMovementForm({...movementForm, mileage: parseInt(e.target.value)})}
+                className="enterprise-input"
+              />
+            </EnterpriseFormGroup>
+          </div>
+          
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+            <EnterpriseButton variant="secondary" onClick={() => setShowMovementModal(false)}>Cancel</EnterpriseButton>
+            <EnterpriseButton variant="primary" onClick={handleSubmitMovement}>Start Movement</EnterpriseButton>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={showCompleteModal}
+        onClose={() => setShowCompleteModal(false)}
+        title="Complete Vehicle Movement"
+      >
+        <div className="p-3">
+          <form>
+            <EnterpriseFormGroup label="Final Vehicle Condition">
+              <input 
+                className="enterprise-input"
+                type="text"
+                value={completeForm.vehicle_condition}
+                onChange={(e) => setCompleteForm({...completeForm, vehicle_condition: e.target.value})}
+              />
+            </EnterpriseFormGroup>
+            
+            <div className="grid-2-col">
+              <EnterpriseFormGroup label="Final Fuel Level (%)">
                 <input 
-                  type="text"
-                  value={completeForm.vehicle_condition}
-                  onChange={(e) => setCompleteForm({...completeForm, vehicle_condition: e.target.value})}
-                />
-              </label>
-              <label>Final Fuel Level (%):
-                <input 
+                  className="enterprise-input"
                   type="number"
                   value={completeForm.fuel_level}
                   onChange={(e) => setCompleteForm({...completeForm, fuel_level: parseInt(e.target.value)})}
                   min="0" max="100"
                 />
-              </label>
-              <label>Final Mileage:
+              </EnterpriseFormGroup>
+              <EnterpriseFormGroup label="Final Mileage">
                 <input 
+                  className="enterprise-input"
                   type="number"
                   value={completeForm.mileage}
                   onChange={(e) => setCompleteForm({...completeForm, mileage: parseInt(e.target.value)})}
                 />
-              </label>
-              <label>Notes:
-                <textarea 
-                  value={completeForm.notes}
-                  onChange={(e) => setCompleteForm({...completeForm, notes: e.target.value})}
-                  rows="3"
-                />
-              </label>
-              <div className="modal-buttons">
-                <button type="button" className="btn-cancel" onClick={() => setShowCompleteModal(false)}>Cancel</button>
-                <button type="button" className="btn-submit" onClick={handleSubmitComplete}>Complete Movement</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+              </EnterpriseFormGroup>
+            </div>
 
-      {showParkingModal && (
-        <div className="modal-overlay" onClick={() => setShowParkingModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <h2>Park Vehicle</h2>
-            <form>
-              <label>Parking Slot:
+            <EnterpriseFormGroup label="Notes">
+              <textarea 
+                className="enterprise-textarea"
+                value={completeForm.notes}
+                onChange={(e) => setCompleteForm({...completeForm, notes: e.target.value})}
+                rows="3"
+              />
+            </EnterpriseFormGroup>
+
+            <div className="modal-buttons">
+              <EnterpriseButton variant="secondary" onClick={() => setShowCompleteModal(false)}>Cancel</EnterpriseButton>
+              <EnterpriseButton variant="primary" onClick={handleSubmitComplete}>Complete Movement</EnterpriseButton>
+            </div>
+          </form>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={showParkingModal}
+        onClose={() => setShowParkingModal(false)}
+        title="Park Vehicle"
+      >
+        <div className="p-3">
+          <form>
+            <div className="grid-2-col">
+              <EnterpriseFormGroup label="Parking Slot">
                 <input 
+                  className="enterprise-input"
                   type="text"
                   value={parkingForm.parking_slot}
                   onChange={(e) => setParkingForm({...parkingForm, parking_slot: e.target.value})}
                   placeholder="e.g., A01"
                 />
-              </label>
-              <label>Zone:
+              </EnterpriseFormGroup>
+              <EnterpriseFormGroup label="Zone">
                 <select 
+                  className="enterprise-select"
                   value={parkingForm.parking_zone}
                   onChange={(e) => setParkingForm({...parkingForm, parking_zone: e.target.value})}
                 >
@@ -741,17 +678,22 @@ export default function CarJockeyDashboard({ user, onLogout }) {
                   <option value="C">Zone C</option>
                   <option value="VIP">VIP</option>
                 </select>
-              </label>
-              <label>Parking Level:
+              </EnterpriseFormGroup>
+            </div>
+
+            <div className="grid-2-col">
+              <EnterpriseFormGroup label="Parking Level">
                 <input 
+                  className="enterprise-input"
                   type="number"
                   value={parkingForm.parking_level}
                   onChange={(e) => setParkingForm({...parkingForm, parking_level: parseInt(e.target.value)})}
                   min="0"
                 />
-              </label>
-              <label>Ground Condition:
+              </EnterpriseFormGroup>
+              <EnterpriseFormGroup label="Ground Condition">
                 <select 
+                  className="enterprise-select"
                   value={parkingForm.ground_condition}
                   onChange={(e) => setParkingForm({...parkingForm, ground_condition: e.target.value})}
                 >
@@ -759,167 +701,140 @@ export default function CarJockeyDashboard({ user, onLogout }) {
                   <option value="wet">Wet</option>
                   <option value="damaged">Damaged</option>
                 </select>
-              </label>
-              <label>Parking Fee (₱):
-                <input 
-                  type="number"
-                  value={parkingForm.parking_fee}
-                  onChange={(e) => setParkingForm({...parkingForm, parking_fee: parseFloat(e.target.value) || 0})}
-                  min="0" step="0.01"
-                />
-              </label>
-              <div className="modal-buttons">
-                <button type="button" className="btn-cancel" onClick={() => setShowParkingModal(false)}>Cancel</button>
-                <button type="button" className="btn-submit" onClick={handleSubmitParking}>Park Vehicle</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {showReleaseModal && (
-        <div className="modal-overlay" onClick={() => setShowReleaseModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <h2>Release Vehicle from Parking</h2>
-            <p>Are you sure you want to release <strong>{selectedVehicle?.plate_no}</strong> from parking?</p>
-            <div className="modal-buttons">
-              <button type="button" className="btn-cancel" onClick={() => setShowReleaseModal(false)}>Cancel</button>
-              <button type="button" className="btn-submit" onClick={handleSubmitRelease}>Confirm Release</button>
+              </EnterpriseFormGroup>
             </div>
+
+            <EnterpriseFormGroup label="Parking Fee (₱)">
+              <input 
+                className="enterprise-input"
+                type="number"
+                value={parkingForm.parking_fee}
+                onChange={(e) => setParkingForm({...parkingForm, parking_fee: parseFloat(e.target.value) || 0})}
+                min="0" step="0.01"
+              />
+            </EnterpriseFormGroup>
+            
+            <div className="modal-buttons">
+              <EnterpriseButton variant="secondary" onClick={() => setShowParkingModal(false)}>Cancel</EnterpriseButton>
+              <EnterpriseButton variant="primary" onClick={handleSubmitParking}>Park Vehicle</EnterpriseButton>
+            </div>
+          </form>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={showReleaseModal}
+        onClose={() => setShowReleaseModal(false)}
+        title="Release Vehicle from Parking"
+      >
+        <div className="p-3">
+          <p className="mb-4">Are you sure you want to release <strong>{selectedVehicle?.plate_no}</strong> from parking?</p>
+          <div className="modal-buttons">
+            <EnterpriseButton variant="secondary" onClick={() => setShowReleaseModal(false)}>Cancel</EnterpriseButton>
+            <EnterpriseButton variant="primary" onClick={handleSubmitRelease}>Confirm Release</EnterpriseButton>
           </div>
         </div>
-      )}
+      </Modal>
 
-      {showPartsRequestModal && (
-        <div className="modal-overlay" onClick={() => setShowPartsRequestModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px', maxHeight: '80vh', overflowY: 'auto' }}>
-            <h2>Request Parts from Warehouse</h2>
-            <p style={{ color: '#666', marginBottom: '15px' }}>
-              Service Order: <strong>{selectedVehicle?.so_id}</strong> | Plate: <strong>{selectedVehicle?.plate_no}</strong>
-            </p>
-            <form style={{ marginBottom: '20px' }}>
-              <div style={{ marginBottom: '15px', padding: '15px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '2px solid #ddd' }}>
-                      <th style={{ textAlign: 'left', padding: '8px', fontWeight: 'bold' }}>Product</th>
-                      <th style={{ textAlign: 'left', padding: '8px', fontWeight: 'bold', width: '100px' }}>Qty</th>
-                      <th style={{ textAlign: 'center', padding: '8px', width: '50px' }}>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {partsRequestForm.items.map((item, index) => (
-                      <tr key={index} style={{ borderBottom: '1px solid #eee' }}>
-                        <td style={{ padding: '10px' }}>
-                          <select
-                            value={item.product_id}
-                            onChange={(e) => handlePartsItemChange(index, 'product_id', e.target.value)}
-                            style={{
-                              width: '100%',
-                              padding: '8px',
-                              border: '1px solid #ddd',
-                              borderRadius: '4px',
-                              fontFamily: 'inherit',
-                              fontSize: 'inherit'
-                            }}
+      <Modal
+        isOpen={showPartsRequestModal}
+        onClose={() => setShowPartsRequestModal(false)}
+        title="Request Parts from Warehouse"
+      >
+        <div className="p-3">
+          <p className="text-secondary mb-4">
+            Service Order: <strong>{selectedVehicle?.so_id}</strong> | Plate: <strong>{selectedVehicle?.plate_no}</strong>
+          </p>
+          <form className="mb-4">
+            <div className="bg-secondary p-3 rounded mb-3 border border-primary">
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border-primary)' }}>
+                    <th className="text-left p-2 font-medium">Product</th>
+                    <th className="text-left p-2 font-medium" style={{ width: '100px' }}>Qty</th>
+                    <th className="text-center p-2" style={{ width: '50px' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {partsRequestForm.items.map((item, index) => (
+                    <tr key={index} style={{ borderBottom: '1px solid var(--border-primary)' }}>
+                      <td className="p-2">
+                        <select
+                          className="enterprise-select w-full"
+                          value={item.product_id}
+                          onChange={(e) => handlePartsItemChange(index, 'product_id', e.target.value)}
+                        >
+                          <option value="">-- Select Product --</option>
+                          {warehouseInventory.map((product, i) => (
+                            <option key={i} value={product.product_id}>
+                              {product.product_code} - {product.description} (Stock: {product.quantity_in_stock})
+                            </option>
+                          ))}
+                        </select>
+                        {item.product_code && (
+                          <div className="text-xs text-secondary mt-1">
+                            Code: {item.product_code}
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-2">
+                        <input
+                          type="number"
+                          className="enterprise-input w-full"
+                          value={item.quantity}
+                          onChange={(e) => handlePartsItemChange(index, 'quantity', e.target.value)}
+                          min="1"
+                        />
+                      </td>
+                      <td className="p-2 text-center">
+                        {partsRequestForm.items.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePartsItem(index)}
+                            className="text-error hover:text-error-dark"
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px' }}
                           >
-                            <option value="">-- Select Product --</option>
-                            {warehouseInventory.map((product, i) => (
-                              <option key={i} value={product.product_id}>
-                                {product.product_code} - {product.description} (Stock: {product.quantity_in_stock})
-                              </option>
-                            ))}
-                          </select>
-                          {item.product_code && (
-                            <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
-                              Code: {item.product_code}
-                            </div>
-                          )}
-                        </td>
-                        <td style={{ padding: '10px' }}>
-                          <input
-                            type="number"
-                            value={item.quantity}
-                            onChange={(e) => handlePartsItemChange(index, 'quantity', e.target.value)}
-                            min="1"
-                            style={{
-                              width: '80px',
-                              padding: '8px',
-                              border: '1px solid #ddd',
-                              borderRadius: '4px',
-                              fontFamily: 'inherit',
-                              fontSize: 'inherit'
-                            }}
-                          />
-                        </td>
-                        <td style={{ textAlign: 'center', padding: '10px' }}>
-                          {partsRequestForm.items.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemovePartsItem(index)}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                color: '#f44336',
-                                cursor: 'pointer',
-                                fontSize: '18px',
-                                padding: '0'
-                              }}
-                            >
-                              ✕
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                            ✕
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-              <button
-                type="button"
-                onClick={handleAddPartsItem}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#4CAF50',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  marginBottom: '20px',
-                  fontFamily: 'inherit',
-                  fontSize: 'inherit'
-                }}
+            <EnterpriseButton
+              type="button"
+              variant="success"
+              onClick={handleAddPartsItem}
+              className="mb-4"
+            >
+              + Add Item
+            </EnterpriseButton>
+
+            <div className="modal-buttons">
+              <EnterpriseButton 
+                variant="secondary" 
+                onClick={() => setShowPartsRequestModal(false)}
               >
-                + Add Item
-              </button>
-
-              <div className="modal-buttons">
-                <button 
-                  type="button" 
-                  className="btn-cancel" 
-                  onClick={() => setShowPartsRequestModal(false)}
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="button" 
-                  className="btn-submit" 
-                  onClick={handleSubmitPartsRequest}
-                >
-                  Submit Request to Job Controller
-                </button>
-              </div>
-            </form>
-          </div>
+                Cancel
+              </EnterpriseButton>
+              <EnterpriseButton 
+                variant="primary" 
+                onClick={handleSubmitPartsRequest}
+              >
+                Submit Request to Job Controller
+              </EnterpriseButton>
+            </div>
+          </form>
         </div>
-      )}
+      </Modal>
 
         {/* Footer */}
         <div className="dashboard-footer">
           <p>*Rapide Services - Car Jockey Module | {new Date().toLocaleDateString()}</p>
         </div>
-      </div>
-    </div>
+      </ModuleLayout>
   );
 }

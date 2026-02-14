@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { fetchJson } from '../utils/fetchJson';
+import { EnterpriseCard, FormGroup } from './EnterpriseComponents';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = '/api';
 
 export default function AppointmentSetting() {
   const [formData, setFormData] = useState({
@@ -91,14 +92,10 @@ export default function AppointmentSetting() {
   };
 
   return (
-    <div className="appointment-section">
-      <h3>📅 Contact & Appointment Setting</h3>
-
-      <div className="card">
+    <EnterpriseCard title="New Appointment" subtitle="Schedule maintenance or repair for a customer">
         <form onSubmit={handleSubmit}>
-          <div className="grid grid-2">
-            <div className="form-group">
-              <label className="form-label">Customer ID</label>
+          <div className="dashboard-grid dashboard-grid-2">
+            <FormGroup label="Customer ID" required>
               <input
                 type="number"
                 className="form-input"
@@ -108,10 +105,9 @@ export default function AppointmentSetting() {
                 placeholder="Enter customer ID"
                 required
               />
-            </div>
+            </FormGroup>
 
-            <div className="form-group">
-              <label className="form-label">Preferred Date</label>
+            <FormGroup label="Preferred Date" required>
               <input
                 type="date"
                 className="form-input"
@@ -120,12 +116,9 @@ export default function AppointmentSetting() {
                 onChange={handleDateTimeChange}
                 required
               />
-            </div>
-          </div>
+            </FormGroup>
 
-          <div className="grid grid-2">
-            <div className="form-group">
-              <label className="form-label">Preferred Time</label>
+            <FormGroup label="Preferred Time" required>
               <input
                 type="time"
                 className="form-input"
@@ -134,12 +127,11 @@ export default function AppointmentSetting() {
                 onChange={handleDateTimeChange}
                 required
               />
-            </div>
+            </FormGroup>
 
-            <div className="form-group">
-              <label className="form-label">Service Bay</label>
+            <FormGroup label="Service Bay" required>
               <select
-                className="form-select"
+                className="form-input"
                 name="bay_id"
                 value={formData.bay_id}
                 onChange={(e) => setFormData({...formData, bay_id: e.target.value})}
@@ -152,14 +144,11 @@ export default function AppointmentSetting() {
                   </option>
                 ))}
               </select>
-            </div>
-          </div>
+            </FormGroup>
 
-          <div className="grid grid-2">
-            <div className="form-group">
-              <label className="form-label">Technician</label>
+            <FormGroup label="Technician" required>
               <select
-                className="form-select"
+                className="form-input"
                 name="technician_id"
                 value={formData.technician_id}
                 onChange={(e) => setFormData({...formData, technician_id: e.target.value})}
@@ -172,12 +161,11 @@ export default function AppointmentSetting() {
                   </option>
                 ))}
               </select>
-            </div>
+            </FormGroup>
 
-            <div className="form-group">
-              <label className="form-label">Service Advisor</label>
+            <FormGroup label="Service Advisor" required>
               <select
-                className="form-select"
+                className="form-input"
                 name="advisor_id"
                 value={formData.advisor_id}
                 onChange={(e) => setFormData({...formData, advisor_id: e.target.value})}
@@ -190,16 +178,16 @@ export default function AppointmentSetting() {
                   </option>
                 ))}
               </select>
-            </div>
+            </FormGroup>
           </div>
 
-          <div className="flex gap-10">
-            <button type="submit" className="btn btn-success">
-              ✓ Create Scheduling Order
+          <div style={{ marginTop: 'var(--spacing-6)', display: 'flex', gap: 'var(--spacing-3)' }}>
+            <button type="submit" className="btn-enterprise btn-primary">
+              Create Schedule
             </button>
             <button
               type="button"
-              className="btn btn-outline"
+              className="btn-enterprise btn-secondary"
               onClick={() =>
                 setFormData({
                   customer_id: '',
@@ -215,7 +203,6 @@ export default function AppointmentSetting() {
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </EnterpriseCard>
   );
 }

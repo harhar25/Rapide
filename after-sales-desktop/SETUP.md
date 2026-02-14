@@ -1,55 +1,53 @@
 # After-Sales Desktop Application - Setup Guide
 
 ## Prerequisites
-- **Python 3.8+**
-- **Node.js 14+** and npm
-- **MySQL 5.7+** (via XAMPP)
-- **XAMPP** running on your system
+- **Node.js (v20+)** and npm
+- **Cloudflare account** (Workers + D1)
+- **Wrangler CLI** (installed automatically via devDependencies)
 
 ## Quick Start
 
-### 1. Start XAMPP
-- Open XAMPP Control Panel
-- Start **Apache** and **MySQL** services
-
-### 2. Create Database
+### 1. Install dependencies
 ```bash
-# Connect to MySQL
-mysql -u root
+cd worker
+npm install
 
-# Run schema
-mysql -u root < database/schema.sql
-
-# Verify
-mysql -u root -e "USE after_sales_db; SHOW TABLES;"
-```
-
-### 3. Install Backend Dependencies
-```bash
-cd backend
-pip install -r requirements.txt
-```
-
-### 4. Run Backend Server
-```bash
-python run.py
-```
-
-Backend runs on: `http://localhost:5000`
-
-### 5. Install Frontend Dependencies
-```bash
 cd frontend
 npm install
 ```
 
-### 6. Run Frontend (Development)
+### 2. Configure API base (cloud Worker)
+
+Your deployed Worker is:
+
+`https://rapide-api.rapideph.workers.dev`
+
+The frontend uses `VITE_API_BASE` for all `/api/*` calls.
+
+- Development: `frontend/.env.development`
+- Production: `frontend/.env.production`
+
+### 3. Run the app (Development)
+
+Start the Electron + React dev stack:
+
 ```bash
-npm start
+cd frontend
+npm run dev
 ```
 
-### 7. Build for Production
+### 4. Deploy the Worker (cloud)
+
+Deploy:
+
 ```bash
+cd worker
+npx wrangler deploy
+```
+
+### 5. Build for Production
+```bash
+cd frontend
 npm run build
 npm run electron-build
 ```
@@ -102,16 +100,7 @@ npm run electron-build
 ## Project Structure
 ```
 after-sales-desktop/
-├── backend/
-│   ├── app/
-│   │   ├── routes/        # API endpoints
-│   │   ├── services/      # Business logic
-│   │   ├── models/        # Data models
-│   ├── config.py          # Configuration
-│   ├── database.py        # Database connection
-│   ├── requirements.txt
-│   └── run.py            # Server entry point
-│
+├── worker/                # Cloudflare Worker API (D1)
 ├── frontend/
 │   ├── public/           # Static assets
 │   ├── src/

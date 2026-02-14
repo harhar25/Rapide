@@ -27,6 +27,18 @@
     box-sizing: border-box;
 }
 
+/* Hide all scrollbars globally */
+::-webkit-scrollbar {
+    width: 0px;
+    height: 0px;
+    display: none;
+}
+
+* {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+
 html, body, #root {
     height: 100%;
     width: 100%;

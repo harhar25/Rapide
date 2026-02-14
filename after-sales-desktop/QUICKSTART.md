@@ -2,16 +2,10 @@
 
 ## One-Command Start (After initial setup)
 
-### Terminal 1 - Backend
-```bash
-cd backend
-python run.py
-```
-
-### Terminal 2 - Frontend
+### Terminal - Dev stack (Worker + React + Electron)
 ```bash
 cd frontend
-npm start
+npm run dev
 ```
 
 ## Default Credentials
@@ -49,21 +43,29 @@ The database includes sample data:
 
 ## Key Endpoints to Test
 
+All UI calls go to `/api/*`. The base URL is controlled by `VITE_API_BASE`.
+
+Deployed Worker URL (current):
+
+```text
+https://rapide-api.rapideph.workers.dev
+```
+
 ### Get PMS Due List
 ```bash
-curl http://localhost:5000/api/customer/pms-due-list
+curl https://rapide-api.rapideph.workers.dev/api/customer/pms-due-list
 ```
 
 ### Search Customer
 ```bash
-curl -X POST http://localhost:5000/api/customer/search \
+curl -X POST https://rapide-api.rapideph.workers.dev/api/customer/search \
   -H "Content-Type: application/json" \
   -d '{"search_type":"plate","search_value":"ABC-1234"}'
 ```
 
 ### Check Availability
 ```bash
-curl -X POST http://localhost:5000/api/scheduler/check-availability \
+curl -X POST https://rapide-api.rapideph.workers.dev/api/scheduler/check-availability \
   -H "Content-Type: application/json" \
   -d '{"date":"2025-12-20","time":"09:00:00"}'
 ```

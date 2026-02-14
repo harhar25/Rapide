@@ -1,9 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import '../styles/follow-up-dashboard.css';
+import React, { useState, useEffect, useCallback } from 'react';
 import '../styles/enterprise-ui.css';
 import '../styles/dashboard-common.css';
 import { fetchJson } from '../utils/fetchJson';
-import { StatCard, EnterpriseCard, StatusBadge, EnterpriseTabs, LoadingSpinner, EmptyState } from '../components/EnterpriseComponents';
+import { useAutoRefresh } from '../hooks/useRealtimeUpdates';
+import { 
+  ModuleLayout, 
+  EnterpriseTable, 
+  EnterpriseButton, 
+  EnterpriseFormGroup, 
+  EnterpriseCard, 
+  EnterpriseTabs, 
+  StatCard as StatsCard, 
+  StatusBadge, 
+  EmptyState, 
+  LoadingSpinner 
+} from '../components/EnterpriseComponents';
 
 export default function FollowUpDashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('pending');
@@ -32,9 +43,16 @@ export default function FollowUpDashboard({ user, onLogout }) {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 60000); // Refresh every 60 seconds
+    const interval = setInterval(fetchData, 3000); // Refresh every 3s
     return () => clearInterval(interval);
   }, []);
+
+  // --- REAL-TIME UPDATES ---
+  const handleRealtimeUpdate = useCallback(() => {
+    fetchData();
+  }, []);
+
+  useAutoRefresh(['follow-up', 'vehicle-handover'], handleRealtimeUpdate);
 
   const fetchData = async () => {
     try {
@@ -199,314 +217,344 @@ export default function FollowUpDashboard({ user, onLogout }) {
     }
   };
 
+  const pendingColumns = [
+    { label: 'ID', render: (_, row) => row[0] },
+    { label: 'Service Order', render: (_, row) => `SO-${row[1]}` },
+    { label: 'Date', render: (_, row) => row[3]?.substring(0, 10) || 'N/A' },
+    { label: 'Contact Method', render: (_, row) => row[5] },
+    { label: 'Feedback', render: (_, row) => (
+      <StatusBadge status={row[7] ? 'success' : 'neutral'}>
+        {row[7] ? 'Received' : 'Pending'}
+      </StatusBadge>
+    )},
+    { label: 'Issues', render: (_, row) => (
+      <StatusBadge status={row[8] ? 'warning' : 'success'}>
+        {row[8] ? 'Reported' : 'None'}
+      </StatusBadge>
+    )},
+    { label: 'Action', render: (_, row) => (
+      <EnterpriseButton 
+        variant="neutral" 
+        size="small"
+        onClick={() => {
+          handleSelectFollowup(row[0]);
+          setActiveTab('process');
+        }}
+      >
+        View
+      </EnterpriseButton>
+    )}
+  ];
+
+  const issuesColumns = [
+    { label: 'ID', render: (_, row) => row[0] },
+    { label: 'Category', render: (_, row) => row[2] },
+    { label: 'Description', render: (_, row) => row[3]?.substring(0, 50) || 'N/A' },
+    { label: 'Severity', render: (_, row) => (
+      <StatusBadge status={row[4] === 'critical' ? 'danger' : row[4] === 'high' ? 'warning' : row[4] === 'medium' ? 'neutral' : 'success'}>
+        {row[4]}
+      </StatusBadge>
+    )},
+    { label: 'Status', render: (_, row) => (
+      <StatusBadge status={row[5] === 'resolved' ? 'success' : 'warning'}>
+        {row[5]}
+      </StatusBadge>
+    )},
+    { label: 'Action', render: (_, row) => row[5] !== 'resolved' && (
+      <EnterpriseButton 
+        variant="secondary" 
+        size="small"
+        onClick={() => handleResolveIssue(row[0])}
+      >
+        Resolve
+      </EnterpriseButton>
+    )}
+  ];
+
   return (
-    <div className="followup-container">
-      <div className="fu-header">
-        <div className="fu-title">
-          📞 Customer Follow-Up Management
-        </div>
-        <div className="fu-user-info">
-          <span>{user.name} ({user.role})</span>
-          {user.role !== 'admin' && (
-            <button onClick={onLogout} className="logout-btn">Logout</button>
+    <ModuleLayout
+      title="Follow-Up & QA"
+      description="Customer Feedback & Quality Assurance"
+      icon="📞"
+      user={user}
+      onLogout={onLogout}
+      actions={
+        (activeTab === 'pending' || activeTab === 'issues') && (
+            <EnterpriseButton onClick={fetchData} variant="secondary">
+                Refresh
+            </EnterpriseButton>
+        )
+      }
+    >
+      <div className="followup-dashboard-content" style={{ padding: '0' }}>
+        {summary && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+            <StatsCard 
+              label="Pending Follow-ups" 
+              value={summary.by_status?.filter(s => s[1] === 'pending')[0]?.[0] || 0} 
+              icon="🕒"
+            />
+            <StatsCard 
+              label="Completed Today" 
+              value={summary.by_status?.filter(s => s[1] === 'completed')[0]?.[0] || 0} 
+              trend="positive" 
+              icon="✓"
+            />
+            <StatsCard 
+              label="Open Issues" 
+              value={summary.issues_by_status?.filter(s => s[1] === 'open')[0]?.[0] || 0} 
+              trend="negative" 
+              icon="⚠"
+            />
+            <StatsCard 
+              label="Resolved Issues" 
+              value={summary.issues_by_status?.filter(s => s[1] === 'resolved')[0]?.[0] || 0} 
+              trend="positive" 
+              icon="🛡️"
+            />
+          </div>
+        )}
+
+        <EnterpriseTabs
+          tabs={[
+            { id: 'pending', label: 'Pending Follow-ups', icon: '🕒' },
+            { id: 'process', label: 'Process Follow-up', icon: '⚙️' },
+            { id: 'issues', label: 'Issues Management', icon: '⚠' },
+            { id: 'create', label: 'Create Follow-up', icon: '➕' }
+          ]}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+        />
+
+        <div style={{ marginTop: '1.5rem' }}>
+          {activeTab === 'pending' && (
+            <div className="tab-content">
+              <h2 style={{ marginBottom: '1rem', marginTop: 0 }}>Pending Follow-ups</h2>
+              <EnterpriseTable 
+                columns={pendingColumns} 
+                data={pendingFollowups} 
+                emptyState={
+                  <EmptyState 
+                    title="No Pending Follow-ups" 
+                    description="Great job! All follow-ups are clear." 
+                  />
+                }
+              />
+            </div>
+          )}
+
+          {activeTab === 'process' && (
+            <div className="tab-content">
+              <h2 style={{ marginBottom: '1rem', marginTop: 0 }}>Process Follow-up</h2>
+              {!selectedFollowup ? (
+                <EmptyState 
+                  title="No Follow-up Selected" 
+                  description="Select a pending follow-up from the Pending tab to process." 
+                  icon="👆"
+                />
+              ) : !followupDetails ? (
+                <LoadingSpinner />
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  <EnterpriseCard title="Follow-up Information">
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', padding: '1rem' }}>
+                      <div className="info-group">
+                        <label style={{ display: 'block', color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>Service Order</label>
+                        <div style={{ fontWeight: 500 }}>SO-{followupDetails.followup[1]}</div>
+                      </div>
+                      <div className="info-group">
+                        <label style={{ display: 'block', color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>Date</label>
+                        <div style={{ fontWeight: 500 }}>{followupDetails.followup[3]}</div>
+                      </div>
+                      <div className="info-group">
+                        <label style={{ display: 'block', color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>Status</label>
+                        <div><StatusBadge status={followupDetails.followup[9]} /></div>
+                      </div>
+                    </div>
+                  </EnterpriseCard>
+
+                  <EnterpriseCard title="Customer Feedback">
+                    {followupDetails.feedback ? (
+                      <div style={{ padding: '1rem' }}>
+                        <div><strong>Overall Experience:</strong> {followupDetails.feedback[5]}/5</div>
+                        <div><strong>Would Recommend:</strong> {followupDetails.feedback[6]}</div>
+                        <div style={{ marginTop: '0.5rem' }}><strong>Comments:</strong> {followupDetails.feedback[7]}</div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem' }}>
+                        <EnterpriseFormGroup label="Overall Experience (1-5)">
+                          <input 
+                            type="number" 
+                            min="1" 
+                            max="5"
+                            className="enterprise-input"
+                            value={feedback.overall_experience}
+                            onChange={(e) => setFeedback({ ...feedback, overall_experience: parseInt(e.target.value) })}
+                          />
+                        </EnterpriseFormGroup>
+                        <EnterpriseFormGroup label="Would Recommend">
+                          <select 
+                            className="enterprise-select"
+                            value={feedback.would_recommend}
+                            onChange={(e) => setFeedback({ ...feedback, would_recommend: e.target.value })}
+                          >
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                            <option value="maybe">Maybe</option>
+                          </select>
+                        </EnterpriseFormGroup>
+                        <EnterpriseFormGroup label="Comments">
+                          <textarea 
+                            className="enterprise-textarea"
+                            value={feedback.comments}
+                            onChange={(e) => setFeedback({ ...feedback, comments: e.target.value })}
+                            placeholder="Customer feedback comments"
+                            rows={3}
+                          />
+                        </EnterpriseFormGroup>
+                        <div>
+                          <EnterpriseButton onClick={handleRecordFeedback}>Record Feedback</EnterpriseButton>
+                        </div>
+                      </div>
+                    )}
+                  </EnterpriseCard>
+
+                  <EnterpriseCard title="Issues">
+                    <div style={{ padding: '1rem' }}>
+                      {followupDetails.issues && followupDetails.issues.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
+                          {followupDetails.issues.map((issue, idx) => (
+                            <div key={idx} style={{ padding: '0.75rem', border: '1px solid var(--color-border)', borderRadius: '4px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <strong>{issue[2]}</strong>
+                                <StatusBadge status={issue[4]}>{issue[4]}</StatusBadge>
+                              </div>
+                              <div style={{ color: 'var(--color-text-secondary)' }}>{issue[3]}</div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ marginBottom: '1.5rem', fontStyle: 'italic', color: 'var(--color-text-secondary)' }}>No issues reported</div>
+                      )}
+                      
+                      <h4 style={{ margin: '0 0 1rem 0' }}>Log New Issue</h4>
+                      <div style={{ display: 'grid', gap: '1rem' }}>
+                        <EnterpriseFormGroup label="Category">
+                          <select 
+                            className="enterprise-select"
+                            value={newIssue.category}
+                            onChange={(e) => setNewIssue({ ...newIssue, category: e.target.value })}
+                          >
+                            <option value="quality">Quality</option>
+                            <option value="warranty">Warranty</option>
+                            <option value="damage">Damage</option>
+                            <option value="missing-parts">Missing Parts</option>
+                            <option value="delayed">Delayed</option>
+                            <option value="other">Other</option>
+                          </select>
+                        </EnterpriseFormGroup>
+                        <EnterpriseFormGroup label="Description">
+                          <textarea 
+                            className="enterprise-textarea"
+                            value={newIssue.description}
+                            onChange={(e) => setNewIssue({ ...newIssue, description: e.target.value })}
+                            placeholder="Issue description"
+                            rows={3}
+                          />
+                        </EnterpriseFormGroup>
+                        <EnterpriseFormGroup label="Severity">
+                          <select 
+                            className="enterprise-select"
+                            value={newIssue.severity}
+                            onChange={(e) => setNewIssue({ ...newIssue, severity: e.target.value })}
+                          >
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                            <option value="critical">Critical</option>
+                          </select>
+                        </EnterpriseFormGroup>
+                        <div>
+                          <EnterpriseButton onClick={handleLogIssue} variant="secondary">Log Issue</EnterpriseButton>
+                        </div>
+                      </div>
+                    </div>
+                  </EnterpriseCard>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '1rem', borderTop: '1px solid var(--color-border)' }}>
+                    <EnterpriseButton onClick={handleCompleteFollowup} variant="primary" size="large">Complete Follow-up</EnterpriseButton>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'issues' && (
+            <div className="tab-content">
+              <h2 style={{ marginBottom: '1rem', marginTop: 0 }}>Issues Management</h2>
+              <EnterpriseTable 
+                columns={issuesColumns} 
+                data={openIssues} 
+                emptyState={
+                  <EmptyState 
+                    title="No Open Issues" 
+                    description="No unresolved issues found." 
+                  />
+                }
+              />
+            </div>
+          )}
+
+          {activeTab === 'create' && (
+            <div className="tab-content">
+              <h2 style={{ marginBottom: '1rem', marginTop: 0 }}>Create New Follow-up</h2>
+              <EnterpriseCard title="New Follow-up Details">
+                <div style={{ maxWidth: '600px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <EnterpriseFormGroup label="Service Order ID" required>
+                    <input 
+                      className="enterprise-input"
+                      value={newFollowup.service_order_id}
+                      onChange={(e) => setNewFollowup({ ...newFollowup, service_order_id: e.target.value })}
+                      placeholder="Enter service order ID"
+                    />
+                  </EnterpriseFormGroup>
+                  <EnterpriseFormGroup label="Customer ID" required>
+                    <input 
+                      className="enterprise-input"
+                      value={newFollowup.customer_id}
+                      onChange={(e) => setNewFollowup({ ...newFollowup, customer_id: e.target.value })}
+                      placeholder="Enter customer ID"
+                    />
+                  </EnterpriseFormGroup>
+                  <EnterpriseFormGroup label="Follow-up Date" required>
+                    <input 
+                      type="date"
+                      className="enterprise-input"
+                      value={newFollowup.followup_date}
+                      onChange={(e) => setNewFollowup({ ...newFollowup, followup_date: e.target.value })}
+                    />
+                  </EnterpriseFormGroup>
+                  <EnterpriseFormGroup label="Contact Method">
+                    <select 
+                      className="enterprise-select"
+                      value={newFollowup.contact_method}
+                      onChange={(e) => setNewFollowup({ ...newFollowup, contact_method: e.target.value })}
+                    >
+                      <option value="phone">Phone</option>
+                      <option value="sms">SMS</option>
+                      <option value="email">Email</option>
+                      <option value="visit">In-person Visit</option>
+                    </select>
+                  </EnterpriseFormGroup>
+                  <div style={{ marginTop: '1rem' }}>
+                    <EnterpriseButton onClick={handleCreateFollowup} variant="primary">Create Follow-up</EnterpriseButton>
+                  </div>
+                </div>
+              </EnterpriseCard>
+            </div>
           )}
         </div>
       </div>
-
-      <div className="fu-summary">
-        {summary && (
-          <>
-            <div className="summary-card">
-              <div className="summary-value">{summary.by_status?.filter(s => s[1] === 'pending')[0]?.[0] || 0}</div>
-              <div className="summary-label">Pending Follow-ups</div>
-            </div>
-            <div className="summary-card success">
-              <div className="summary-value">{summary.by_status?.filter(s => s[1] === 'completed')[0]?.[0] || 0}</div>
-              <div className="summary-label">Completed Today</div>
-            </div>
-            <div className="summary-card warning">
-              <div className="summary-value">{summary.issues_by_status?.filter(s => s[1] === 'open')[0]?.[0] || 0}</div>
-              <div className="summary-label">Open Issues</div>
-            </div>
-            <div className="summary-card">
-              <div className="summary-value">{summary.issues_by_status?.filter(s => s[1] === 'resolved')[0]?.[0] || 0}</div>
-              <div className="summary-label">Resolved Issues</div>
-            </div>
-          </>
-        )}
-      </div>
-
-      <div className="fu-tabs">
-        <button className={`tab ${activeTab === 'pending' ? 'active' : ''}`} onClick={() => setActiveTab('pending')}>Pending Follow-ups</button>
-        <button className={`tab ${activeTab === 'process' ? 'active' : ''}`} onClick={() => setActiveTab('process')}>Process Follow-up</button>
-        <button className={`tab ${activeTab === 'issues' ? 'active' : ''}`} onClick={() => setActiveTab('issues')}>Issues Management</button>
-        <button className={`tab ${activeTab === 'create' ? 'active' : ''}`} onClick={() => setActiveTab('create')}>Create Follow-up</button>
-      </div>
-
-      <div className="fu-content">
-        {activeTab === 'pending' && (
-          <div className="tab-content">
-            <h2>Pending Follow-ups</h2>
-            <div className="actions">
-              <button onClick={fetchData} className="action-btn refresh">Refresh</button>
-            </div>
-            <div className="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Service Order</th>
-                    <th>Date</th>
-                    <th>Contact Method</th>
-                    <th>Feedback</th>
-                    <th>Issues</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pendingFollowups.map((fu, idx) => (
-                    <tr key={idx}>
-                      <td>{fu[0]}</td>
-                      <td>SO-{fu[1]}</td>
-                      <td>{fu[3]?.substring(0, 10) || 'N/A'}</td>
-                      <td>{fu[5]}</td>
-                      <td><span className={`badge ${fu[7] ? 'success' : ''}`}>{fu[7] ? '✓' : '✗'}</span></td>
-                      <td><span className={`badge ${fu[8] ? 'warning' : ''}`}>{fu[8] ? '⚠' : '✓'}</span></td>
-                      <td>
-                        <button onClick={() => handleSelectFollowup(fu[0])} className="action-btn">View</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'process' && (
-          <div className="tab-content">
-            <h2>Process Follow-up</h2>
-            {!selectedFollowup ? (
-              <div className="info-message">Select a pending follow-up to process</div>
-            ) : followupDetails ? (
-              <div className="followup-process">
-                <div className="section">
-                  <h3>Follow-up Information</h3>
-                  <div className="info-grid">
-                    <div><strong>Service Order:</strong> SO-{followupDetails.followup[1]}</div>
-                    <div><strong>Date:</strong> {followupDetails.followup[3]}</div>
-                    <div><strong>Status:</strong> <span className="badge">{followupDetails.followup[9]}</span></div>
-                  </div>
-                </div>
-
-                <div className="section">
-                  <h3>Customer Feedback</h3>
-                  {followupDetails.feedback ? (
-                    <div className="feedback-display">
-                      <div><strong>Overall Experience:</strong> {followupDetails.feedback[5]}/5</div>
-                      <div><strong>Would Recommend:</strong> {followupDetails.feedback[6]}</div>
-                      <div><strong>Comments:</strong> {followupDetails.feedback[7]}</div>
-                    </div>
-                  ) : (
-                    <form className="feedback-form">
-                      <div className="form-group">
-                        <label htmlFor="fu_overall_experience">Overall Experience (1-5)</label>
-                        <input 
-                          id="fu_overall_experience"
-                          name="overall_experience"
-                          type="number" 
-                          min="1" 
-                          max="5"
-                          value={feedback.overall_experience}
-                          onChange={(e) => setFeedback({ ...feedback, overall_experience: parseInt(e.target.value) })}
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label htmlFor="fu_would_recommend">Would Recommend</label>
-                        <select 
-                          id="fu_would_recommend"
-                          name="would_recommend"
-                          value={feedback.would_recommend}
-                          onChange={(e) => setFeedback({ ...feedback, would_recommend: e.target.value })}
-                        >
-                          <option value="yes">Yes</option>
-                          <option value="no">No</option>
-                          <option value="maybe">Maybe</option>
-                        </select>
-                      </div>
-                      <div className="form-group">
-                        <label htmlFor="fu_feedback_comments">Comments</label>
-                        <textarea 
-                          id="fu_feedback_comments"
-                          name="comments"
-                          value={feedback.comments}
-                          onChange={(e) => setFeedback({ ...feedback, comments: e.target.value })}
-                          placeholder="Customer feedback comments"
-                        />
-                      </div>
-                      <button type="button" onClick={handleRecordFeedback} className="action-btn">Record Feedback</button>
-                    </form>
-                  )}
-                </div>
-
-                <div className="section">
-                  <h3>Issues</h3>
-                  {followupDetails.issues && followupDetails.issues.length > 0 ? (
-                    <div className="issues-list">
-                      {followupDetails.issues.map((issue, idx) => (
-                        <div key={idx} className="issue-card">
-                          <div><strong>{issue[2]}</strong> - {issue[4]}</div>
-                          <div>{issue[3]}</div>
-                          <div><span className={`severity-badge ${issue[4]}`}>{issue[4]}</span></div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="info-message">No issues reported</div>
-                  )}
-                  
-                  <div className="issue-form">
-                    <h4>Log New Issue</h4>
-                    <label htmlFor="fu_issue_category">Category</label>
-                    <select 
-                      id="fu_issue_category"
-                      name="issue_category"
-                      value={newIssue.category}
-                      onChange={(e) => setNewIssue({ ...newIssue, category: e.target.value })}
-                    >
-                      <option value="quality">Quality</option>
-                      <option value="warranty">Warranty</option>
-                      <option value="damage">Damage</option>
-                      <option value="missing-parts">Missing Parts</option>
-                      <option value="delayed">Delayed</option>
-                      <option value="other">Other</option>
-                    </select>
-                    <label htmlFor="fu_issue_description">Description</label>
-                    <textarea 
-                      id="fu_issue_description"
-                      name="issue_description"
-                      placeholder="Issue description"
-                      value={newIssue.description}
-                      onChange={(e) => setNewIssue({ ...newIssue, description: e.target.value })}
-                    />
-                    <label htmlFor="fu_issue_severity">Severity</label>
-                    <select 
-                      id="fu_issue_severity"
-                      name="severity"
-                      value={newIssue.severity}
-                      onChange={(e) => setNewIssue({ ...newIssue, severity: e.target.value })}
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                      <option value="critical">Critical</option>
-                    </select>
-                    <button onClick={handleLogIssue} className="action-btn">Log Issue</button>
-                  </div>
-                </div>
-
-                <div className="section">
-                  <button onClick={handleCompleteFollowup} className="submit-btn">Complete Follow-up</button>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        )}
-
-        {activeTab === 'issues' && (
-          <div className="tab-content">
-            <h2>Issues Management</h2>
-            <div className="actions">
-              <button onClick={fetchData} className="action-btn refresh">Refresh</button>
-            </div>
-            <div className="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Category</th>
-                    <th>Description</th>
-                    <th>Severity</th>
-                    <th>Status</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {openIssues.map((issue, idx) => (
-                    <tr key={idx}>
-                      <td>{issue[0]}</td>
-                      <td>{issue[2]}</td>
-                      <td>{issue[3]?.substring(0, 50) || 'N/A'}</td>
-                      <td><span className={`severity-badge ${issue[4]}`}>{issue[4]}</span></td>
-                      <td><span className="badge">{issue[5]}</span></td>
-                      <td>
-                        {issue[5] !== 'resolved' && (
-                          <button onClick={() => handleResolveIssue(issue[0])} className="action-btn">Resolve</button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'create' && (
-          <div className="tab-content">
-            <h2>Create New Follow-up</h2>
-            <form className="form-container">
-              <div className="form-group">
-                <label htmlFor="fu_service_order_id">Service Order ID *</label>
-                <input 
-                  id="fu_service_order_id"
-                  name="service_order_id"
-                  type="text" 
-                  value={newFollowup.service_order_id}
-                  onChange={(e) => setNewFollowup({ ...newFollowup, service_order_id: e.target.value })}
-                  placeholder="Enter service order ID"
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="fu_customer_id">Customer ID *</label>
-                <input 
-                  id="fu_customer_id"
-                  name="customer_id"
-                  type="text" 
-                  value={newFollowup.customer_id}
-                  onChange={(e) => setNewFollowup({ ...newFollowup, customer_id: e.target.value })}
-                  placeholder="Enter customer ID"
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="fu_followup_date">Follow-up Date *</label>
-                <input 
-                  id="fu_followup_date"
-                  name="followup_date"
-                  type="date" 
-                  value={newFollowup.followup_date}
-                  onChange={(e) => setNewFollowup({ ...newFollowup, followup_date: e.target.value })}
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="fu_contact_method">Contact Method</label>
-                <select 
-                  id="fu_contact_method"
-                  name="contact_method"
-                  value={newFollowup.contact_method}
-                  onChange={(e) => setNewFollowup({ ...newFollowup, contact_method: e.target.value })}
-                >
-                  <option value="phone">Phone</option>
-                  <option value="sms">SMS</option>
-                  <option value="email">Email</option>
-                  <option value="visit">In-person Visit</option>
-                </select>
-              </div>
-              <button type="button" onClick={handleCreateFollowup} className="submit-btn">Create Follow-up</button>
-            </form>
-          </div>
-        )}
-      </div>
-    </div>
+    </ModuleLayout>
   );
 }

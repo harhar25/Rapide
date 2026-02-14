@@ -253,7 +253,7 @@ app.whenReady().then(() => {
     session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
       const responseHeaders = details.responseHeaders || {};
       responseHeaders['Content-Security-Policy'] = [
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https: http://localhost:5000 http://127.0.0.1:5000;"
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https: http://localhost:5000 http://127.0.0.1:5000 http://127.0.0.1:8787 http://localhost:8787;"
       ];
       callback({ responseHeaders });
     });

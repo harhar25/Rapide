@@ -1,24 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/enterprise-ui.css';
-import '../styles/dashboard-common.css';
 import { fetchJson } from '../utils/fetchJson';
-import { StatCard, EnterpriseCard, StatusBadge, EnterpriseTabs, LoadingSpinner, EmptyState } from '../components/EnterpriseComponents';
+import { 
+  ModuleLayout, 
+  EnterpriseTable, 
+  EnterpriseButton, 
+  EnterpriseCard, 
+  EnterpriseTabs, 
+  StatCard, 
+  StatusBadge, 
+  EmptyState, 
+  LoadingSpinner 
+} from '../components/EnterpriseComponents';
 
 export default function ServiceManagerDashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('overview');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
   const [overallStats, setOverallStats] = useState(null);
   const [pendingApprovals, setPendingApprovals] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
 
   useEffect(() => {
     loadDashboardData();
-    const interval = setInterval(loadDashboardData, 60000);
+    const interval = setInterval(loadDashboardData, 3000); // Refresh every 3s
     return () => clearInterval(interval);
   }, []);
 
   const loadDashboardData = async () => {
-    setLoading(true);
+    if (!initialLoadDone) setLoading(true);
     try {
       await Promise.all([
         loadOverallStats(),
@@ -28,7 +38,10 @@ export default function ServiceManagerDashboard({ user, onLogout }) {
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
-      setLoading(false);
+      if (!initialLoadDone) {
+        setLoading(false);
+        setInitialLoadDone(true);
+      }
     }
   };
 
@@ -104,216 +117,149 @@ export default function ServiceManagerDashboard({ user, onLogout }) {
     }
   };
 
-  return (
-    <div className="dashboard-container">
-      <div className="dashboard-wrapper">
-        {/* Enterprise Header */}
-        <div className="dashboard-header">
-          <div className="dashboard-header-content">
-            <div className="dashboard-title-section">
-              <h1 className="dashboard-title">
-                <span className="dashboard-title-icon">👔</span>
-                Service Manager Dashboard
-              </h1>
-              <p className="dashboard-subtitle">Operations Overview & Approvals Management</p>
-            </div>
-            <div className="dashboard-actions">
-              <button onClick={loadDashboardData} className="btn-enterprise btn-secondary btn-sm" disabled={loading}>
-                {loading ? <LoadingSpinner size={16} /> : '🔄'} Refresh
-              </button>
-              {user?.role !== 'admin' && (
-                <button onClick={onLogout} className="btn-enterprise btn-secondary btn-sm">Logout</button>
-              )}
-            </div>
-          </div>
+  // Columns for Approvals Table
+  const approvalColumns = [
+    { label: 'ID', key: 'gatepass_number', render: (val) => <strong>{val}</strong> },
+    { label: 'Customer', key: 'customer_name' },
+    { label: 'Plate', key: 'vehicle_plate_no' },
+    { 
+      label: 'Status', 
+      key: 'status', 
+      render: (_, row) => (
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+            {row.cashier_signed && <StatusBadge status="success">Cashier</StatusBadge>}
+            {row.accounting_signed && <StatusBadge status="success">Accounting</StatusBadge>}
+            {row.warranty_signed && <StatusBadge status="success">Warranty</StatusBadge>}
+            {!row.manager_signed && <StatusBadge status="pending">Manager Pending</StatusBadge>}
         </div>
+      )
+    },
+    { 
+      label: 'Actions', 
+      key: 'actions', 
+      render: (_, row) => (
+        !row.manager_signed ? (
+            <EnterpriseButton 
+                variant="success" 
+                size="sm"
+                onClick={() => handleApproveGatepass(row.gatepass_id)}
+            >
+                Approve
+            </EnterpriseButton>
+        ) : (
+            <StatusBadge status="success">Approved</StatusBadge>
+        )
+      )
+    }
+  ];
 
-        {/* Overall Statistics */}
-        {overallStats && (
-          <div className="summary-grid stagger-children">
-            <StatCard 
-              value={formatMoney(overallStats.total_revenue)} 
-              label="Total Revenue"
-              icon="💰"
-            />
-            <StatCard 
-              value={overallStats.pending_invoices} 
-              label="Pending Invoices"
-              icon="📄"
-            />
-            <StatCard 
-              value={overallStats.qc_passed} 
-              label="QC Passed Today"
-              icon="✓"
-            />
-            <StatCard 
-              value={overallStats.qc_pending} 
-              label="QC Pending"
-              icon="⏳"
-            />
-            <StatCard 
-              value={overallStats.active_jobs} 
-              label="Active Jobs"
-              icon="🔧"
-            />
-            <StatCard 
-              value={overallStats.pending_followups} 
-              label="Pending Follow-Ups"
-              icon="📞"
-            />
-          </div>
+  // Columns for Activity Table
+  const activityColumns = [
+    { label: 'Date', key: 'date', render: (_, row) => new Date(row[3]).toLocaleDateString() },
+    { label: 'Type', key: 'type', render: (_, row) => row[5] },
+    { label: 'Customer', key: 'customer', render: (_, row) => row[1] },
+    { label: 'Status', key: 'status', render: (_, row) => <StatusBadge status={row[6]}>{row[6]}</StatusBadge> },
+    { label: 'Details', key: 'details', render: (_, row) => row[7] ? 'Has feedback' : 'Pending' }
+  ];
+
+  return (
+    <ModuleLayout
+      title="Service Manager"
+      description="Operational Overview & Approvals"
+      icon="👨‍💼"
+      user={user}
+      onLogout={onLogout}
+      actions={
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <EnterpriseButton variant="secondary" onClick={loadDashboardData} disabled={loading} size="sm">
+            {loading ? <LoadingSpinner size={16} /> : '🔄 Refresh'}
+          </EnterpriseButton>
+           {user?.role !== 'admin' && (
+             <EnterpriseButton variant="secondary" onClick={onLogout} size="sm">Logout</EnterpriseButton>
+           )}
+        </div>
+      }
+    >
+      <EnterpriseTabs
+        tabs={[
+            { id: 'overview', label: 'Overview', icon: '📊' },
+            { id: 'approvals', label: 'Approvals', icon: '✓' },
+            { id: 'activity', label: 'Activity', icon: '📋' }
+        ]}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+      />
+
+      <div style={{ marginTop: '20px' }}>
+        {activeTab === 'overview' && overallStats && (
+            <div className="dashboard-grid" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div className="summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                    <StatCard value={formatMoney(overallStats.total_revenue)} label="Total Revenue" icon="💰" />
+                    <StatCard value={overallStats.pending_invoices} label="Pending Invoices" icon="📄" />
+                    <StatCard value={overallStats.qc_passed} label="QC Passed Today" icon="✓" />
+                    <StatCard value={overallStats.qc_pending} label="QC Pending" icon="⏳" />
+                    <StatCard value={overallStats.active_jobs} label="Active Jobs" icon="🔧" />
+                    <StatCard value={overallStats.pending_followups} label="Pending Follow-Ups" icon="📞" />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                     <EnterpriseCard title="System Health" subtitle="Current operational status">
+                        <div style={{ padding: '20px 0' }}>
+                            <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span>Backend API</span>
+                                <StatusBadge status="active">Running</StatusBadge>
+                            </div>
+                            <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span>Database Connection</span>
+                                <StatusBadge status="active">Connected</StatusBadge>
+                            </div>
+                            <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span>All Modules</span>
+                                <StatusBadge status="success">Operational</StatusBadge>
+                            </div>
+                        </div>
+                    </EnterpriseCard>
+
+                    <EnterpriseCard title="Quick Actions">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <EnterpriseButton variant="primary" onClick={() => setActiveTab('approvals')}>
+                                Review Pending Approvals ({pendingApprovals.length})
+                            </EnterpriseButton>
+                            <EnterpriseButton variant="secondary" onClick={() => setActiveTab('activity')}>
+                                View Recent Activity
+                            </EnterpriseButton>
+                        </div>
+                    </EnterpriseCard>
+                </div>
+            </div>
         )}
 
-        {/* Enterprise Tabs */}
-        <EnterpriseTabs
-          tabs={[
-            { id: 'overview', label: 'Overview', icon: '📊' },
-            { id: 'approvals', label: 'Pending Approvals', icon: '✓' },
-            { id: 'activity', label: 'Recent Activity', icon: '📋' }
-          ]}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-        />
-
-        {/* Content */}
-        <div className="content-section">
-          <div className="section-body">
-            {/* Overview Tab */}
-            {activeTab === 'overview' && (
-              <div className="dashboard-grid">
-                <EnterpriseCard title="System Health" subtitle="Current operational status">
-                  <div style={{ padding: '20px 0' }}>
-                    <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span>Backend API</span>
-                      <StatusBadge status="active">Running</StatusBadge>
-                    </div>
-                    <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span>Database Connection</span>
-                      <StatusBadge status="active">Connected</StatusBadge>
-                    </div>
-                    <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span>All Modules</span>
-                      <StatusBadge status="success">Operational</StatusBadge>
-                    </div>
-                  </div>
-                </EnterpriseCard>
-
-                <EnterpriseCard title="Quick Actions">
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <button className="btn-enterprise btn-primary" onClick={() => setActiveTab('approvals')}>
-                      Review Pending Approvals ({pendingApprovals.length})
-                    </button>
-                    <button className="btn-enterprise btn-secondary" onClick={() => setActiveTab('activity')}>
-                      View Recent Activity
-                    </button>
-                    <button className="btn-enterprise btn-secondary" onClick={loadDashboardData}>
-                      Refresh Dashboard
-                    </button>
-                  </div>
-                </EnterpriseCard>
-              </div>
-            )}
-
-            {/* Approvals Tab */}
-            {activeTab === 'approvals' && (
-              <div>
-                <h3 style={{ marginBottom: '20px', fontSize: '20px', fontWeight: '600' }}>Pending Gatepass Approvals</h3>
+        {activeTab === 'approvals' && (
+            <EnterpriseCard title="Pending Gatepass Approvals">
                 {pendingApprovals.length === 0 ? (
-                  <EmptyState 
-                    icon="✓" 
-                    title="No Pending Approvals" 
-                    description="All gatepasses have been processed"
-                  />
+                    <EmptyState icon="✓" title="No Pending Approvals" description="All gatepasses have been processed" />
                 ) : (
-                  <div className="enterprise-table">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Gatepass #</th>
-                          <th>Service Order</th>
-                          <th>Vehicle</th>
-                          <th>Customer</th>
-                          <th>Signatures</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {pendingApprovals.map((gp, idx) => (
-                          <tr key={idx}>
-                            <td><strong>{gp.gatepass_number}</strong></td>
-                            <td>SO-{gp.service_order_id}</td>
-                            <td>{gp.vehicle_plate_no}</td>
-                            <td>{gp.customer_name}</td>
-                            <td>
-                              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                                {gp.cashier_signed && <StatusBadge status="success">Cashier</StatusBadge>}
-                                {gp.accounting_signed && <StatusBadge status="success">Accounting</StatusBadge>}
-                                {gp.warranty_signed && <StatusBadge status="success">Warranty</StatusBadge>}
-                                {!gp.manager_signed && <StatusBadge status="pending">Manager Pending</StatusBadge>}
-                              </div>
-                            </td>
-                            <td>
-                              {!gp.manager_signed ? (
-                                <button 
-                                  className="btn-enterprise btn-success btn-sm"
-                                  onClick={() => handleApproveGatepass(gp.gatepass_id)}
-                                >
-                                  Approve
-                                </button>
-                              ) : (
-                                <StatusBadge status="success">Approved</StatusBadge>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                    <EnterpriseTable 
+                        columns={approvalColumns}
+                        data={pendingApprovals}
+                    />
                 )}
-              </div>
-            )}
+            </EnterpriseCard>
+        )}
 
-            {/* Activity Tab */}
-            {activeTab === 'activity' && (
-              <div>
-                <h3 style={{ marginBottom: '20px', fontSize: '20px', fontWeight: '600' }}>Recent Activity</h3>
-                {recentActivity.length === 0 ? (
-                  <EmptyState 
-                    icon="📋" 
-                    title="No Recent Activity" 
-                    description="No recent follow-ups or activities"
-                  />
+        {activeTab === 'activity' && (
+            <EnterpriseCard title="Recent Activity">
+                 {recentActivity.length === 0 ? (
+                    <EmptyState icon="📋" title="No Recent Activity" description="No recent follow-ups or activities" />
                 ) : (
-                  <div className="enterprise-table">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Date</th>
-                          <th>Type</th>
-                          <th>Customer</th>
-                          <th>Status</th>
-                          <th>Details</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {recentActivity.map((activity, idx) => (
-                          <tr key={idx}>
-                            <td>{new Date(activity[3]).toLocaleDateString()}</td>
-                            <td>{activity[5]}</td>
-                            <td>{activity[1]}</td>
-                            <td><StatusBadge status={activity[6]}>{activity[6]}</StatusBadge></td>
-                            <td>{activity[7] ? 'Has feedback' : 'Pending'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                    <EnterpriseTable 
+                        columns={activityColumns}
+                        data={recentActivity}
+                    />
                 )}
-              </div>
-            )}
-          </div>
-        </div>
+            </EnterpriseCard>
+        )}
       </div>
-    </div>
+    </ModuleLayout>
   );
 }

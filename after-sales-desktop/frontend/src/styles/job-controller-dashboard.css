@@ -1,692 +1,259 @@
-.jc-dashboard {
-  width: 100%;
-  height: 100%;
-  background-color: #fafbfc;
-  display: flex;
-  flex-direction: column;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+/* Job Controller dashboard now uses shared enterprise styles.
+   This file provides the professional layout and component styling. */
+
+/* --- Layout Structure --- */
+.jc-container {
+  max-width: 1800px; /* Wider for dashboard feel */
+  margin: 0 auto;
+  padding-bottom: 40px;
 }
 
-.jc-header {
-  background-color: #212529;
-  color: white;
-  padding: 20px 24px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
-}
-
-.jc-header h1 {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 500;
-}
-
-.jc-header p {
-  margin: 4px 0 0 0;
-  font-size: 13px;
-  opacity: 0.8;
-}
-
-.logout-btn {
-  background: white;
-  color: #212529;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.logout-btn:hover {
-  background: #e9ecef;
-}
-
-.jc-content {
-  flex: 1;
-  padding: 24px;
-  overflow-y: auto;
-}
-
-/* Tabs */
-.tabs {
-  display: flex;
-  gap: 8px;
+/* --- Header Stats --- */
+.jc-header-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
   margin-bottom: 24px;
-  border-bottom: 1px solid #e9ecef;
 }
 
-.tab {
-  padding: 12px 16px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  color: #6c757d;
-  font-size: 14px;
-  font-weight: 500;
-  border-bottom: 3px solid transparent;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-}
-
-.tab:hover {
-  color: #212529;
-}
-
-.tab.active {
-  color: #212529;
-  border-bottom-color: #212529;
-}
-
-.tab-content {
+.jc-stat-card {
   background: white;
-  border-radius: 8px;
-  padding: 24px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-
-.tab-content h2 {
-  margin: 0 0 20px 0;
-  font-size: 18px;
-  font-weight: 500;
-  color: #212529;
-}
-
-/* Tables */
-.orders-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.orders-table thead {
-  background: #f8f9fa;
-  border-bottom: 2px solid #dee2e6;
-}
-
-.orders-table th {
-  padding: 12px;
-  text-align: left;
-  font-weight: 600;
-  color: #212529;
-}
-
-.orders-table td {
-  padding: 12px;
-  border-bottom: 1px solid #dee2e6;
-  color: #495057;
-}
-
-.orders-table tbody tr {
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.orders-table tbody tr:hover {
-  background: #f8f9fa;
-}
-
-.status-badge {
-  display: inline-block;
-  padding: 4px 12px;
-  background: #fff3cd;
-  color: #856404;
   border-radius: 12px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: capitalize;
-}
-
-.status-badge.active {
-  background: #d1ecf1;
-  color: #0c5460;
-}
-
-/* Assignment Form */
-.assignment-form {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.form-section {
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
-  padding: 16px;
-  background: #fafbfc;
-}
-
-.form-section h3 {
-  margin: 0 0 16px 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #212529;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.form-select {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #dee2e6;
-  border-radius: 4px;
-  font-size: 13px;
-  font-family: inherit;
-  transition: all 0.2s;
-}
-
-.form-select:focus {
-  outline: none;
-  border-color: #212529;
-  box-shadow: 0 0 0 2px rgba(33, 37, 41, 0.1);
-}
-
-.order-details {
-  margin-top: 12px;
-  padding: 12px;
-  background: white;
-  border-radius: 4px;
-  border-left: 4px solid #212529;
-}
-
-.order-details p {
-  margin: 6px 0;
-  font-size: 13px;
-  color: #495057;
-}
-
-/* Technician Cards */
-.technician-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px;
-  margin-top: 12px;
-}
-
-.tech-card {
-  background: white;
-  border: 2px solid #e9ecef;
-  border-radius: 6px;
-  padding: 16px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.tech-card:hover {
-  border-color: #212529;
-  box-shadow: 0 2px 8px rgba(33, 37, 41, 0.1);
-}
-
-.tech-card.selected {
-  background: #e7f5ff;
-  border-color: #212529;
-  box-shadow: 0 4px 12px rgba(33, 37, 41, 0.15);
-}
-
-.tech-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: #212529;
-  margin-bottom: 4px;
-}
-
-.tech-spec {
-  font-size: 12px;
-  color: #6c757d;
-  margin-bottom: 8px;
-}
-
-.tech-jobs {
-  font-size: 12px;
-  font-weight: 500;
-  color: #495057;
-  margin-bottom: 4px;
-}
-
-.tech-skills {
-  font-size: 11px;
-  color: #6c757d;
-  font-style: italic;
-}
-
-/* Buttons */
-.btn-assign,
-.btn-clock-in,
-.btn-clock-out {
-  padding: 10px 16px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-  transition: all 0.2s;
-}
-
-.btn-assign {
-  background: #212529;
-  color: white;
-  align-self: flex-start;
-  margin-top: 12px;
-}
-
-.btn-assign:hover:not(:disabled) {
-  background: #495057;
-}
-
-.btn-assign:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-clock-in {
-  background: #28a745;
-  color: white;
-}
-
-.btn-clock-in:hover {
-  background: #218838;
-}
-
-.btn-clock-out {
-  background: #dc3545;
-  color: white;
-}
-
-.btn-clock-out:hover {
-  background: #c82333;
-}
-
-/* Resources Section */
-.resources-section {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.resource-card {
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  border-radius: 8px;
-  padding: 20px;
-  text-align: center;
-  border: 1px solid #dee2e6;
-}
-
-.resource-card h3 {
-  margin: 0 0 12px 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #212529;
-}
-
-.resource-card .stat {
-  margin: 0;
-  font-size: 32px;
-  font-weight: 700;
-  color: #212529;
-}
-
-/* Technician Details */
-.technician-details {
-  margin-top: 24px;
-}
-
-.technician-details h3 {
-  margin: 0 0 12px 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #212529;
-}
-
-.labor-summary {
-  background: #f8f9fa;
-  border: 1px solid #dee2e6;
-  border-radius: 6px;
-  padding: 16px;
-  margin-top: 16px;
-}
-
-.labor-summary h4 {
-  margin: 0 0 12px 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: #212529;
-}
-
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
-}
-
-.summary-item {
-  background: white;
-  padding: 12px;
-  border-radius: 4px;
-  border: 1px solid #e9ecef;
-  text-align: center;
-}
-
-.summary-item label {
-  display: block;
-  font-size: 11px;
-  font-weight: 600;
-  color: #6c757d;
-  text-transform: uppercase;
-  margin-bottom: 4px;
-}
-
-.summary-item span {
-  display: block;
-  font-size: 24px;
-  font-weight: 700;
-  color: #212529;
-}
-
-/* Clock Records */
-.clock-records {
-  background: #f8f9fa;
-  border: 1px solid #dee2e6;
-  border-radius: 6px;
-  padding: 16px;
-  margin-top: 16px;
-}
-
-.clock-records h4 {
-  margin: 0 0 12px 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: #212529;
-}
-
-.records-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-}
-
-.records-table thead {
-  background: white;
-  border-bottom: 2px solid #dee2e6;
-}
-
-.records-table th {
-  padding: 10px;
-  text-align: left;
-  font-weight: 600;
-  color: #212529;
-}
-
-.records-table td {
-  padding: 10px;
-  border-bottom: 1px solid #dee2e6;
-  color: #495057;
-}
-
-/* Empty State */
-.empty-state {
-  padding: 40px;
-  text-align: center;
-  color: #6c757d;
-  font-size: 14px;
-}
-
-/* Footer */
-.jc-footer {
-  background-color: white;
-  border-top: 1px solid #e9ecef;
-  padding: 16px 24px;
-  text-align: center;
-  color: #6c757d;
-  font-size: 12px;
-  margin-top: auto;
-}
-
-.jc-footer p {
-  margin: 0;
-  font-weight: 300;
-  letter-spacing: -0.2px;
-}
-
-.jc-footer em {
-  font-style: italic;
-  font-weight: 400;
-  color: #212529;
-}
-
-/* ========================================
-   Job Order Printing Section Styles
-   ======================================== */
-
-.tab-content.full-width {
-  max-width: 100%;
-}
-
-.job-order-selection {
-  background: white;
-  border-radius: 8px;
   padding: 24px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.job-order-selection h2 {
-  color: #212529;
-  margin-top: 0;
-  margin-bottom: 24px;
-  font-size: 20px;
-}
-
-.order-selection-container {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+  border: 1px solid var(--color-border);
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.jc-stat-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: var(--stat-color, var(--color-primary-500));
+}
+
+.jc-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.jc-stat-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.75rem;
+  background: var(--color-bg-subtle);
+  color: var(--stat-color, var(--color-primary-600));
+}
+
+.jc-stat-content h3 {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.jc-stat-content p {
+  margin: 4px 0 0 0;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* --- Tech Team Visuals --- */
+.jc-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 20px;
 }
 
-.order-tabs {
-  display: flex;
-  gap: 10px;
-  border-bottom: 2px solid #e9ecef;
-  padding-bottom: 0;
-}
-
-.order-tab-btn {
-  padding: 12px 16px;
-  background: none;
-  border: none;
-  border-bottom: 3px solid transparent;
-  color: #666;
-  cursor: pointer;
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.order-tab-btn.active {
-  color: #0275d8;
-  border-bottom-color: #0275d8;
-}
-
-.order-tab-btn:hover {
-  color: #212529;
-}
-
-.order-list h3 {
-  font-size: 16px;
-  color: #212529;
-  margin-bottom: 16px;
-}
-
-.orders-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-.order-card {
+.jc-tech-card {
   background: white;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  overflow: hidden;
-  transition: all 0.3s ease;
-  cursor: pointer;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
+  gap: 16px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  position: relative;
 }
 
-.order-card:hover {
-  border-color: #0275d8;
-  box-shadow: 0 4px 12px rgba(2, 117, 216, 0.15);
+.jc-tech-card:hover { 
+  border-color: var(--color-primary-400); 
   transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
-.order-card-header {
-  background: #f8f9fa;
-  padding: 12px 16px;
-  border-bottom: 1px solid #e9ecef;
+.jc-tech-card.selected {
+  border-color: var(--color-primary-500);
+  background-color: var(--color-primary-50);
+  box-shadow: 0 0 0 2px var(--color-primary-200);
+}
+
+.jc-tech-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 12px;
 }
 
-.order-id {
-  font-weight: 700;
-  color: #0275d8;
-  font-size: 14px;
+.jc-tech-avatar {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, var(--color-primary-100) 0%, var(--color-primary-50) 100%);
+    color: var(--color-primary-700);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.1rem;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05);
 }
 
-.order-date {
-  font-size: 12px;
-  color: #999;
-}
-
-.order-card-body {
-  padding: 16px;
-  flex: 1;
-}
-
-.order-card-body p {
-  margin: 0 0 8px 0;
-  color: #333;
-  font-size: 14px;
-}
-
-.order-card-body p:first-child {
+.jc-tech-name {
   font-weight: 600;
-  color: #212529;
+  color: var(--text-primary);
+  font-size: 0.95rem;
 }
 
-.vehicle-info {
-  font-size: 13px;
-  color: #666;
+.jc-tech-role {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
 }
 
-.service-type {
-  font-size: 13px;
-  color: #5cb85c;
+.jc-status-dot {
+  margin-left: auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.jc-status-dot.available { background-color: var(--color-success-500); box-shadow: 0 0 0 2px var(--color-success-100); }
+.jc-status-dot.busy { background-color: var(--color-error-500); box-shadow: 0 0 0 2px var(--color-error-100); }
+
+.jc-tech-load {
+  background: var(--bg-secondary);
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.jc-load-bar {
+  height: 6px;
+  background: var(--color-gray-200);
+  border-radius: 99px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.jc-load-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.3s ease;
+}
+
+.jc-tech-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.jc-skill-tag {
+  background: white;
+  border: 1px solid var(--border-primary);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
   font-weight: 500;
 }
 
-.order-card-footer {
-  padding: 12px 16px;
-  background: #f8f9fa;
-  border-top: 1px solid #e9ecef;
+
+/* --- Parts Request Form Improvements --- */
+.jc-parts-form {
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid var(--color-border);
+    box-shadow: 0 10px 40px -10px rgba(0,0,0,0.1);
+    overflow: hidden;
+    margin-bottom: 24px;
+    animation: slideDown 0.3s ease-out;
 }
 
-.btn-print-order {
-  width: 100%;
-  padding: 8px 12px;
-  background: #0275d8;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-  transition: all 0.2s ease;
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.btn-print-order:hover {
-  background: #0259b3;
+.jc-parts-form-header {
+    background: #f8fafc;
+    padding: 16px 24px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
-.manual-entry {
+.jc-parts-form-header h4 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #0f172a;
+}
+
+.jc-parts-form-body {
+    padding: 24px;
+}
+
+.jc-item-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr auto;
+  gap: 12px;
+  align-items: start;
+  margin-bottom: 12px;
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  transition: border-color 0.2s;
+}
+
+.jc-item-row:focus-within {
+  border-color: var(--color-primary-300);
+  background: #fff;
+}
+
+/* --- Utilities --- */
+.jc-loading {
   display: flex;
+  align-items: center;
   justify-content: center;
-  padding-top: 20px;
-  border-top: 2px solid #e9ecef;
-}
-
-.btn-manual-entry {
-  padding: 12px 32px;
-  background: #5cb85c;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  transition: all 0.3s ease;
-}
-
-.btn-manual-entry:hover {
-  background: #4cae4c;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(92, 184, 92, 0.3);
-}
-
-.empty-state {
-  text-align: center;
   padding: 40px;
-  color: #999;
-  font-size: 14px;
+  color: var(--text-secondary);
+  font-weight: 500;
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-  .jc-content {
-    padding: 16px;
-  }
-
-  .tabs {
-    flex-wrap: wrap;
-  }
-
-  .technician-list {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  }
-
-  .orders-table,
-  .records-table {
-    font-size: 12px;
-  }
-
-  .orders-table th,
-  .orders-table td,
-  .records-table th,
-  .records-table td {
-    padding: 8px;
-  }
-
-  .orders-grid {
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  }
+.jc-grid-2 {
+  display: grid;
+  grid-template-columns: 2fr 1fr; /* Main content vs Sidebar */
+  gap: 24px;
 }
 
-@media (max-width: 480px) {
-  .orders-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .order-tabs {
-    flex-wrap: wrap;
-  }
-
-  .order-tab-btn {
-    padding: 8px 12px;
-    font-size: 12px;
-  }
+@media (max-width: 1024px) {
+  .jc-grid-2 { grid-template-columns: 1fr; }
 }
 

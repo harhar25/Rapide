@@ -1,0 +1,125 @@
+/* ============================================
+   ENTERPRISE MODULE TOP NAV SYSTEM
+   Extension for dashboard-common.css
+   ============================================ */
+
+/* Top Navigation Bar */
+.module-top-nav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-4) var(--spacing-6);
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-primary);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+}
+
+.module-nav-content {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4);
+  flex: 1;
+}
+
+.module-title {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  letter-spacing: -0.01em;
+}
+
+.module-title-icon {
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary-50);
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  color: var(--color-primary-600);
+}
+
+.module-description {
+  font-size: var(--font-size-sm);
+  color: var(--text-tertiary);
+  margin-left: var(--spacing-2);
+  padding-left: var(--spacing-4);
+  border-left: 1px solid var(--border-primary);
+  display: flex;
+  align-items: center;
+}
+
+.module-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+}
+
+.module-divider {
+  width: 1px;
+  height: 24px;
+  background-color: var(--border-primary);
+  margin: 0 var(--spacing-2);
+}
+
+.module-user-info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+}
+
+.module-user-name {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+.module-user-role {
+  font-size: var(--font-size-xs);
+  padding: 2px 6px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+
+/* Layout Wrapper for Module with Top Nav */
+.module-layout {
+  min-height: 100vh;
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+}
+
+.module-layout-content {
+  flex: 1;
+  padding: var(--spacing-6);
+  max-width: 1600px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .module-top-nav {
+    padding: var(--spacing-3) var(--spacing-4);
+  }
+  
+  .module-layout-content {
+    padding: var(--spacing-4);
+  }
+  
+  .module-description {
+    display: none; /* Hide description on smaller screens */
+  }
+}

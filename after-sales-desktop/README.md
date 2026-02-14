@@ -4,23 +4,23 @@
 A beautiful, minimalist desktop application for managing after-sales service operations.
 
 ### Tech Stack
-- **Frontend**: Electron + Vanilla JavaScript/HTML/CSS
-- **Backend**: Python Flask
-- **Database**: MySQL (XAMPP)
-- **Desktop**: Electron
+- **Frontend**: Electron + React (CRA)
+- **Backend**: Cloudflare Worker API
+- **Database**: Cloudflare D1 (SQLite)
 
 ### Quick Start
-1. Install dependencies: `npm install` and `pip install -r requirements.txt`
-2. Start XAMPP MySQL server
-3. Create database: `mysql < database/schema.sql`
-4. Run backend: `python backend/run.py`
-5. Run frontend: `npm start`
+1. Install Node.js (v20+) and npm
+2. Install dependencies:
+	- `cd worker && npm install`
+	- `cd ../frontend && npm install`
+3. Run the dev stack (Worker + React + Electron):
+	- `cd frontend && npm run dev`
 
 ### Project Structure
 ```
 after-sales-desktop/
-├── backend/              # Python Flask API
+├── worker/               # Cloudflare Worker API (D1)
 ├── frontend/             # Electron + UI
-├── database/             # MySQL schema
+├── database/             # (Legacy) MySQL schema
 └── README.md
 ```

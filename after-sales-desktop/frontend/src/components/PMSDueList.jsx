@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { fetchJson } from '../utils/fetchJson';
+import { EnterpriseTable, StatusBadge, Modal, EmptyState, LoadingSpinner } from './EnterpriseComponents';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = '/api';
 
 export default function PMSDueList({ customers, loading, onRefresh }) {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -83,94 +84,80 @@ export default function PMSDueList({ customers, loading, onRefresh }) {
     }
   };
 
-  return (
-    <div className="pms-section">
-      <div className="section-header flex-between">
-        <h3>✓ PMS Due Customers</h3>
-        <button className="btn btn-primary" onClick={onRefresh}>
-          🔄 Refresh
+  const columns = [
+    { key: 'name', label: 'Customer Name', render: (val) => <span className="font-medium">{val}</span> },
+    { key: 'contact_no', label: 'Contact', render: (val) => <span className="text-secondary">{val || '—'}</span> },
+    { key: 'plate_no', label: 'Plate No.', render: (val) => <code className="enterprise-badge badge-neutral">{val}</code> },
+    { key: 'vehicle_model', label: 'Vehicle' },
+    { 
+      key: 'days_since_service', 
+      label: 'Elapsed',
+      render: (val) => <StatusBadge status="warning">{val} days</StatusBadge>
+    },
+    {
+      key: 'actions',
+      label: 'Action',
+      render: (_, row) => (
+        <button
+          className="btn-enterprise btn-sm btn-primary"
+          onClick={() => handleContactCustomer(row)}
+        >
+          Contact
         </button>
-      </div>
+      )
+    }
+  ];
 
-      {loading ? (
-        <div className="flex-center" style={{ padding: '40px' }}>
-          <div className="spinner"></div> Loading...
-        </div>
-      ) : customers.length === 0 ? (
-        <div className="alert alert-info">No customers due for PMS at this time.</div>
-      ) : (
-        <div className="card">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Customer Name</th>
-                <th>Contact</th>
-                <th>Plate No.</th>
-                <th>Vehicle</th>
-                <th>Days Since Service</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {customers.map((customer) => (
-                <tr key={customer.id}>
-                  <td>{customer.name}</td>
-                  <td>{customer.contact_no}</td>
-                  <td>{customer.plate_no}</td>
-                  <td>{customer.vehicle_model}</td>
-                  <td>
-                    <span className="badge badge-warning">{customer.days_since_service} days</span>
-                  </td>
-                  <td>
-                    <button
-                      className="btn btn-primary btn-sm"
-                      onClick={() => handleContactCustomer(customer)}
-                    >
-                      📞 Contact
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+  if (loading) return <LoadingSpinner />;
 
-      {contactModal && selectedCustomer && (
-        <div className="modal active">
-          <div className="modal-content">
-            <div className="modal-header">Contact {selectedCustomer.name}</div>
-            <div className="form-group">
-              <label className="form-label">Select Contact Method:</label>
-              <div className="contact-methods">
+  if (!customers || customers.length === 0) {
+    return <EmptyState icon="📅" title="No PMS Due" description="No customers are currently due for maintenance." />;
+  }
+
+  return (
+    <>
+      <EnterpriseTable columns={columns} data={customers} />
+
+      <Modal 
+        isOpen={contactModal && !!selectedCustomer}
+        onClose={() => setContactModal(false)}
+        title={`Contact ${selectedCustomer?.name}`}
+        footer={
+           <button className="btn-enterprise btn-secondary" onClick={() => setContactModal(false)}>
+              Cancel
+           </button>
+        }
+      >
+        <div style={{ display: 'grid', gap: '1rem' }}>
+            <p className="text-secondary">Choose a communication channel to reach this customer.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
                 <button
-                  className="btn btn-secondary btn-contact"
+                  className="btn-enterprise btn-secondary"
+                  style={{ flexDirection: 'column', padding: '1.5rem', gap: '0.5rem' }}
                   onClick={() => handleContactSubmit('call')}
                 >
-                  ☎️ Call
+                  <span style={{ fontSize: '1.5rem' }}>☎️</span>
+                  <span>Call</span>
                 </button>
                 <button
-                  className="btn btn-secondary btn-contact"
+                  className="btn-enterprise btn-secondary"
+                  style={{ flexDirection: 'column', padding: '1.5rem', gap: '0.5rem' }}
                   onClick={() => handleContactSubmit('sms')}
                 >
-                  📱 Queue SMS
+                  <span style={{ fontSize: '1.5rem' }}>📱</span>
+                  <span>SMS</span>
                 </button>
                 <button
-                  className="btn btn-secondary btn-contact"
+                  className="btn-enterprise btn-secondary"
+                  style={{ flexDirection: 'column', padding: '1.5rem', gap: '0.5rem' }}
                   onClick={() => handleContactSubmit('email')}
                 >
-                  📧 Email
+                  <span style={{ fontSize: '1.5rem' }}>📧</span>
+                  <span>Email</span>
                 </button>
-              </div>
             </div>
-            <div className="modal-footer">
-              <button className="btn btn-outline" onClick={() => setContactModal(false)}>
-                Cancel
-              </button>
-            </div>
-          </div>
         </div>
-      )}
-    </div>
+      </Modal>
+    </>
   );
 }

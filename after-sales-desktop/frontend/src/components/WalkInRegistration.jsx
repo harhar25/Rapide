@@ -1,12 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { fetchJson } from '../utils/fetchJson';
+import { EnterpriseCard, EnterpriseTable, FormGroup, StatusBadge } from './EnterpriseComponents';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = '/api';
+
+// Debounce helper
+const debounce = (func, wait) => {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+};
 
 export default function WalkInRegistration({ onSuccess }) {
   const [searchMode, setSearchMode] = useState('search');
   const [searchResults, setSearchResults] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [plateLoading, setPlateLoading] = useState(false);
+  const [foundExisting, setFoundExisting] = useState(null); // Track if we found existing customer
 
   const [customerData, setCustomerData] = useState({
     name: '',
@@ -20,6 +32,80 @@ export default function WalkInRegistration({ onSuccess }) {
     address: '',
     city: ''
   });
+
+  // Auto-lookup by plate number
+  const lookupByPlate = useCallback(
+    debounce(async (plate) => {
+      if (!plate || plate.length < 3) {
+        setFoundExisting(null);
+        return;
+      }
+      
+      setPlateLoading(true);
+      try {
+        const res = await fetchJson(`${API_BASE}/customer/search`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            search_type: 'plate',
+            search_value: plate
+          })
+        });
+        
+        if (res.success && res.data && res.data.length > 0) {
+          // Found existing customer - auto-fill the form
+          const customer = res.data[0];
+          setFoundExisting(customer);
+          setCustomerData(prev => ({
+            ...prev,
+            name: customer.name || prev.name,
+            contact_no: customer.contact_no || prev.contact_no,
+            vehicle_model: customer.vehicle_model || prev.vehicle_model,
+            vehicle_year: customer.vehicle_year || prev.vehicle_year,
+            email: customer.email || prev.email,
+            engine_no: customer.engine_no || prev.engine_no,
+            chassis_no: customer.chassis_no || prev.chassis_no,
+            address: customer.address || prev.address,
+            city: customer.city || prev.city
+          }));
+        } else {
+          setFoundExisting(null);
+        }
+      } catch (e) {
+        console.error('Plate lookup error:', e);
+        setFoundExisting(null);
+      }
+      setPlateLoading(false);
+    }, 500),
+    []
+  );
+
+  // Handle plate number change with auto-lookup
+  const handlePlateChange = (e) => {
+    const plate = e.target.value.toUpperCase();
+    setCustomerData(prev => ({ ...prev, plate_no: plate }));
+    lookupByPlate(plate);
+  };
+
+  // Reset form to initial state
+  const resetForm = () => {
+    setCustomerData({
+      name: '',
+      contact_no: '',
+      plate_no: '',
+      vehicle_model: '',
+      vehicle_year: new Date().getFullYear(),
+      email: '',
+      engine_no: '',
+      chassis_no: '',
+      address: '',
+      city: ''
+    });
+    setFoundExisting(null);
+    setSearchMode('search');
+    setSearchResults([]);
+    setSelectedCustomer(null);
+  };
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -64,6 +150,21 @@ export default function WalkInRegistration({ onSuccess }) {
     }
 
     try {
+      // If we found an existing customer by plate lookup, use that customer ID
+      if (foundExisting && foundExisting.id) {
+        // Update customer info if needed
+        await fetchJson(`${API_BASE}/customer/${foundExisting.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(customerData)
+        });
+        
+        alert(`✓ Existing customer ${foundExisting.name} selected`);
+        resetForm();
+        onSuccess({ ...customerData, id: foundExisting.id });
+        return;
+      }
+
       const attemptRegister = async (payload) => {
         return fetchJson(`${API_BASE}/customer/register`, {
           method: 'POST',
@@ -75,20 +176,9 @@ export default function WalkInRegistration({ onSuccess }) {
       const data = await attemptRegister(customerData);
       if (data && data.success) {
         alert(`✓ Walk-in customer #${data.customer_id} registered successfully`);
-        setCustomerData({
-          name: '',
-          contact_no: '',
-          plate_no: '',
-          vehicle_model: '',
-          vehicle_year: new Date().getFullYear(),
-          email: '',
-          engine_no: '',
-          chassis_no: '',
-          address: '',
-          city: ''
-        });
-        setSearchMode('search');
-        onSuccess();
+        const savedData = { ...customerData, id: data.customer_id };
+        resetForm();
+        onSuccess(savedData);
         return;
       }
 
@@ -110,20 +200,9 @@ export default function WalkInRegistration({ onSuccess }) {
         const forced = await attemptRegister({ ...customerData, force_create: true });
         if (forced && forced.success) {
           alert(`✓ Walk-in customer #${forced.customer_id} registered successfully`);
-          setCustomerData({
-            name: '',
-            contact_no: '',
-            plate_no: '',
-            vehicle_model: '',
-            vehicle_year: new Date().getFullYear(),
-            email: '',
-            engine_no: '',
-            chassis_no: '',
-            address: '',
-            city: ''
-          });
-          setSearchMode('search');
-          onSuccess();
+          const savedData = { ...customerData, id: forced.customer_id };
+          resetForm();
+          onSuccess(savedData);
           return;
         }
 
@@ -137,29 +216,37 @@ export default function WalkInRegistration({ onSuccess }) {
     }
   };
 
+  const searchColumns = [
+    { key: 'name', label: 'Name', render: (val) => <span className="font-medium">{val}</span> },
+    { key: 'plate_no', label: 'Plate No.', render: (val) => <StatusBadge status="neutral">{val}</StatusBadge> },
+    { key: 'contact_no', label: 'Contact' },
+    { key: 'vehicle_model', label: 'Vehicle' },
+    { 
+        key: 'actions', 
+        label: 'Action', 
+        render: (_, row) => (
+            <button className="btn-enterprise btn-sm btn-secondary" onClick={() => handleSelectCustomer(row)}>
+                Select
+            </button>
+        ) 
+    }
+  ];
+
   return (
-    <div className="walkin-section">
-      <h3>🚗 Walk-In Customer Registration</h3>
-
-      {searchMode === 'search' ? (
-        <div className="card">
-          <div className="card-header">
-            <h4>Step 1: Search Existing Customer</h4>
-          </div>
-
+    <>
+      {searchMode === 'search' && (
+        <EnterpriseCard title="Customer Search" subtitle="Find existing customer or register new">
           <form onSubmit={handleSearch}>
-            <div className="grid grid-2">
-              <div className="form-group">
-                <label className="form-label">Search By</label>
-                <select name="search_type" className="form-select" required>
+            <div className="dashboard-grid dashboard-grid-2">
+              <FormGroup label="Search By">
+                <select name="search_type" className="form-input" required>
                   <option value="plate">Plate Number</option>
                   <option value="name">Name</option>
                   <option value="contact">Contact Number</option>
                 </select>
-              </div>
+              </FormGroup>
 
-              <div className="form-group">
-                <label className="form-label">Search Value</label>
+              <FormGroup label="Search Value">
                 <input
                   type="text"
                   name="search_value"
@@ -167,85 +254,70 @@ export default function WalkInRegistration({ onSuccess }) {
                   placeholder="Enter value to search"
                   required
                 />
-              </div>
+              </FormGroup>
             </div>
 
-            <button type="submit" className="btn btn-primary">
-              🔍 Search Customer
-            </button>
+            <div className="form-actions" style={{ marginTop: '1rem' }}>
+                <button type="submit" className="btn-enterprise btn-primary">
+                🔍 Search Customer
+                </button>
+            </div>
           </form>
 
           {searchResults.length > 0 && (
-            <div className="mt-20">
-              <h4>Search Results</h4>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Plate No.</th>
-                    <th>Contact</th>
-                    <th>Vehicle</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {searchResults.map((customer) => (
-                    <tr key={customer.id}>
-                      <td>{customer.name}</td>
-                      <td>{customer.plate_no}</td>
-                      <td>{customer.contact_no}</td>
-                      <td>{customer.vehicle_model}</td>
-                      <td>
-                        <button
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => handleSelectCustomer(customer)}
-                        >
-                          Select
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="mt-6">
+              <h4 className="text-lg font-semibold mb-4">Search Results</h4>
+              <EnterpriseTable columns={searchColumns} data={searchResults} />
             </div>
           )}
 
-          <div className="mt-20 text-center">
-            <p style={{ marginBottom: '15px' }}>Or</p>
+          <div className="mt-6 pt-6 border-t border-gray-100 flex justify-center">
             <button
-              className="btn btn-outline"
+              className="btn-enterprise btn-outline"
               onClick={() => setSearchMode('register')}
             >
               ➕ Register New Customer
             </button>
           </div>
-        </div>
-      ) : searchMode === 'existing' ? (
-        <div className="card">
-          <div className="alert alert-success">
-            ✓ Customer selected: <strong>{selectedCustomer?.name}</strong>
-          </div>
-          <button
-            className="btn btn-outline"
-            onClick={() => {
-              setSearchMode('search');
-              setSelectedCustomer(null);
-              setSearchResults([]);
-            }}
-          >
-            ← Back to Search
-          </button>
-        </div>
-      ) : (
-        <div className="card">
-          <div className="card-header">
-            <h4>Customer Information Sheet (CIS) - New Customer</h4>
-          </div>
-
+        </EnterpriseCard>
+      )} 
+      
+      {searchMode === 'existing' && (
+        <EnterpriseCard title="Selected Customer" subtitle="Customer selected for service">
+            <div className="bg-green-50 p-4 rounded-lg border border-green-100 mb-6 flex items-center gap-3">
+                <span className="text-2xl">✓</span>
+                <div>
+                    <div className="font-bold text-green-900">{selectedCustomer?.name}</div>
+                    <div className="text-green-700">{selectedCustomer?.plate_no} • {selectedCustomer?.vehicle_model}</div>
+                </div>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '16px', marginTop: '24px' }}>
+                <button
+                    className="btn-enterprise btn-secondary"
+                    onClick={() => {
+                        setSearchMode('search');
+                        setSelectedCustomer(null);
+                        setSearchResults([]);
+                    }}
+                >
+                    ← Back to Search
+                </button>
+                <button
+                    className="btn-enterprise btn-primary"
+                    onClick={() => onSuccess(selectedCustomer)}
+                >
+                    Proceed to Check-In →
+                </button>
+            </div>
+        </EnterpriseCard>
+      )}
+      
+      {searchMode === 'register' && (
+        <EnterpriseCard title="New Customer Registration" subtitle="Create record for new walk-in customer">
           <form onSubmit={handleRegisterWalkIn}>
-            <div className="grid grid-2">
-              <div className="form-group">
-                <label className="form-label">Full Name *</label>
+            <div className="dashboard-grid dashboard-grid-2">
+              <FormGroup label="Full Name" required>
                 <input
                   type="text"
                   className="form-input"
@@ -254,10 +326,9 @@ export default function WalkInRegistration({ onSuccess }) {
                   placeholder="Customer name"
                   required
                 />
-              </div>
+              </FormGroup>
 
-              <div className="form-group">
-                <label className="form-label">Contact Number *</label>
+              <FormGroup label="Contact Number" required>
                 <input
                   type="tel"
                   className="form-input"
@@ -266,24 +337,35 @@ export default function WalkInRegistration({ onSuccess }) {
                   placeholder="09XX-XXX-XXXX"
                   required
                 />
-              </div>
-            </div>
+              </FormGroup>
 
-            <div className="grid grid-2">
-              <div className="form-group">
-                <label className="form-label">Plate Number *</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={customerData.plate_no}
-                  onChange={(e) => setCustomerData({...customerData, plate_no: e.target.value})}
-                  placeholder="ABC-1234"
-                  required
-                />
-              </div>
+              <FormGroup label="Plate Number" required>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={customerData.plate_no}
+                    onChange={handlePlateChange}
+                    placeholder="ABC-1234 (auto-lookup)"
+                    required
+                    style={{ 
+                      borderColor: foundExisting ? '#22c55e' : undefined,
+                      paddingRight: plateLoading ? '40px' : undefined
+                    }}
+                  />
+                  {plateLoading && (
+                    <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }}>⏳</span>
+                  )}
+                </div>
+                {foundExisting && (
+                  <div style={{ marginTop: '4px', padding: '8px 12px', background: '#f0fdf4', border: '1px solid #22c55e', borderRadius: '6px', fontSize: '12px' }}>
+                    <span style={{ color: '#16a34a', fontWeight: 600 }}>✓ Found:</span>{' '}
+                    <span style={{ color: '#166534' }}>{foundExisting.name} • {foundExisting.contact_no}</span>
+                  </div>
+                )}
+              </FormGroup>
 
-              <div className="form-group">
-                <label className="form-label">Vehicle Model</label>
+              <FormGroup label="Vehicle Model" required>
                 <input
                   type="text"
                   className="form-input"
@@ -292,12 +374,9 @@ export default function WalkInRegistration({ onSuccess }) {
                   placeholder="e.g., Toyota Camry"
                   required
                 />
-              </div>
-            </div>
+              </FormGroup>
 
-            <div className="grid grid-2">
-              <div className="form-group">
-                <label className="form-label">Vehicle Year</label>
+              <FormGroup label="Vehicle Year">
                 <input
                   type="number"
                   className="form-input"
@@ -306,10 +385,9 @@ export default function WalkInRegistration({ onSuccess }) {
                   min="1990"
                   max={new Date().getFullYear() + 1}
                 />
-              </div>
+              </FormGroup>
 
-              <div className="form-group">
-                <label className="form-label">Email</label>
+              <FormGroup label="Email">
                 <input
                   type="email"
                   className="form-input"
@@ -317,12 +395,9 @@ export default function WalkInRegistration({ onSuccess }) {
                   onChange={(e) => setCustomerData({ ...customerData, email: e.target.value })}
                   placeholder="email@example.com"
                 />
-              </div>
-            </div>
+              </FormGroup>
 
-            <div className="grid grid-2">
-              <div className="form-group">
-                <label className="form-label">Engine Number</label>
+              <FormGroup label="Engine Number">
                 <input
                   type="text"
                   className="form-input"
@@ -330,10 +405,9 @@ export default function WalkInRegistration({ onSuccess }) {
                   onChange={(e) => setCustomerData({...customerData, engine_no: e.target.value})}
                   placeholder="Engine No."
                 />
-              </div>
+              </FormGroup>
 
-              <div className="form-group">
-                <label className="form-label">Chassis Number</label>
+              <FormGroup label="Chassis Number">
                 <input
                   type="text"
                   className="form-input"
@@ -341,46 +415,44 @@ export default function WalkInRegistration({ onSuccess }) {
                   onChange={(e) => setCustomerData({...customerData, chassis_no: e.target.value})}
                   placeholder="Chassis No."
                 />
-              </div>
+              </FormGroup>
+
+              <FormGroup label="Address">
+                <input
+                  type="text"
+                  className="form-input"
+                  value={customerData.address}
+                  onChange={(e) => setCustomerData({...customerData, address: e.target.value})}
+                  placeholder="Street address"
+                />
+              </FormGroup>
+
+              <FormGroup label="City">
+                <input
+                  type="text"
+                  className="form-input"
+                  value={customerData.city}
+                  onChange={(e) => setCustomerData({...customerData, city: e.target.value})}
+                  placeholder="City"
+                />
+              </FormGroup>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Address</label>
-              <input
-                type="text"
-                className="form-input"
-                value={customerData.address}
-                onChange={(e) => setCustomerData({...customerData, address: e.target.value})}
-                placeholder="Street address"
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">City</label>
-              <input
-                type="text"
-                className="form-input"
-                value={customerData.city}
-                onChange={(e) => setCustomerData({...customerData, city: e.target.value})}
-                placeholder="City"
-              />
-            </div>
-
-            <div className="flex gap-10">
-              <button type="submit" className="btn btn-success">
-                ✓ Register Customer
+            <div className="flex gap-4 mt-6">
+              <button type="submit" className="btn-enterprise btn-primary">
+                Register Customer
               </button>
               <button
                 type="button"
-                className="btn btn-outline"
+                className="btn-enterprise btn-secondary"
                 onClick={() => setSearchMode('search')}
               >
                 Cancel
               </button>
             </div>
           </form>
-        </div>
+        </EnterpriseCard>
       )}
-    </div>
+    </>
   );
 }

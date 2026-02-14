@@ -3,7 +3,21 @@ import '../styles/job-wrapup-dashboard.css';
 import '../styles/enterprise-ui.css';
 import '../styles/dashboard-common.css';
 import { fetchJson } from '../utils/fetchJson';
-import { StatCard, EnterpriseCard, StatusBadge, EnterpriseTabs, LoadingSpinner, EmptyState } from '../components/EnterpriseComponents';
+import { 
+  StatCard, 
+  EnterpriseCard, 
+  StatusBadge, 
+  EnterpriseTabs, 
+  LoadingSpinner, 
+  EmptyState,
+  ModuleLayout,
+  EnterpriseTable,
+  Modal,
+  EnterpriseButton,
+  EnterpriseFormGroup,
+  EnterpriseInput,
+  EnterpriseCheckbox
+} from '../components/EnterpriseComponents';
 
 const JobWrapupDashboard = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState('ready');
@@ -17,11 +31,21 @@ const JobWrapupDashboard = ({ user, onLogout }) => {
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
+  // Form states
+  const [finalNotes, setFinalNotes] = useState('');
+  const [checklistData, setChecklistData] = useState({
+    checklistItems: '',
+    materialsReturned: false,
+    toolsReturned: false,
+    vehicleCondition: 'Good',
+    qualityPassed: false
+  });
+
   const API_BASE = '/api/job-wrapup';
 
   useEffect(() => {
     loadAllData();
-    const interval = setInterval(loadAllData, 30000);
+    const interval = setInterval(loadAllData, 3000); // Refresh every 3s
     return () => clearInterval(interval);
   }, []);
 
@@ -89,7 +113,7 @@ const JobWrapupDashboard = ({ user, onLogout }) => {
   };
 
   const handleClockOut = async (e) => {
-    e.preventDefault();
+    e?.preventDefault();
     setErrorMessage('');
     setSuccessMessage('');
 
@@ -98,12 +122,13 @@ const JobWrapupDashboard = ({ user, onLogout }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          notes: document.getElementById('finalNotes')?.value || ''
+          notes: finalNotes
         })
       });
       if (data.success) {
         setSuccessMessage(`Technician clocked out - ${data.labor_hours.toFixed(2)} hours logged`);
         setShowClockOutForm(false);
+        setFinalNotes('');
         loadAllData();
       } else {
         setErrorMessage(data.error || 'Failed to clock out');
@@ -114,7 +139,7 @@ const JobWrapupDashboard = ({ user, onLogout }) => {
   };
 
   const handleUpdateChecklist = async (e) => {
-    e.preventDefault();
+    e?.preventDefault();
     setErrorMessage('');
     setSuccessMessage('');
 
@@ -123,16 +148,24 @@ const JobWrapupDashboard = ({ user, onLogout }) => {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          checklist_items: document.getElementById('checklistItems')?.value || '',
-          materials_returned: document.getElementById('materials')?.checked ? 1 : 0,
-          tools_returned: document.getElementById('tools')?.checked ? 1 : 0,
-          vehicle_condition: document.getElementById('condition')?.value,
-          quality_passed: document.getElementById('qualityPassed')?.checked
+          checklist_items: checklistData.checklistItems,
+          materials_returned: checklistData.materialsReturned ? 1 : 0,
+          tools_returned: checklistData.toolsReturned ? 1 : 0,
+          vehicle_condition: checklistData.vehicleCondition,
+          quality_passed: checklistData.qualityPassed
         })
       });
       if (data.success) {
         setSuccessMessage('Checklist updated successfully');
         setShowChecklistForm(false);
+        // Reset form
+        setChecklistData({
+          checklistItems: '',
+          materialsReturned: false,
+          toolsReturned: false,
+          vehicleCondition: 'Good',
+          qualityPassed: false
+        });
         loadAllData();
       } else {
         setErrorMessage(data.error || 'Failed to update checklist');
@@ -142,268 +175,230 @@ const JobWrapupDashboard = ({ user, onLogout }) => {
     }
   };
 
-  const handleReturnToSA = async (wrapupId) => {
-    if (!window.confirm('Return this job to Service Advisor?')) return;
+  const moduleStats = summary ? [
+    { label: 'Total', value: summary.total_wrapups, icon: '📋' },
+    { label: 'Ready', value: summary.ready_count, icon: '⏱️', status: 'warning' },
+    { label: 'Active', value: summary.pending_count, icon: '🔄', status: 'info' },
+    { label: 'Returned', value: summary.returned_count, icon: '↩️', status: 'error' },
+    { label: 'Avg Labor', value: `${summary.avg_labor_hours?.toFixed(1) || 0}h`, icon: '⏳' }
+  ] : [];
 
-    try {
-      const data = await fetchJson(`${API_BASE}/wrapups/${wrapupId}/return-to-sa`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      if (data.success) {
-        setSuccessMessage('Job returned to Service Advisor');
-        loadAllData();
-      } else {
-        setErrorMessage(data.error || 'Failed to return job');
-      }
-    } catch (error) {
-      setErrorMessage('Error: ' + error.message);
+  const tabItems = [
+    { id: 'ready', label: 'Ready for Wrap-Up', icon: '⏱️' },
+    { id: 'active', label: 'Active Wrap-Ups', icon: '🔄' }
+  ];
+
+  /* Prepare table data for Ready Jobs */
+  // job: [id, orderNo, customer, vehicle, techId, techName, qcStatus]
+  const readyJobsColumns = [
+    { header: 'Order No', accessor: (job) => <strong>{job[1]}</strong> },
+    { header: 'Customer', accessor: (job) => job[2] },
+    { header: 'Vehicle', accessor: (job) => job[3] },
+    { header: 'Technician', accessor: (job) => job[5] },
+    { header: 'QC Status', accessor: (job) => <StatusBadge status="passed">{job[6]}</StatusBadge> },
+    { 
+      header: 'Actions', 
+      accessor: (job) => (
+        <EnterpriseButton 
+          variant="primary" 
+          size="sm"
+          onClick={() => handleStartWrapup(job)}
+        >
+          Start Wrap-Up
+        </EnterpriseButton>
+      )
     }
-  };
+  ];
+
+  /* Prepare table data for Active Wrap-ups */
+  // wrapup: [id, soId, orderNo, customer, status, laborHours, startedAt]
+  const activeWrapupsColumns = [
+    { header: 'Order No', accessor: (w) => <strong>{w[2]}</strong> },
+    { header: 'Customer', accessor: (w) => w[3] },
+    { header: 'Status', accessor: (w) => <StatusBadge status={w[4]}>{w[4].replace('-', ' ')}</StatusBadge> },
+    { header: 'Labor Hours', accessor: (w) => w[5] ? parseFloat(w[5]).toFixed(2) : '-' },
+    { header: 'Started', accessor: (w) => new Date(w[6]).toLocaleDateString() },
+    { 
+      header: 'Actions', 
+      accessor: (w) => (
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {w[4] === 'pending' && (
+            <>
+              <EnterpriseButton 
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setSelectedJob({ wrapupId: w[0], soId: w[1] });
+                  setShowChecklistForm(true);
+                }}
+              >
+                Checklist
+              </EnterpriseButton>
+              <EnterpriseButton 
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  setSelectedJob({ wrapupId: w[0] });
+                  setShowClockOutForm(true);
+                }}
+              >
+                Clock Out
+              </EnterpriseButton>
+            </>
+          )}
+        </div>
+      )
+    }
+  ];
 
   return (
-    <div className="job-wrapup-dashboard">
-      <header className="wu-header">
-        <div className="header-left">
-          <h1>Job Wrap-Up Management</h1>
-          <p>Welcome, {user.name}</p>
+    <ModuleLayout
+      title="Job Wrap-Up Management"
+      description="Manage job completion, checklists and clock-outs"
+      icon="🏁"
+      stats={moduleStats}
+      user={user}
+      onLogout={onLogout}
+    >
+      {/* Messages */}
+      {errorMessage && (
+        <div className="enterprise-alert error" style={{ marginBottom: '16px' }}>
+          {errorMessage}
         </div>
-        {user?.role !== 'admin' && (
-          <button onClick={onLogout} className="logout-btn">Sign Out</button>
-        )}
-      </header>
+      )}
+      {successMessage && (
+        <div className="enterprise-alert success" style={{ marginBottom: '16px' }}>
+          {successMessage}
+        </div>
+      )}
 
-      <div className="wu-content">
-        {/* Summary Cards */}
-        {summary && (
-          <div className="summary-cards">
-            <div className="summary-card">
-              <h3>{summary.total_wrapups}</h3>
-              <p>Total Wrap-Ups</p>
-            </div>
-            <div className="summary-card ready">
-              <h3>{summary.ready_count}</h3>
-              <p>Ready for SA</p>
-            </div>
-            <div className="summary-card">
-              <h3>{summary.returned_count}</h3>
-              <p>Returned</p>
-            </div>
-            <div className="summary-card pending">
-              <h3>{summary.pending_count}</h3>
-              <p>Pending</p>
-            </div>
-            <div className="summary-card">
-              <h3>{summary.avg_labor_hours.toFixed(1)}h</h3>
-              <p>Avg Labor Hours</p>
-            </div>
-          </div>
-        )}
+      {/* Tabs */}
+      <EnterpriseCard>
+        <EnterpriseTabs
+          tabs={tabItems}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+        />
 
-        {/* Messages */}
-        {errorMessage && <div className="error-message">{errorMessage}</div>}
-        {successMessage && <div className="success-message">{successMessage}</div>}
+        <div style={{ marginTop: '20px' }}>
+          {activeTab === 'ready' && (
+            readyJobs.length > 0 ? (
+              <EnterpriseTable
+                columns={readyJobsColumns}
+                data={readyJobs}
+              />
+            ) : (
+              <EmptyState 
+                icon="⏱️"
+                title="No Jobs Ready"
+                description="There are no jobs currently waiting for wrap-up."
+              />
+            )
+          )}
 
-        {/* Tabs */}
-        <div className="tabs">
-          <button 
-            className={`tab ${activeTab === 'ready' ? 'active' : ''}`}
-            onClick={() => setActiveTab('ready')}
-          >
-            Ready for Wrap-Up
-          </button>
-          <button 
-            className={`tab ${activeTab === 'active' ? 'active' : ''}`}
-            onClick={() => setActiveTab('active')}
-          >
-            Active Wrap-Ups
-          </button>
+          {activeTab === 'active' && (
+            activeWrapups.length > 0 ? (
+              <EnterpriseTable
+                columns={activeWrapupsColumns}
+                data={activeWrapups}
+              />
+            ) : (
+              <EmptyState 
+                icon="🔄"
+                title="No Active Wrap-Ups"
+                description="There are no active wrap-up sessions."
+              />
+            )
+          )}
+        </div>
+      </EnterpriseCard>
+
+      {/* Clock Out Modal */}
+      <Modal
+        isOpen={showClockOutForm}
+        onClose={() => setShowClockOutForm(false)}
+        title="Technician Clock Out"
+        footer={
+          <>
+            <EnterpriseButton variant="secondary" onClick={() => setShowClockOutForm(false)}>
+              Cancel
+            </EnterpriseButton>
+            <EnterpriseButton variant="primary" onClick={handleClockOut}>
+              Confirm Clock Out
+            </EnterpriseButton>
+          </>
+        }
+      >
+        <EnterpriseFormGroup label="Final Notes">
+          <textarea
+            className="enterprise-textarea"
+            rows="3"
+            value={finalNotes}
+            onChange={(e) => setFinalNotes(e.target.value)}
+            placeholder="Enter any final notes about the job..."
+          />
+        </EnterpriseFormGroup>
+      </Modal>
+
+      {/* Checklist Modal */}
+      <Modal
+        isOpen={showChecklistForm}
+        onClose={() => setShowChecklistForm(false)}
+        title="Job Wrap-Up Checklist"
+        footer={
+          <>
+            <EnterpriseButton variant="secondary" onClick={() => setShowChecklistForm(false)}>
+              Cancel
+            </EnterpriseButton>
+            <EnterpriseButton variant="primary" onClick={handleUpdateChecklist}>
+              Save Checklist
+            </EnterpriseButton>
+          </>
+        }
+      >
+        <EnterpriseFormGroup label="Checklist Items">
+          <textarea
+            className="enterprise-textarea"
+            rows="3"
+            value={checklistData.checklistItems}
+            onChange={(e) => setChecklistData({ ...checklistData, checklistItems: e.target.value })}
+            placeholder="List checked items..."
+          />
+        </EnterpriseFormGroup>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+          <EnterpriseCheckbox
+            label="Materials Returned"
+            checked={checklistData.materialsReturned}
+            onChange={(checked) => setChecklistData({ ...checklistData, materialsReturned: checked })}
+          />
+          <EnterpriseCheckbox
+            label="Tools Returned"
+            checked={checklistData.toolsReturned}
+            onChange={(checked) => setChecklistData({ ...checklistData, toolsReturned: checked })}
+          />
+          <EnterpriseCheckbox
+            label="Quality Passed"
+            checked={checklistData.qualityPassed}
+            onChange={(checked) => setChecklistData({ ...checklistData, qualityPassed: checked })}
+          />
         </div>
 
-        {/* Ready for Wrap-Up Tab */}
-        {activeTab === 'ready' && (
-          <div className="tab-content">
-            {readyJobs.length > 0 ? (
-              <table className="jobs-table">
-                <thead>
-                  <tr>
-                    <th>Order No</th>
-                    <th>Customer</th>
-                    <th>Vehicle</th>
-                    <th>Technician</th>
-                    <th>QC Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {readyJobs.map(job => (
-                    <tr key={job[0]}>
-                      <td><strong>{job[1]}</strong></td>
-                      <td>{job[2]}</td>
-                      <td>{job[3]}</td>
-                      <td>{job[5]}</td>
-                      <td><span className="badge passed">{job[6]}</span></td>
-                      <td>
-                        <button 
-                          className="btn-small primary"
-                          onClick={() => handleStartWrapup(job)}
-                        >
-                          Start Wrap-Up
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div className="empty-state">No jobs ready for wrap-up</div>
-            )}
-          </div>
-        )}
+        <EnterpriseFormGroup label="Vehicle Condition">
+          <select 
+            className="enterprise-select"
+            value={checklistData.vehicleCondition}
+            onChange={(e) => setChecklistData({ ...checklistData, vehicleCondition: e.target.value })}
+          >
+            <option value="Excellent">Excellent</option>
+            <option value="Good">Good</option>
+            <option value="Fair">Fair</option>
+            <option value="Poor">Poor</option>
+          </select>
+        </EnterpriseFormGroup>
+      </Modal>
 
-        {/* Active Wrap-Ups Tab */}
-        {activeTab === 'active' && (
-          <div className="tab-content">
-            {activeWrapups.length > 0 ? (
-              <div className="wrapups-grid">
-                {activeWrapups.map(wrapup => (
-                  <div key={wrapup[0]} className="wrapup-card">
-                    <div className="card-header">
-                      <h3>{wrapup[2]}</h3>
-                      <span className={`badge ${wrapup[4]}`}>{wrapup[4].replace('-', ' ')}</span>
-                    </div>
-                    <div className="card-content">
-                      <p><strong>Customer:</strong> {wrapup[3]}</p>
-                      <p><strong>Labor Hours:</strong> {wrapup[5] ? parseFloat(wrapup[5]).toFixed(2) : '-'}</p>
-                      <p><strong>Started:</strong> {new Date(wrapup[6]).toLocaleDateString()}</p>
-                    </div>
-                    <div className="card-actions">
-                      {wrapup[4] === 'pending' ? (
-                        <>
-                          <button 
-                            className="btn-small info"
-                            onClick={() => {
-                              setSelectedJob({ wrapupId: wrapup[0], soId: wrapup[1] });
-                              setShowChecklistForm(true);
-                            }}
-                          >
-                            Checklist
-                          </button>
-                          <button 
-                            className="btn-small success"
-                            onClick={() => {
-                              setSelectedJob({ wrapupId: wrapup[0] });
-                              setShowClockOutForm(true);
-                            }}
-                          >
-                            Clock Out
-                          </button>
-                        </>
-                      ) : (
-                        <button 
-                          className="btn-small complete"
-                          onClick={() => handleReturnToSA(wrapup[0])}
-                        >
-                          ✓ Return to SA
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="empty-state">No active wrap-ups</div>
-            )}
-
-            {/* Clock Out Modal */}
-            {showClockOutForm && (
-              <div className="modal-overlay">
-                <form onSubmit={handleClockOut} className="modal-form">
-                  <h3>Clock Out Technician</h3>
-                  <div className="form-group">
-                    <label>Final Notes</label>
-                    <textarea 
-                      id="finalNotes" 
-                      placeholder="Any final comments or issues..."
-                      rows="4"
-                    ></textarea>
-                  </div>
-                  <div className="form-actions">
-                    <button type="submit" className="btn-success">Clock Out</button>
-                    <button type="button" className="btn-cancel" onClick={() => setShowClockOutForm(false)}>Cancel</button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            {/* Checklist Modal */}
-            {showChecklistForm && (
-              <div className="modal-overlay">
-                <form onSubmit={handleUpdateChecklist} className="modal-form">
-                  <h3>Job Completion Checklist</h3>
-                  
-                  <div className="form-section">
-                    <h4>Completion Items</h4>
-                    <div className="form-group">
-                      <label>Checklist Items</label>
-                      <textarea 
-                        id="checklistItems" 
-                        placeholder="List all completed items..."
-                        rows="4"
-                      ></textarea>
-                    </div>
-                  </div>
-
-                  <div className="form-section">
-                    <h4>Resources</h4>
-                    <div className="form-group">
-                      <label>
-                        <input type="checkbox" id="materials" /> Materials Returned
-                      </label>
-                    </div>
-                    <div className="form-group">
-                      <label>
-                        <input type="checkbox" id="tools" /> Tools Returned
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="form-section">
-                    <h4>Vehicle Condition</h4>
-                    <div className="form-group">
-                      <label>Final Condition</label>
-                      <select id="condition">
-                        <option value="">Select condition</option>
-                        <option value="excellent">Excellent</option>
-                        <option value="good">Good</option>
-                        <option value="fair">Fair</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="form-section">
-                    <div className="form-group">
-                      <label>
-                        <input type="checkbox" id="qualityPassed" /> Quality Check Passed
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="form-actions">
-                    <button type="submit" className="btn-success">Update Checklist</button>
-                    <button type="button" className="btn-cancel" onClick={() => setShowChecklistForm(false)}>Cancel</button>
-                  </div>
-                </form>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      <footer className="wu-footer">
-        <p>© 2025 <em>Rapide</em> Job Wrap-Up System</p>
-      </footer>
-    </div>
+    </ModuleLayout>
   );
 };
 

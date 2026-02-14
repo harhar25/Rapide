@@ -1,18 +1,34 @@
-import React, { useState, useEffect } from 'react';
-import '../styles/technician-dashboard.css';
+import React, { useState, useEffect, useCallback } from 'react';
+import '../styles/technician-dashboard-v2.css';
 import '../styles/enterprise-ui.css';
 import '../styles/dashboard-common.css';
 import { fetchJson } from '../utils/fetchJson';
-import { StatCard, EnterpriseCard, StatusBadge, EnterpriseTabs, LoadingSpinner, EmptyState } from '../components/EnterpriseComponents';
+import { 
+  StatCard, 
+  EnterpriseCard, 
+  StatusBadge, 
+  EnterpriseTabs, 
+  LoadingSpinner, 
+  EmptyState,
+  ModuleLayout,
+  EnterpriseButton,
+  EnterpriseFormGroup
+} from '../components/EnterpriseComponents';
 
 const TechnicianDashboard = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = React.useState('assigned');
   const [technician, setTechnician] = React.useState(null);
   const [jobs, setJobs] = React.useState([]);
-  const [loading, setLoading] = React.useState(false);
+  const [loading, setLoading] = React.useState(true);
+  const [initialLoadDone, setInitialLoadDone] = React.useState(false);
   const [error, setError] = React.useState('');
   const [notesDraft, setNotesDraft] = React.useState({});
-  const [partsDraft, setPartsDraft] = React.useState({});
+  
+  // Modal & Form State
+  const [isPartsModalOpen, setIsPartsModalOpen] = useState(false);
+  const [selectedJobForParts, setSelectedJobForParts] = useState(null);
+  const [partsList, setPartsList] = useState([{ productId: '', quantity: 1 }]);
+  const [requestNotes, setRequestNotes] = useState('');
 
   const resolveTechnician = React.useCallback(async () => {
     const res = await fetchJson('/api/technician/resolve', {
@@ -28,7 +44,7 @@ const TechnicianDashboard = ({ user, onLogout }) => {
   }, [user?.username, user?.name]);
 
   const loadJobs = React.useCallback(async (technicianId) => {
-    setLoading(true);
+    if (!initialLoadDone) setLoading(true);
     setError('');
     try {
       const res = await fetchJson(`/api/technician/jobs?technician_id=${encodeURIComponent(technicianId)}`);
@@ -37,18 +53,24 @@ const TechnicianDashboard = ({ user, onLogout }) => {
     } catch (e) {
       setError(e?.message || String(e));
     } finally {
-      setLoading(false);
+      if (!initialLoadDone) {
+        setLoading(false);
+        setInitialLoadDone(true);
+      }
     }
-  }, []);
+  }, [initialLoadDone]);
 
   React.useEffect(() => {
     let cancelled = false;
+    let intervalId = null;
     (async () => {
       try {
         const resolved = await resolveTechnician();
         if (cancelled) return;
         setTechnician(resolved);
         await loadJobs(resolved.technician_id);
+        // Start 3s polling after initial load
+        intervalId = setInterval(() => loadJobs(resolved.technician_id), 3000);
       } catch (e) {
         if (cancelled) return;
         setError(e?.message || String(e));
@@ -56,77 +78,126 @@ const TechnicianDashboard = ({ user, onLogout }) => {
     })();
     return () => {
       cancelled = true;
+      if (intervalId) clearInterval(intervalId);
     };
   }, [resolveTechnician, loadJobs]);
 
   const startJob = async (assignmentId) => {
-    const res = await fetchJson('/api/technician/clock-in', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ assignment_id: assignmentId }),
-    });
-    if (!res?.success) throw new Error(res?.error || 'Clock-in failed');
-    if (technician?.technician_id) {
-      await loadJobs(technician.technician_id);
+    try {
+      const res = await fetchJson('/api/technician/clock-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assignment_id: assignmentId }),
+      });
+      if (!res?.success) throw new Error(res?.error || 'Clock-in failed');
+      if (technician?.technician_id) {
+        await loadJobs(technician.technician_id);
+      }
+    } catch (e) {
+      setError(e?.message || String(e));
     }
   };
 
   const completeJob = async (assignmentId) => {
-    const res = await fetchJson('/api/technician/clock-out', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ assignment_id: assignmentId }),
-    });
-    if (!res?.success) throw new Error(res?.error || 'Clock-out failed');
-    if (technician?.technician_id) {
-      await loadJobs(technician.technician_id);
+    if (!window.confirm('Are you sure you want to complete this job?')) return;
+    try {
+      const res = await fetchJson('/api/technician/clock-out', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assignment_id: assignmentId }),
+      });
+      if (!res?.success) throw new Error(res?.error || 'Clock-out failed');
+      if (technician?.technician_id) {
+        await loadJobs(technician.technician_id);
+      }
+    } catch (e) {
+      setError(e?.message || String(e));
     }
   };
 
   const saveNotes = async (assignmentId) => {
-    const res = await fetchJson(`/api/technician/assignments/${assignmentId}/notes`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        technician_id: technician?.technician_id,
-        notes: notesDraft[assignmentId] || '',
-      }),
-    });
-    if (!res?.success) throw new Error(res?.error || 'Save notes failed');
-    if (technician?.technician_id) {
-      await loadJobs(technician.technician_id);
+    try {
+      const res = await fetchJson(`/api/technician/assignments/${assignmentId}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          technician_id: technician?.technician_id,
+          notes: notesDraft[assignmentId] || '',
+        }),
+      });
+      if (!res?.success) throw new Error(res?.error || 'Save notes failed');
+      if (technician?.technician_id) {
+        await loadJobs(technician.technician_id);
+      }
+      alert('Notes saved!');
+    } catch (e) {
+      setError(e?.message || String(e));
     }
   };
 
-  const requestParts = async (serviceOrderId, assignmentId) => {
-    const raw = partsDraft[assignmentId] || '';
-    const partsList = raw
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const [productIdStr, qtyStr] = line.split(',').map((x) => (x || '').trim());
-        const product_id = parseInt(productIdStr, 10);
-        const quantity = qtyStr ? parseInt(qtyStr, 10) : 1;
-        return { product_id, quantity };
-      })
-      .filter((p) => Number.isFinite(p.product_id) && p.product_id > 0 && Number.isFinite(p.quantity) && p.quantity > 0);
+  // Parts Header Handling
+  const openPartsModal = (job) => {
+    setSelectedJobForParts(job);
+    setPartsList([{ productId: '', quantity: 1 }]);
+    setRequestNotes('');
+    setIsPartsModalOpen(true);
+  };
 
-    if (!partsList.length) {
-      throw new Error('Please enter parts as: product_id, quantity (one per line)');
+  const closePartsModal = () => {
+    setIsPartsModalOpen(false);
+    setSelectedJobForParts(null);
+  };
+
+  const handlePartChange = (index, field, value) => {
+    const list = [...partsList];
+    list[index][field] = value;
+    setPartsList(list);
+  };
+
+  const addPartRow = () => {
+    setPartsList([...partsList, { productId: '', quantity: 1 }]);
+  };
+
+  const removePartRow = (index) => {
+    const list = [...partsList];
+    list.splice(index, 1);
+    setPartsList(list);
+  };
+
+  const submitPartsRequest = async () => {
+    if (!selectedJobForParts) return;
+    
+    // Validation
+    const validParts = partsList.filter(p => p.productId && p.quantity > 0);
+    if (validParts.length === 0) {
+      alert("Please add at least one valid part (ID and Quantity).");
+      return;
     }
 
-    const res = await fetchJson(`/api/technician/service-orders/${serviceOrderId}/parts-request`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        technician_id: technician?.technician_id,
-        requested_parts: partsList,
-        notes: notesDraft[assignmentId] || null,
-      }),
-    });
+    try {
+      const finalParts = validParts.map(p => ({
+        product_id: parseInt(p.productId, 10),
+        quantity: parseInt(p.quantity, 10)
+      }));
 
-    if (!res?.success) throw new Error(res?.error || 'Parts request failed');
+      const res = await fetchJson(`/api/technician/service-orders/${selectedJobForParts.service_order_id}/parts-request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          technician_id: technician?.technician_id,
+          requested_parts: finalParts,
+          notes: requestNotes,
+        }),
+      });
+
+      if (!res?.success) throw new Error(res?.error || 'Parts request failed');
+      
+      alert('Parts request sent successfully');
+      closePartsModal();
+      
+    } catch (e) {
+      alert(e?.message || String(e));
+    }
   };
 
   const filteredJobs = jobs.filter((job) => {
@@ -136,149 +207,125 @@ const TechnicianDashboard = ({ user, onLogout }) => {
     return status === 'completed';
   });
 
+  const tabItems = [
+    { id: 'assigned', label: 'Assigned', icon: '📝' },
+    { id: 'in-progress', label: 'In Progress', icon: '⚡' },
+    { id: 'completed', label: 'Completed', icon: '✅' }
+  ];
+
+  /* Stats for ModuleLayout */
+  const techStats = [
+    { label: 'Assigned', value: jobs.filter(j => j.assignment_status === 'assigned').length, icon: '📝' },
+    { label: 'In Progress', value: jobs.filter(j => j.assignment_status === 'in-progress').length, icon: '⚡', status: 'warning' },
+    { label: 'Completed Today', value: jobs.filter(j => j.assignment_status === 'completed').length, icon: '✅', status: 'success' }
+  ];
+
   return (
-    <div className="tech-dashboard">
-      <header className="tech-header">
-        <div className="header-left">
-          <h1>Jobs</h1>
-          <p>Welcome, {user.name}</p>
+    <ModuleLayout
+      title="Technician Dashboard"
+      description="View assigned jobs, track time, and request parts"
+      icon="🔧"
+      user={user}
+      onLogout={onLogout}
+      stats={techStats}
+    >
+      {error && (
+        <div className="enterprise-alert error" style={{ marginBottom: '16px' }}>
+          {error}
         </div>
-        {user?.role !== 'admin' && (
-          <button onClick={onLogout} className="logout-btn">Sign Out</button>
+      )}
+      
+      {loading && <LoadingSpinner />}
+
+      <EnterpriseTabs
+        tabs={tabItems}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+      />
+
+      <div className="jobs-grid">
+        {filteredJobs.length === 0 && !loading && (
+            <EmptyState 
+                title={`No ${activeTab.replace('-', ' ')} jobs`}
+                description="Jobs assigned to you will appear here." 
+                icon="📋"
+            />
         )}
-      </header>
-
-      <div className="tech-content">
-        <div className="tabs">
-          <button 
-            className={`tab ${activeTab === 'assigned' ? 'active' : ''}`}
-            onClick={() => setActiveTab('assigned')}
-          >
-            Assigned
-          </button>
-          <button 
-            className={`tab ${activeTab === 'in-progress' ? 'active' : ''}`}
-            onClick={() => setActiveTab('in-progress')}
-          >
-            In Progress
-          </button>
-          <button 
-            className={`tab ${activeTab === 'completed' ? 'active' : ''}`}
-            onClick={() => setActiveTab('completed')}
-          >
-            Completed
-          </button>
-        </div>
-
-        {error ? (
-          <div style={{ marginBottom: 16, color: '#b91c1c' }}>{error}</div>
-        ) : null}
-        {loading ? (
-          <div style={{ marginBottom: 16, color: '#6c757d' }}>Loading...</div>
-        ) : null}
-
-        <div className="jobs-grid">
-          {filteredJobs.map((job) => (
-            <div key={job.assignment_id} className="job-card">
-              <div className="job-header">
-                <h3>{job.customer_name || 'Customer'}</h3>
-                <span className={`status ${job.assignment_status}`}>{String(job.assignment_status).replace('-', ' ')}</span>
+        
+        {filteredJobs.map(job => (
+          <div key={job.assignment_id} className={`job-card ${job.assignment_status}`}>
+            <div className="job-header">
+              <div>
+                <span className="job-id">#{job.job_order_number || job.service_order_id}</span>
+                <h3>{job.customer_name || 'Guest Customer'}</h3>
+                <p className="vehicle-info">{job.vehicle_name || 'Unknown Vehicle'}</p>
               </div>
-              <div className="job-details">
-                <p><strong>Vehicle</strong> {job.vehicle_model || job.vehicle_plate_no || '-'}</p>
-                <p><strong>Service</strong> {job.service_type || '-'}</p>
-                <p><strong>Plate</strong> {job.vehicle_plate_no || '-'}</p>
-              </div>
-
-              <div style={{ marginBottom: 12 }}>
-                <label htmlFor={`notes-${job.assignment_id}`} style={{ display: 'block', marginBottom: 6, color: '#495057', fontSize: '0.85em' }}>
-                  Work notes
-                </label>
-                <textarea
-                  id={`notes-${job.assignment_id}`}
-                  name={`notes-${job.assignment_id}`}
-                  rows={3}
-                  style={{ width: '100%', padding: 10, borderRadius: 6, border: '1px solid #e9ecef' }}
-                  value={notesDraft[job.assignment_id] ?? (job.notes || '')}
-                  onChange={(e) => setNotesDraft((p) => ({ ...p, [job.assignment_id]: e.target.value }))}
-                />
-                <button
-                  className="btn-complete"
-                  style={{ marginTop: 10 }}
-                  onClick={async () => {
-                    try {
-                      await saveNotes(job.assignment_id);
-                    } catch (e) {
-                      setError(e?.message || String(e));
-                    }
-                  }}
-                >
-                  Save Notes
-                </button>
-              </div>
-
-              <div style={{ marginBottom: 12 }}>
-                <label htmlFor={`parts-${job.assignment_id}`} style={{ display: 'block', marginBottom: 6, color: '#495057', fontSize: '0.85em' }}>
-                  Request parts (one per line: product_id, quantity)
-                </label>
-                <textarea
-                  id={`parts-${job.assignment_id}`}
-                  name={`parts-${job.assignment_id}`}
-                  rows={3}
-                  style={{ width: '100%', padding: 10, borderRadius: 6, border: '1px solid #e9ecef' }}
-                  value={partsDraft[job.assignment_id] || ''}
-                  onChange={(e) => setPartsDraft((p) => ({ ...p, [job.assignment_id]: e.target.value }))}
-                />
-                <button
-                  className="btn-complete"
-                  style={{ marginTop: 10 }}
-                  onClick={async () => {
-                    try {
-                      await requestParts(job.service_order_id, job.assignment_id);
-                    } catch (e) {
-                      setError(e?.message || String(e));
-                    }
-                  }}
-                >
-                  Send Parts Request
-                </button>
-              </div>
-
-              <div className="job-actions">
-                {job.assignment_status === 'assigned' && (
-                  <button
-                    className="btn-start"
-                    onClick={async () => {
-                      try {
-                        await startJob(job.assignment_id);
-                      } catch (e) {
-                        setError(e?.message || String(e));
-                      }
-                    }}
-                  >
-                    Start
-                  </button>
-                )}
-                {job.assignment_status === 'in-progress' && (
-                  <button
-                    className="btn-complete"
-                    onClick={async () => {
-                      try {
-                        await completeJob(job.assignment_id);
-                      } catch (e) {
-                        setError(e?.message || String(e));
-                      }
-                    }}
-                  >
-                    Complete
-                  </button>
-                )}
-              </div>
+              <StatusBadge status={job.assignment_status || 'pending'} />
             </div>
-          ))}
-        </div>
+            
+            <div className="job-details">
+              <div className="detail-row">
+                <span className="label">Task:</span>
+                <span className="value">{job.description || 'General Service'}</span>
+              </div>
+              <div className="detail-row">
+                <span className="label">Time Est:</span>
+                <span className="value">{job.estimated_hours ? `${job.estimated_hours} hrs` : 'N/A'}</span>
+              </div>
+              {job.start_time && (
+                 <div className="detail-row">
+                 <span className="label">Started:</span>
+                 <span className="value">{new Date(job.start_time).toLocaleTimeString()}</span>
+               </div>
+              )}
+            </div>
+
+            {/* Work Notes Section */}
+            <div className="work-notes-section">
+                <label>Technician Notes</label>
+                <div className="notes-input-group">
+                    <textarea
+                        rows="2"
+                        className="ent-textarea"
+                        placeholder="Update notes..."
+                        value={notesDraft[job.assignment_id] ?? (job.notes || '')}
+                        onChange={(e) => setNotesDraft((p) => ({ ...p, [job.assignment_id]: e.target.value }))}
+                    />
+                    <button 
+                        className="btn-save-notes" 
+                        onClick={() => saveNotes(job.assignment_id)}
+                        disabled={loading}
+                    >
+                        Save
+                    </button>
+                </div>
+            </div>
+
+            <div className="job-actions-area">
+                {job.assignment_status === 'assigned' && (
+                    <button 
+                        className="tech-btn btn-clock-in" 
+                        onClick={() => startJob(job.assignment_id)}
+                    >
+                        ⏱️ START JOB
+                    </button>
+                )}
+                
+                {job.assignment_status === 'in-progress' && (
+                    <div className="active-actions">
+                        <button 
+                            className="tech-btn btn-complete"
+                            onClick={() => completeJob(job.assignment_id)}
+                        >
+                            ✅ Complete Job
+                        </button>
+                    </div>
+                )}
+            </div>
+          </div>
+        ))}
       </div>
-    </div>
+    </ModuleLayout>
   );
 };
 

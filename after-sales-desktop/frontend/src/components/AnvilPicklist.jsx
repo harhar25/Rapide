@@ -402,7 +402,13 @@ const AnvilPicklist = ({ partsRequest = null, onClose, onComplete } = {}) => {
     setIsPrinting(true);
     try {
       const htmlContent = generatePicklistHTML();
-      await printJobOrder(htmlContent, printer.name);
+      const logData = {
+          service_order_id: picklistData.jobOrderNumber,
+          document_type: 'picklist',
+          printed_by: 'Technician/Warehouse',
+          data: { picklistNumber: picklistData.picklistNumber }
+      };
+      await printJobOrder(htmlContent, printer.name, {}, logData);
       setShowPrinterSelector(false);
       alert('Picklist sent to printer successfully!');
     } catch (error) {
@@ -553,7 +559,7 @@ const AnvilPicklist = ({ partsRequest = null, onClose, onComplete } = {}) => {
             onClick={handleCompletePicklist}
             disabled={!isPicklistComplete()}
           >
-            ✓ Complete Picklist
+            ✓ Ready for Release
           </button>
           <button 
             className="btn-print-action"

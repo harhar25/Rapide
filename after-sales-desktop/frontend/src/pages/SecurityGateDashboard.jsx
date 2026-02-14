@@ -1,28 +1,51 @@
-import React, { useState, useEffect } from 'react';
-import '../styles/security-gate-dashboard.css';
-import '../styles/enterprise-ui.css';
-import '../styles/dashboard-common.css';
+import React, { useState, useEffect, useCallback } from 'react';
+import { 
+  ModuleLayout, 
+  EnterpriseTable, 
+  EnterpriseButton, 
+  EnterpriseFormGroup, 
+  EnterpriseCard, 
+  EnterpriseTabs, 
+  StatCard, 
+  StatusBadge, 
+  EmptyState, 
+  LoadingSpinner 
+} from '../components/EnterpriseComponents';
 import { fetchJson } from '../utils/fetchJson';
-import { StatCard, EnterpriseCard, StatusBadge, EnterpriseTabs, LoadingSpinner, EmptyState } from '../components/EnterpriseComponents';
+import { useAutoRefresh } from '../hooks/useRealtimeUpdates';
+import '../styles/enterprise-ui.css';
 
 export default function SecurityGateDashboard({ user, onLogout }) {
-  const [activeTab, setActiveTab] = useState('entries');
+  const [activeTab, setActiveTab] = useState('release');
   const [entryLogs, setEntryLogs] = useState([]);
   const [exitLogs, setExitLogs] = useState([]);
   const [activeBadges, setActiveBadges] = useState([]);
+  const [pendingGatepasses, setPendingGatepasses] = useState([]); // Vehicles ready to release
   const [newBadge, setNewBadge] = useState({ service_order_id: '', vehicle_plate: '', customer_name: '', customer_id: '', badge_days: 1 });
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
   const [summary, setSummary] = useState(null);
 
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 30000); // Refresh every 30 seconds
+    fetchData(false);
+    const interval = setInterval(() => fetchData(true), 5000); // Refresh every 5s (Silent)
     return () => clearInterval(interval);
   }, []);
 
-  const fetchData = async () => {
+  // --- REAL-TIME UPDATES ---
+  const handleRealtimeUpdate = useCallback(() => {
+    fetchData(true);
+  }, []);
+
+  useAutoRefresh(['security-gate', 'cashier', 'vehicle-handover'], handleRealtimeUpdate);
+
+  const fetchData = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
+      
+      // Fetch pending gatepasses (vehicles ready to release)
+      const gatepassData = await fetchJson('/api/gatepass/pending');
+      if (gatepassData.success) setPendingGatepasses(gatepassData.data || []);
       
       // Fetch entry logs
       const entryData = await fetchJson('/api/security-gate/logs/entries?date=' + new Date().toISOString().split('T')[0]);
@@ -40,10 +63,16 @@ export default function SecurityGateDashboard({ user, onLogout }) {
       const summaryData = await fetchJson('/api/security-gate/summary');
       if (summaryData.success) setSummary(summaryData.data || summaryData.summary || {});
       
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+        setInitialLoadDone(true);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+        setInitialLoadDone(true);
+      }
     }
   };
 
@@ -127,225 +156,290 @@ export default function SecurityGateDashboard({ user, onLogout }) {
     }
   };
 
-  return (
-    <div className="security-gate-container">
-      <div className="sg-header">
-        <div className="sg-title">
-          🔐 Security Gate Management
+  const handleReleaseVehicle = async (gatepass) => {
+    if (!window.confirm(`Release vehicle for Service Order #${gatepass.service_order_id}?`)) return;
+    
+    try {
+      // Sign the gatepass
+      const res = await fetchJson('/api/gatepass/sign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gatepass_id: gatepass.id,
+          signature_type: 'security',
+          signed_by: user.id
+        })
+      });
+
+      if (res.success) {
+        alert('Vehicle released successfully!');
+        fetchData();
+      } else {
+        alert('Error releasing vehicle: ' + (res.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error releasing vehicle');
+    }
+  };
+
+  const entryColumns = [
+    { label: 'Time', key: 'time', render: (val) => val?.substring(11, 19) || 'N/A' },
+    { label: 'Plate Number', key: 'plate_no', render: (val) => val || 'N/A' },
+    { label: 'Customer', key: 'customer', render: (val) => val || 'N/A' },
+    { label: 'Gate Operator', key: 'operator', render: (val) => val || 'N/A' },
+    { label: 'Authorization', key: 'authorized', render: (val) => (
+        <StatusBadge status={val ? 'success' : 'danger'}>
+            {val ? 'Authorized' : 'Not Authorized'}
+        </StatusBadge>
+    )}
+  ];
+
+  const exitColumns = [
+    { label: 'Time', key: 'time', render: (val) => val?.substring(11, 19) || 'N/A' },
+    { label: 'Plate Number', key: 'plate_no', render: (val) => val || 'N/A' },
+    { label: 'Customer', key: 'customer', render: (val) => val || 'N/A' },
+    { label: 'Gate Operator', key: 'operator', render: (val) => val || 'N/A' },
+    { label: 'Status', key: 'status', render: () => <StatusBadge status="success">Completed</StatusBadge> }
+  ];
+
+  const badgeColumns = [
+    { label: 'Badge #', key: 'badge_no' },
+    { label: 'Plate Number', key: 'plate_no' },
+    { label: 'Customer', key: 'customer' },
+    { label: 'Issue Date', key: 'issued', render: (val) => val?.substring(0, 10) },
+    { label: 'Expiry Date', key: 'expires', render: (val) => val?.substring(0, 10) },
+    { label: 'Type', key: 'type' },
+    { label: 'Scans', key: 'scans' },
+    { label: 'Action', key: 'action', render: (_, row) => (
+        <EnterpriseButton variant="danger" style={{ padding: '4px 8px', fontSize: '12px' }} onClick={() => handleRevokeBadge(row.badge_no)}>
+            Revoke
+        </EnterpriseButton>
+    )}
+  ];
+
+  const actions = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ fontSize: '0.875rem', color: '#6b7280', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginRight: '8px' }}>
+            <span style={{ fontWeight: '600', color: '#111827' }}>{user.name}</span>
+            <span style={{ fontSize: '0.75rem' }}>{user.role}</span>
         </div>
-        <div className="sg-user-info">
-          <span>{user.name} ({user.role})</span>
-          {user?.role !== 'admin' && (
-            <button onClick={onLogout} className="logout-btn">Logout</button>
-          )}
-        </div>
-      </div>
-
-      <div className="sg-summary">
-        {summary && (
-          <>
-            <div className="summary-card">
-              <div className="summary-value">{summary.total_entries || 0}</div>
-              <div className="summary-label">Entries Today</div>
-            </div>
-            <div className="summary-card">
-              <div className="summary-value">{summary.total_exits || 0}</div>
-              <div className="summary-label">Exits Today</div>
-            </div>
-            <div className="summary-card warning">
-              <div className="summary-value">{(summary.denied_entries || 0) + (summary.denied_exits || 0)}</div>
-              <div className="summary-label">Access Denied</div>
-            </div>
-            <div className="summary-card">
-              <div className="summary-value">{summary.vehicles_processed || 0}</div>
-              <div className="summary-label">Vehicles On-Site</div>
-            </div>
-          </>
+        {user?.role !== 'admin' && (
+            <EnterpriseButton variant="secondary" onClick={onLogout}>Logout</EnterpriseButton>
         )}
-      </div>
-
-      <div className="sg-tabs">
-        <button className={`tab ${activeTab === 'entries' ? 'active' : ''}`} onClick={() => setActiveTab('entries')}>Entry Logs</button>
-        <button className={`tab ${activeTab === 'exits' ? 'active' : ''}`} onClick={() => setActiveTab('exits')}>Exit Logs</button>
-        <button className={`tab ${activeTab === 'badges' ? 'active' : ''}`} onClick={() => setActiveTab('badges')}>Badge Management</button>
-        <button className={`tab ${activeTab === 'issue' ? 'active' : ''}`} onClick={() => setActiveTab('issue')}>Issue Badge</button>
-      </div>
-
-      <div className="sg-content">
-        {activeTab === 'entries' && (
-          <div className="tab-content">
-            <h2>Entry Logs - Today</h2>
-            <div className="actions">
-              <button onClick={() => handleLogAccess('entry')} className="action-btn">Log Entry</button>
-              <button onClick={fetchData} className="action-btn refresh">Refresh</button>
-            </div>
-            <div className="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Time</th>
-                    <th>Plate Number</th>
-                    <th>Customer</th>
-                    <th>Gate Operator</th>
-                    <th>Authorization Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {entryLogs.map((log, idx) => (
-                    <tr key={idx}>
-                      <td>{log.time?.substring(11, 19) || 'N/A'}</td>
-                      <td>{log.plate_no || 'N/A'}</td>
-                      <td>{log.customer || 'N/A'}</td>
-                      <td>{log.operator || 'N/A'}</td>
-                      <td><span className={`badge ${log.authorized ? 'authorized' : 'unauthorized'}`}>{log.authorized ? 'Authorized' : 'Not Authorized'}</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'exits' && (
-          <div className="tab-content">
-            <h2>Exit Logs - Today</h2>
-            <div className="actions">
-              <button onClick={() => handleLogAccess('exit')} className="action-btn">Log Exit</button>
-              <button onClick={fetchData} className="action-btn refresh">Refresh</button>
-            </div>
-            <div className="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Time</th>
-                    <th>Plate Number</th>
-                    <th>Customer</th>
-                    <th>Gate Operator</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {exitLogs.map((log, idx) => (
-                    <tr key={idx}>
-                      <td>{log.time?.substring(11, 19) || 'N/A'}</td>
-                      <td>{log.plate_no || 'N/A'}</td>
-                      <td>{log.customer || 'N/A'}</td>
-                      <td>{log.operator || 'N/A'}</td>
-                      <td><span className="badge success">Completed</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'badges' && (
-          <div className="tab-content">
-            <h2>Active Vehicle Badges</h2>
-            <div className="actions">
-              <button onClick={fetchData} className="action-btn refresh">Refresh</button>
-            </div>
-            <div className="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Badge Number</th>
-                    <th>Plate Number</th>
-                    <th>Customer</th>
-                    <th>Issue Date</th>
-                    <th>Expiry Date</th>
-                    <th>Type</th>
-                    <th>Scans</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {activeBadges.map((badge, idx) => (
-                    <tr key={idx}>
-                      <td>{badge.badge_no || 'N/A'}</td>
-                      <td>{badge.plate_no || 'N/A'}</td>
-                      <td>{badge.customer || 'N/A'}</td>
-                      <td>{badge.issued?.substring(0, 10) || 'N/A'}</td>
-                      <td>{badge.expires?.substring(0, 10) || 'N/A'}</td>
-                      <td>{badge.type || 'N/A'}</td>
-                      <td>{badge.scans ?? 0}</td>
-                      <td>
-                        <button onClick={() => handleRevokeBadge(badge.badge_no)} className="action-btn delete">Revoke</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'issue' && (
-          <div className="tab-content">
-            <h2>Issue New Vehicle Badge</h2>
-            <form className="form-container">
-              <div className="form-group">
-                <label htmlFor="sg_service_order_id">Service Order ID *</label>
-                <input 
-                  id="sg_service_order_id"
-                  name="service_order_id"
-                  type="text" 
-                  value={newBadge.service_order_id}
-                  onChange={(e) => setNewBadge({ ...newBadge, service_order_id: e.target.value })}
-                  placeholder="Enter service order ID"
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="sg_vehicle_plate">Vehicle Plate Number *</label>
-                <input 
-                  id="sg_vehicle_plate"
-                  name="vehicle_plate"
-                  type="text" 
-                  value={newBadge.vehicle_plate}
-                  onChange={(e) => setNewBadge({ ...newBadge, vehicle_plate: e.target.value })}
-                  placeholder="e.g., ABC-1234"
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="sg_customer_name">Customer Name</label>
-                <input 
-                  id="sg_customer_name"
-                  name="customer_name"
-                  type="text" 
-                  value={newBadge.customer_name}
-                  onChange={(e) => setNewBadge({ ...newBadge, customer_name: e.target.value })}
-                  placeholder="Customer name"
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="sg_customer_id">Customer ID</label>
-                <input
-                  id="sg_customer_id"
-                  name="customer_id"
-                  type="text"
-                  value={newBadge.customer_id || ''}
-                  onChange={(e) => setNewBadge({ ...newBadge, customer_id: e.target.value })}
-                  placeholder="Customer ID"
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="sg_badge_days">Valid for (days)</label>
-                <input 
-                  id="sg_badge_days"
-                  name="badge_days"
-                  type="number" 
-                  value={newBadge.badge_days}
-                  onChange={(e) => setNewBadge({ ...newBadge, badge_days: parseInt(e.target.value) })}
-                  min="1"
-                  max="30"
-                />
-              </div>
-              <button type="button" onClick={handleIssueBadge} className="submit-btn">Issue Badge</button>
-            </form>
-          </div>
-        )}
-      </div>
+        <EnterpriseButton variant="primary" onClick={fetchData}>Refresh</EnterpriseButton>
     </div>
   );
+
+  return (
+    <ModuleLayout
+        title="Security Gate"
+        description="Access Control & Visitor Management"
+        icon="🚧"
+        user={user}
+        onLogout={onLogout}
+        actions={actions}
+    >
+      <div className="sg-dashboard-content">
+        {summary && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+                <StatCard label="Entries Today" value={summary.total_entries || 0} />
+                <StatCard label="Exits Today" value={summary.total_exits || 0} />
+                <StatCard label="Access Denied" value={(summary.denied_entries || 0) + (summary.denied_exits || 0)} />
+                <StatCard label="Vehicles On-Site" value={summary.vehicles_processed || 0} />
+            </div>
+        )}
+
+        <EnterpriseTabs
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            tabs={[
+                { id: 'release', label: `Ready for Release (${pendingGatepasses.length})`, icon: '🚗' },
+                { id: 'entries', label: 'Entry Logs', icon: '📥' },
+                { id: 'exits', label: 'Exit Logs', icon: '📤' },
+                { id: 'badges', label: 'Badge Management', icon: '📇' },
+                { id: 'issue', label: 'Issue Badge', icon: '➕' },
+            ]}
+        />
+
+        <div style={{ marginTop: '1.5rem' }}>
+            {activeTab === 'release' && (
+                <EnterpriseCard 
+                    title="Vehicles Ready for Release"
+                    subtitle="Paid vehicles waiting to exit - Handover must be completed first"
+                >
+                    {pendingGatepasses.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {pendingGatepasses.map((gp) => {
+                                const handoverComplete = gp.handover_status === 'completed';
+                                return (
+                                <div key={gp.id} style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '16px',
+                                    background: handoverComplete ? '#f0fdf4' : '#fef3c7',
+                                    border: `2px solid ${handoverComplete ? '#22c55e' : '#f59e0b'}`,
+                                    borderRadius: '8px'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                                        <div style={{ fontSize: '40px' }}>{handoverComplete ? '🚗' : '⏳'}</div>
+                                        <div>
+                                            <div style={{ fontWeight: 'bold', fontSize: '18px', color: handoverComplete ? '#166534' : '#92400e' }}>
+                                                {gp.plate_no || 'Unknown Plate'}
+                                            </div>
+                                            <div style={{ color: '#333', fontSize: '14px' }}>
+                                                {gp.customer_name || 'Walk-in'} • {gp.service_type || 'Service'}
+                                            </div>
+                                            <div style={{ color: '#666', fontSize: '12px', marginTop: '4px' }}>
+                                                SO #{gp.service_order_id} • Gatepass #{gp.id} • {new Date(gp.created_at).toLocaleTimeString()}
+                                            </div>
+                                            <div style={{ 
+                                                marginTop: '6px', 
+                                                padding: '4px 8px', 
+                                                borderRadius: '4px',
+                                                fontSize: '12px',
+                                                fontWeight: 'bold',
+                                                display: 'inline-block',
+                                                background: handoverComplete ? '#dcfce7' : '#fef9c3',
+                                                color: handoverComplete ? '#166534' : '#92400e'
+                                            }}>
+                                                {handoverComplete ? '✓ Handover Complete' : '⏳ Awaiting Vehicle Handover'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {handoverComplete ? (
+                                        <EnterpriseButton 
+                                            variant="primary" 
+                                            onClick={() => handleReleaseVehicle(gp)}
+                                            style={{ background: '#22c55e', padding: '12px 24px', fontSize: '16px' }}
+                                        >
+                                            ✓ Release Vehicle
+                                        </EnterpriseButton>
+                                    ) : (
+                                        <div style={{ 
+                                            padding: '12px 24px', 
+                                            background: '#e5e7eb', 
+                                            borderRadius: '8px',
+                                            color: '#6b7280',
+                                            fontSize: '14px',
+                                            textAlign: 'center'
+                                        }}>
+                                            Complete handover<br/>before release
+                                        </div>
+                                    )}
+                                </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <EmptyState 
+                            icon="✅" 
+                            title="No vehicles waiting" 
+                            description="All paid vehicles have been released"
+                        />
+                    )}
+                </EnterpriseCard>
+            )}
+
+            {activeTab === 'entries' && (
+                <EnterpriseCard 
+                    title="Entry Logs - Today"
+                    footer={
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                            <EnterpriseButton onClick={() => handleLogAccess('entry')}>Log Entry</EnterpriseButton>
+                        </div>
+                    }
+                >
+                    {loading ? <LoadingSpinner /> : (
+                        <EnterpriseTable columns={entryColumns} data={entryLogs} />
+                    )}
+                </EnterpriseCard>
+            )}
+
+            {activeTab === 'exits' && (
+               <EnterpriseCard 
+                    title="Exit Logs - Today"
+                    footer={
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                            <EnterpriseButton onClick={() => handleLogAccess('exit')}>Log Exit</EnterpriseButton>
+                        </div>
+                    }
+               >
+                    {loading ? <LoadingSpinner /> : (
+                        <EnterpriseTable columns={exitColumns} data={exitLogs} />
+                    )}
+               </EnterpriseCard>
+            )}
+
+            {activeTab === 'badges' && (
+                <EnterpriseCard title="Active Vehicle Badges">
+                    {loading ? <LoadingSpinner /> : (
+                        <EnterpriseTable columns={badgeColumns} data={activeBadges} />
+                    )}
+                </EnterpriseCard>
+            )}
+
+            {activeTab === 'issue' && (
+                <EnterpriseCard title="Issue New Vehicle Badge" className="max-w-2xl">
+                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <EnterpriseFormGroup label="Service Order ID *">
+                            <input
+                                type="text"
+                                className="enterprise-input"
+                                value={newBadge.service_order_id}
+                                onChange={(e) => setNewBadge({ ...newBadge, service_order_id: e.target.value })}
+                                placeholder="Enter service order ID"
+                            />
+                        </EnterpriseFormGroup>
+                        <EnterpriseFormGroup label="Vehicle Plate Number *">
+                            <input
+                                type="text"
+                                className="enterprise-input"
+                                value={newBadge.vehicle_plate}
+                                onChange={(e) => setNewBadge({ ...newBadge, vehicle_plate: e.target.value })}
+                                placeholder="e.g. ABC-1234"
+                            />
+                        </EnterpriseFormGroup>
+                        <EnterpriseFormGroup label="Customer Name">
+                            <input
+                                type="text"
+                                className="enterprise-input"
+                                value={newBadge.customer_name}
+                                onChange={(e) => setNewBadge({ ...newBadge, customer_name: e.target.value })}
+                                placeholder="Enter customer name"
+                            />
+                        </EnterpriseFormGroup>
+                        <EnterpriseFormGroup label="Customer ID">
+                            <input
+                                type="text"
+                                className="enterprise-input"
+                                value={newBadge.customer_id || ''}
+                                onChange={(e) => setNewBadge({ ...newBadge, customer_id: e.target.value })}
+                                placeholder="Customer ID"
+                            />
+                        </EnterpriseFormGroup>
+                         <EnterpriseFormGroup label="Badge Validity (Days)">
+                            <input
+                                type="number"
+                                className="enterprise-input"
+                                min="1"
+                                max="30"
+                                value={newBadge.badge_days}
+                                onChange={(e) => setNewBadge({ ...newBadge, badge_days: parseInt(e.target.value) })}
+                            />
+                        </EnterpriseFormGroup>
+                     </div>
+                     <div style={{ marginTop: '1.5rem' }}>
+                        <EnterpriseButton variant="primary" onClick={handleIssueBadge}>
+                            Issue Badge
+                        </EnterpriseButton>
+                     </div>
+                </EnterpriseCard>
+            )}
+        </div>
+      </div>
+    </ModuleLayout>
+  );
 }
+

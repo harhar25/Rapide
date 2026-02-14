@@ -1,0 +1,9 @@
+name = "rapide-api"
+main = "src/index.ts"
+compatibility_date = "2026-01-01"
+account_id = "511ab58be2c9af80f31385dad731f5ab"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "aftersalesdesktop"
+database_id = "2f0c328b-7d50-4056-9019-2e64218e95c1"
