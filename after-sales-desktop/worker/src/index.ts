@@ -3262,6 +3262,7 @@ export default {
 
     // Create wrapup (Stop Clock action) - calculates labor hours from assignment times
     if (url.pathname === '/api/job-wrapup/wrapups' && request.method === 'POST') {
+      const adminId = getAdminId(request);
       const data = await readJson<any>(request);
       if (!data) return fail(request, 400, 'Invalid JSON');
       const serviceOrderId = toInt(data.service_order_id, null);
@@ -3285,10 +3286,10 @@ export default {
       const result = await env.DB
         .prepare(
           `INSERT INTO job_wrapups
-           (service_order_id, job_controller_id, technician_id, qc_inspection_id, total_labor_hours, final_status, created_at)
-           VALUES (?1, ?2, ?3, ?4, ?5, 'stopped', CURRENT_TIMESTAMP)`
+           (service_order_id, job_controller_id, technician_id, qc_inspection_id, total_labor_hours, final_status, created_at, admin_id)
+           VALUES (?1, ?2, ?3, ?4, ?5, 'stopped', CURRENT_TIMESTAMP, ?6)`
         )
-        .bind(serviceOrderId, toInt(data.job_controller_id, null), assignment?.technician_id || toInt(data.technician_id, null), toInt(data.qc_inspection_id, null), laborHours)
+        .bind(serviceOrderId, toInt(data.job_controller_id, null), assignment?.technician_id || toInt(data.technician_id, null), toInt(data.qc_inspection_id, null), laborHours, adminId)
         .run();
       const id = await d1FirstId(result);
       emitEvent({ type: 'job-wrapup', action: 'stop-clock', service_order_id: serviceOrderId, wrapup_id: id, labor_hours: laborHours });
@@ -4593,6 +4594,7 @@ export default {
     {
       const m = url.pathname.match(/^\/api\/technician\/service-orders\/(\d+)\/parts-request$/);
       if (m && request.method === 'POST') {
+        const adminId = getAdminId(request);
         const serviceOrderId = parseInt(m[1]);
         const body = await request.json() as {
           technician_id?: number;
@@ -4606,10 +4608,10 @@ export default {
 
         // 1. Create parts_requests entry
         const res1 = await env.DB.prepare(`
-          INSERT INTO parts_requests (service_order_id, requested_by, requested_by_role, status, notes)
-          VALUES (?, ?, 'technician', 'pending', ?)
+          INSERT INTO parts_requests (service_order_id, requested_by, requested_by_role, status, notes, admin_id)
+          VALUES (?, ?, 'technician', 'pending', ?, ?)
         `)
-        .bind(serviceOrderId, body.technician_id || null, body.notes || '')
+        .bind(serviceOrderId, body.technician_id || null, body.notes || '', adminId)
         .run();
 
         if (!res1.success) {
@@ -4626,9 +4628,9 @@ export default {
         // 2. Insert items
         const stmts = body.requested_parts.map(p => 
             env.DB.prepare(`
-                INSERT INTO parts_request_items (parts_request_id, product_id, quantity_requested, status)
-                VALUES (?, ?, ?, 'pending')
-            `).bind(requestId, p.product_id, p.quantity)
+                INSERT INTO parts_request_items (parts_request_id, product_id, quantity_requested, status, admin_id)
+                VALUES (?, ?, ?, 'pending', ?)
+            `).bind(requestId, p.product_id, p.quantity, adminId)
         );
 
         await env.DB.batch(stmts);
@@ -4767,6 +4769,7 @@ export default {
     }
 
     if (url.pathname === '/api/documents/log-print' && request.method === 'POST') {
+      const adminId = getAdminId(request);
       const data = await readJson<any>(request);
       if (!data) return fail(request, 400, 'Invalid JSON');
 
@@ -4779,10 +4782,10 @@ export default {
 
       await env.DB.prepare(
         `INSERT INTO service_order_documents 
-         (service_order_id, document_type, printed_by, document_data, printed_at, created_at)
-         VALUES (?1, ?2, ?3, ?4, datetime('now'), datetime('now'))`
+         (service_order_id, document_type, printed_by, document_data, printed_at, created_at, admin_id)
+         VALUES (?1, ?2, ?3, ?4, datetime('now'), datetime('now'), ?5)`
       )
-      .bind(serviceOrderId, documentType, printedBy, documentData)
+      .bind(serviceOrderId, documentType, printedBy, documentData, adminId)
       .run();
 
       return ok(request, { message: 'Print logged' });
@@ -4903,12 +4906,13 @@ export default {
     
     if (url.pathname === '/api/admin/technicians' && request.method === 'POST') {
        if (!isAdmin(request)) return fail(request, 401, 'Unauthorized');
+       const adminId = getAdminId(request);
        const data = await readJson<any>(request);
        try {
          await env.DB.prepare(`
-           INSERT INTO technicians (name, employee_id, specialization, contact_no, status)
-           VALUES (?1, ?2, ?3, ?4, ?5)
-         `).bind(data.name, data.employee_id, data.specialization, data.contact_no, data.status || 'active').run();
+           INSERT INTO technicians (name, employee_id, specialization, contact_no, status, admin_id)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+         `).bind(data.name, data.employee_id, data.specialization, data.contact_no, data.status || 'active', adminId).run();
          return ok(request, { message: 'Technician added' });
        } catch (e: any) { return fail(request, 500, e.message); }
     }
@@ -4934,9 +4938,10 @@ export default {
     
     if (url.pathname === '/api/admin/bays' && request.method === 'POST') {
        if (!isAdmin(request)) return fail(request, 401, 'Unauthorized');
+       const adminId = getAdminId(request);
        const data = await readJson<any>(request);
-       await env.DB.prepare(`INSERT INTO service_bays (bay_name, bay_type, capacity, status) VALUES (?1, ?2, 1, ?3)`)
-         .bind(data.bay_name, data.bay_type || 'general', data.status || 'active').run();
+       await env.DB.prepare(`INSERT INTO service_bays (bay_name, bay_type, capacity, status, admin_id) VALUES (?1, ?2, 1, ?3, ?4)`)
+         .bind(data.bay_name, data.bay_type || 'general', data.status || 'active', adminId).run();
        return ok(request, { message: 'Bay added' });
     }
     
