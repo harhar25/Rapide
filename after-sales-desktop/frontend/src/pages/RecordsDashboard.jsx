@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/enterprise-ui.css';
 import { useAutoRefresh } from '../hooks/useRealtimeUpdates';
+import ServiceDocumentBundle from '../components/ServiceDocumentBundle';
 import { 
   ModuleLayout, 
   EnterpriseButton, 
@@ -19,6 +20,7 @@ export default function RecordsDashboard({ user, onLogout }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState('month'); // Default to this month for performance/relevance
   const [customRange, setCustomRange] = useState({ start: '', end: '' });
+  const [printSOId, setPrintSOId] = useState(null);
   
   const formatMoney = (val) => Number.isFinite(Number(val)) ? new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(Number(val)) : '-';
   const formatDate = (str) => str ? new Date(str).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
@@ -232,8 +234,8 @@ export default function RecordsDashboard({ user, onLogout }) {
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <thead style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                           <tr>
-                              {['ID', 'Customer', 'Vehicle', 'Status', 'Payment', 'Date', 'Amount', ''].map((h,i) => (
-                                  <th key={i} style={{ textAlign: h === 'Amount' ? 'right' : 'left', padding: '16px 24px', fontSize: '11px', fontWeight: '700', color: '#475569', textTransform: 'uppercase' }}>{h}</th>
+                              {['ID', 'Customer', 'Vehicle', 'Status', 'Payment', 'Date', 'Amount', 'Print', ''].map((h,i) => (
+                                  <th key={i} style={{ textAlign: h === 'Amount' ? 'right' : h === 'Print' ? 'center' : 'left', padding: '16px 24px', fontSize: '11px', fontWeight: '700', color: '#475569', textTransform: 'uppercase' }}>{h}</th>
                               ))}
                           </tr>
                       </thead>
@@ -255,6 +257,21 @@ export default function RecordsDashboard({ user, onLogout }) {
                                   </td>
                                   <td style={{ padding: '16px 24px', fontSize: '13px', color: '#64748b' }}>{formatDate(row.created_at)}</td>
                                   <td style={{ padding: '16px 24px', textAlign: 'right', fontWeight: '700', color: '#0f172a' }}>{formatMoney(row.total_amount)}</td>
+                                  <td style={{ padding: '16px 24px', textAlign: 'center' }}>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setPrintSOId(row.id); }}
+                                      style={{
+                                        padding: '6px 14px', background: '#1e40af', color: '#fff', border: 'none',
+                                        borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12,
+                                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                                        transition: 'background .15s'
+                                      }}
+                                      onMouseEnter={(e) => e.currentTarget.style.background = '#1e3a8a'}
+                                      onMouseLeave={(e) => e.currentTarget.style.background = '#1e40af'}
+                                    >
+                                      🖨️ Print
+                                    </button>
+                                  </td>
                                   <td style={{ padding: '16px 24px', textAlign: 'center', color: '#cbd5e1' }}>›</td>
                               </tr>
                           ))}
@@ -263,6 +280,14 @@ export default function RecordsDashboard({ user, onLogout }) {
               )}
           </div>
     </div>
+
+    {/* Document Bundle Print Modal */}
+    {printSOId && (
+      <ServiceDocumentBundle
+        serviceOrderId={printSOId}
+        onClose={() => setPrintSOId(null)}
+      />
+    )}
     </ModuleLayout>
   );
 }

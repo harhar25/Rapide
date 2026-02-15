@@ -3,7 +3,6 @@ import '../styles/vehicle-handover-dashboard.css';
 import '../styles/enterprise-ui.css';
 import { fetchJson } from '../utils/fetchJson';
 import { useAutoRefresh } from '../hooks/useRealtimeUpdates';
-import ServiceDocumentBundle from '../components/ServiceDocumentBundle';
 import { 
   ModuleLayout, 
   EnterpriseTable, 
@@ -39,7 +38,6 @@ export default function VehicleHandoverDashboard({ user, onLogout, embedded = fa
   const [loading, setLoading] = useState(true);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const [handingOver, setHandingOver] = useState(null); // tracks which handover ID is being processed
-  const [printSOId, setPrintSOId] = useState(null); // service order ID for document bundle print
 
   // Toast state
   const [toast, setToast] = useState({ message: '', type: 'success' });
@@ -90,11 +88,7 @@ export default function VehicleHandoverDashboard({ user, onLogout, embedded = fa
         })
       });
       if (res.success) {
-        showToast('Vehicle handed over! Opening documents for print…');
-        // Auto-open the document bundle print for this service order
-        // row[0] = handover ID, row[1] = service_order_id
-        const handover = pendingHandovers.find(h => h[0] === handoverId);
-        if (handover) setPrintSOId(handover[1]);
+        showToast('Vehicle handed over successfully!');
         fetchData();
       } else {
         showToast(res.error || 'Failed to hand over', 'error');
@@ -163,21 +157,7 @@ export default function VehicleHandoverDashboard({ user, onLogout, embedded = fa
     { label: 'Plate #', key: 7, render: (val) => <span style={{ fontWeight: 700 }}>{val || '—'}</span> },
     { label: 'Vehicle', key: 10, render: (val) => val || '—' },
     { label: 'Completed', key: 2, render: (val) => val ? new Date(val).toLocaleString() : '—' },
-    { label: 'Status', key: 6, render: () => <StatusBadge status="completed" /> },
-    { label: 'Documents', key: 'print', render: (_, row) => (
-      <button
-        onClick={(e) => { e.stopPropagation(); setPrintSOId(row[1]); }}
-        style={{
-          padding: '6px 14px', background: '#1e40af', color: '#fff', border: 'none',
-          borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12,
-          display: 'inline-flex', alignItems: 'center', gap: 4,
-        }}
-        onMouseEnter={(e) => e.currentTarget.style.background = '#1e3a8a'}
-        onMouseLeave={(e) => e.currentTarget.style.background = '#1e40af'}
-      >
-        🖨️ Print All
-      </button>
-    )}
+    { label: 'Status', key: 6, render: () => <StatusBadge status="completed" /> }
   ];
 
   const content = (
@@ -213,13 +193,6 @@ export default function VehicleHandoverDashboard({ user, onLogout, embedded = fa
         )}
       </div>
 
-      {/* Document Bundle Print Modal */}
-      {printSOId && (
-        <ServiceDocumentBundle
-          serviceOrderId={printSOId}
-          onClose={() => setPrintSOId(null)}
-        />
-      )}
     </>
   );
 

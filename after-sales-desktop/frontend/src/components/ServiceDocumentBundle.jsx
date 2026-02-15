@@ -164,16 +164,16 @@ function PageServiceOrder({ order, work, parts, companyName }) {
 // Page 2 – Vehicle Report Card (VRC / Inspection)
 // ────────────────────────────────────────────────────────
 const VRC_ITEMS = [
-  { key: 'engine_running_condition', label: 'Engine Running Condition' },
-  { key: 'fluid_levels_and_leaks', label: 'Fluid Levels & Leaks' },
-  { key: 'brake_system', label: 'Brake System' },
-  { key: 'suspension_and_steering', label: 'Suspension & Steering' },
-  { key: 'battery_condition', label: 'Battery Condition' },
-  { key: 'tire_condition', label: 'Tire Condition' },
-  { key: 'lights_and_signals', label: 'Lights & Signals' },
-  { key: 'body_and_paint', label: 'Body & Paint' },
-  { key: 'wiper_and_washer', label: 'Wiper & Washer' },
-  { key: 'handbrake', label: 'Handbrake' },
+  { key: 'checklist_1_engine', label: 'Engine Running Condition' },
+  { key: 'checklist_2_fluids', label: 'Fluid Levels & Leaks' },
+  { key: 'checklist_3_brakes', label: 'Brake System' },
+  { key: 'checklist_4_suspension', label: 'Suspension & Steering' },
+  { key: 'checklist_5_battery', label: 'Battery Condition' },
+  { key: 'checklist_6_tires', label: 'Tire Condition' },
+  { key: 'checklist_7_lights', label: 'Lights & Signals' },
+  { key: 'checklist_8_body', label: 'Body & Paint' },
+  { key: 'checklist_9_wipers', label: 'Wiper & Washer' },
+  { key: 'checklist_10_handbrake', label: 'Handbrake' },
 ];
 
 function PageVRC({ order, vrc, qcInspection, roadTest, companyName }) {
@@ -219,7 +219,7 @@ function PageVRC({ order, vrc, qcInspection, roadTest, companyName }) {
               {VRC_ITEMS.map((item, i) => {
                 const val = vrc[item.key];
                 const isPass = val === 'pass' || val === 'good' || val === 'ok' || val === true;
-                const isFail = val === 'fail' || val === 'bad' || val === false;
+                const isFail = val === 'fail' || val === 'bad' || val === 'needs_attention' || val === false;
                 return (
                   <tr key={item.key}>
                     <td style={{ ...TD, textAlign: 'center' }}>{i + 1}</td>

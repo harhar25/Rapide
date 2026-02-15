@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import '../styles/enterprise-ui.css';
 import { LoadingSpinner } from '../components/EnterpriseComponents';
+import ServiceDocumentBundle from '../components/ServiceDocumentBundle';
 
 const API_BASE = 'https://rapide-api.rapideph.workers.dev';
 
@@ -10,6 +11,7 @@ export default function RecordDetailPage({ user, onLogout }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [record, setRecord] = useState(null);
+  const [showPrintBundle, setShowPrintBundle] = useState(false);
 
   useEffect(() => {
     fetchRecordDetails();
@@ -61,168 +63,18 @@ export default function RecordDetailPage({ user, onLogout }) {
   };
 
   const handlePrint = () => {
-    window.print();
+    setShowPrintBundle(true);
   };
 
   const handleBack = () => {
     navigate('/records');
   };
 
-  // --- RECEIPT COMPONENTS ---
-
-  const ReceiptHeader = ({ title }) => (
-    <div style={{ textAlign: 'center', marginBottom: '15px' }}>
-      <div style={{ fontSize: '16px', fontWeight: 'bold', letterSpacing: '2px' }}>RAPIDE AUTO SERVICE</div>
-      <div style={{ fontSize: '10px' }}>Professional Automotive Solutions</div>
-      <div style={{ margin: '5px 0', borderBottom: '1px dashed #000' }}></div>
-      <div style={{ fontSize: '14px', fontWeight: 'bold', margin: '5px 0' }}>{title}</div>
-      <div style={{ fontSize: '12px' }}>SO NO: {String(record?.order?.id || id).padStart(5, '0')}</div>
-      <div style={{ fontSize: '10px' }}>{new Date().toLocaleString('en-PH')}</div>
-      <div style={{ margin: '5px 0', borderBottom: '1px dashed #000' }}></div>
-    </div>
-  );
-
-  const ReceiptRow = ({ label, value, bold = false }) => (
-    <div style={{ 
-      display: 'flex', 
-      justifyContent: 'space-between', 
-      marginBottom: '4px',
-      fontSize: '11px',
-      fontWeight: bold ? 'bold' : 'normal'
-    }}>
-      <span style={{ overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: '60%' }}>{label}</span>
-      <span style={{ textAlign: 'right', maxWidth: '40%' }}>{value}</span>
-    </div>
-  );
-
-  const ReceiptDivider = () => (
-    <div style={{ borderBottom: '1px dashed #000', margin: '10px 0' }}></div>
-  );
-
-  const CutLine = () => (
-    <div className="cut-line" style={{ 
-      margin: '20px 0', 
-      borderTop: '2px dashed #000', 
-      position: 'relative',
-      height: '10px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center'
-    }}>
-      <span style={{ 
-        background: '#fff', 
-        padding: '0 10px', 
-        fontSize: '12px',
-        position: 'absolute',
-        top: '-10px'
-      }}>✂ CUT HERE</span>
-    </div>
-  );
-
-  const SectionTitle = ({ title }) => (
-    <div style={{ 
-      fontSize: '12px', 
-      fontWeight: 'bold', 
-      textTransform: 'uppercase', 
-      borderBottom: '1px solid #000', 
-      paddingBottom: '2px',
-      marginBottom: '8px',
-      marginTop: '10px'
-    }}>
-      {title}
-    </div>
-  );
-
   if (loading) return <div style={{ padding: '20px', textAlign: 'center' }}><LoadingSpinner /> Loading...</div>;
   if (!record) return <div style={{ padding: '20px', textAlign: 'center' }}>Record not found</div>;
 
   const { order, vrc, invoice, parts, work, qc_inspection, road_test, gatepass, handover } = record;
   const soNumber = String(order?.id || id).padStart(5, '0');
-
-  // Page Header Component for Screen
-  const PageHeader = ({ title, pageNum }) => (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingBottom: '16px',
-      marginBottom: '20px',
-      borderBottom: '3px solid #1e40af'
-    }}>
-      <div>
-        <div style={{ fontSize: '20px', fontWeight: '800', color: '#1e40af', letterSpacing: '0.5px' }}>
-          RAPIDE AUTO SERVICE
-        </div>
-        <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-          Professional Automotive Solutions
-        </div>
-      </div>
-      <div style={{ textAlign: 'right' }}>
-        <div style={{ fontSize: '12px', color: '#64748b' }}>{title}</div>
-        <div style={{ fontSize: '18px', fontWeight: '700', color: '#1e293b' }}>SO #{soNumber}</div>
-      </div>
-    </div>
-  );
-
-  // Info Grid Component
-  const InfoGrid = ({ items }) => (
-    <div style={{ 
-      display: 'grid', 
-      gridTemplateColumns: 'repeat(2, 1fr)', 
-      gap: '12px 24px',
-      fontSize: '13px'
-    }}>
-      {items.map((item, idx) => (
-        <div key={idx} style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between',
-          padding: '8px 0',
-          borderBottom: '1px solid #e2e8f0'
-        }}>
-          <span style={{ color: '#64748b', fontWeight: '500' }}>{item.label}</span>
-          <span style={{ color: '#1e293b', fontWeight: item.bold ? '700' : '500' }}>{item.value || '-'}</span>
-        </div>
-      ))}
-    </div>
-  );
-
-  // Section Title Component
-  const ScreenSectionTitle = ({ title, subtitle }) => (
-    <div style={{ marginBottom: '16px' }}>
-      <div style={{ 
-        fontSize: '14px', 
-        fontWeight: '700', 
-        color: '#1e293b',
-        textTransform: 'uppercase',
-        letterSpacing: '0.5px'
-      }}>
-        {title}
-      </div>
-      {subtitle && <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>{subtitle}</div>}
-    </div>
-  );
-
-  // Check Status Badge
-  const CheckBadge = ({ passed, label }) => (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: '8px 12px',
-      background: passed ? '#f0fdf4' : passed === false ? '#fef2f2' : '#f8fafc',
-      border: `1px solid ${passed ? '#86efac' : passed === false ? '#fca5a5' : '#e2e8f0'}`,
-      borderRadius: '6px',
-      fontSize: '12px'
-    }}>
-      <span style={{ color: '#374151' }}>{label}</span>
-      <span style={{ 
-        fontWeight: '700',
-        color: passed ? '#16a34a' : passed === false ? '#dc2626' : '#9ca3af'
-      }}>
-        {passed === true ? '✓ OK' : passed === false ? '✗ FAIL' : 'N/A'}
-      </span>
-    </div>
-  );
 
   return (
     <>
@@ -293,6 +145,14 @@ export default function RecordDetailPage({ user, onLogout }) {
           🖨️ Print Full Docket
         </button>
       </div>
+
+      {/* Print Bundle Modal */}
+      {showPrintBundle && (
+        <ServiceDocumentBundle
+          serviceOrderId={id}
+          onClose={() => setShowPrintBundle(false)}
+        />
+      )}
 
       <div style={{
         maxWidth: '1000px',
@@ -486,251 +346,6 @@ export default function RecordDetailPage({ user, onLogout }) {
 
       </div>
     </div>
-
-
-    {/* ==================================================================================== */}
-    {/*                                   PRINT VIEW (DOCUMENTS)                             */}
-    {/* ==================================================================================== */}
-      <div className="print-container" style={{ display: 'none' }}>
-        
-        {/* PAGE 1: CHECK-IN & ORDER INFO */}
-        <div className="print-page">
-          <PageHeader title="CHECK-IN RECORD" pageNum={1} />
-          
-          <ScreenSectionTitle title="Customer Information" />
-          <InfoGrid items={[
-            { label: 'Customer Name', value: order?.customer_name, bold: true },
-            { label: 'Contact Number', value: order?.contact_no },
-            { label: 'Address', value: order?.address || '-' },
-            { label: 'Email', value: order?.email || '-' }
-          ]} />
-
-          <div style={{ height: '20px' }}></div>
-
-          <ScreenSectionTitle title="Vehicle Information" />
-          <InfoGrid items={[
-            { label: 'Plate Number', value: order?.plate_no, bold: true },
-            { label: 'Model', value: order?.vehicle_model },
-            { label: 'Service Type', value: order?.service_type },
-            { label: 'Status', value: order?.status?.toUpperCase() }
-          ]} />
-
-          <div style={{ height: '20px' }}></div>
-
-          <ScreenSectionTitle title="Service Details" />
-          <InfoGrid items={[
-             { label: 'Check-In Time', value: formatDateTime(order?.check_in_time) },
-             { label: 'Estimated Completion', value: formatDateTime(order?.estimated_completion_time) },
-             { label: 'Technician', value: work?.technician_name || 'Unassigned' },
-             { label: 'Notes', value: order?.customer_concern || '-' }
-          ]} />
-
-          <div style={{ marginTop: '50px', borderTop: '1px solid #000', paddingTop: '10px', width: '200px' }}>
-            <div style={{ fontSize: '11px', textAlign: 'center' }}>Customer Signature</div>
-          </div>
-        </div>
-
-        {/* PAGE 2: VRC */}
-        <div className="print-page">
-          <PageHeader title="VEHICLE RECEPTION CHECKLIST" pageNum={2} />
-          
-          <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
-             <div style={{ flex: 1, border: '1px solid #000', padding: '10px', textAlign: 'center' }}>
-                <div style={{ fontSize: '10px' }}>MILEAGE IN</div>
-                <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{vrc?.mileage_in?.toLocaleString() || 0} km</div>
-             </div>
-             <div style={{ flex: 1, border: '1px solid #000', padding: '10px', textAlign: 'center' }}>
-                <div style={{ fontSize: '10px' }}>FUEL LEVEL</div>
-                <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{vrc?.fuel_level || 0}%</div>
-             </div>
-          </div>
-
-          <ScreenSectionTitle title="10-Point Inspection" />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12px' }}>
-            <div>1. Engine: <b>{vrc?.checklist_1_engine === 'pass' ? 'OK' : 'FAIL'}</b></div>
-            <div>2. Fluids: <b>{vrc?.checklist_2_fluids === 'pass' ? 'OK' : 'FAIL'}</b></div>
-            <div>3. Brakes: <b>{vrc?.checklist_3_brakes === 'pass' ? 'OK' : 'FAIL'}</b></div>
-            <div>4. Suspension: <b>{vrc?.checklist_4_suspension === 'pass' ? 'OK' : 'FAIL'}</b></div>
-            <div>5. Battery: <b>{vrc?.checklist_5_battery === 'pass' ? 'OK' : 'FAIL'}</b></div>
-            <div>6. Tires: <b>{vrc?.checklist_6_tires === 'pass' ? 'OK' : 'FAIL'}</b></div>
-            <div>7. Lights: <b>{vrc?.checklist_7_lights === 'pass' ? 'OK' : 'FAIL'}</b></div>
-            <div>8. Body: <b>{vrc?.checklist_8_body === 'pass' ? 'OK' : 'FAIL'}</b></div>
-            <div>9. Wipers: <b>{vrc?.checklist_9_wipers === 'pass' ? 'OK' : 'FAIL'}</b></div>
-            <div>10. Handbrake: <b>{vrc?.checklist_10_handbrake === 'pass' ? 'OK' : 'FAIL'}</b></div>
-          </div>
-          
-          <div style={{ marginTop: '20px' }}>
-             <div style={{ fontWeight: 'bold', fontSize: '12px' }}>Additional Findings:</div>
-             <div style={{ border: '1px solid #ccc', padding: '10px', minHeight: '60px', marginTop: '5px', fontSize: '12px' }}>
-               {vrc?.additional_findings || 'None'}
-             </div>
-          </div>
-          
-          <div style={{ marginTop: '20px' }}>
-             <div style={{ fontSize: '12px' }}>Interior Condition: {vrc?.interior_condition || '-'}</div>
-             <div style={{ fontSize: '12px' }}>Exterior Condition: {vrc?.exterior_condition || '-'}</div>
-          </div>
-        </div>
-
-        {/* PAGE 3: BILLING */}
-        <div className="print-page">
-          <PageHeader title="INVOICE / BILLING" pageNum={3} />
-          
-          <ScreenSectionTitle title="Items Breakdown" />
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px', fontSize: '12px' }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid #000' }}>
-                <th style={{ textAlign: 'left', padding: '5px' }}>Description</th>
-                <th style={{ textAlign: 'center', padding: '5px' }}>Qty</th>
-                <th style={{ textAlign: 'right', padding: '5px' }}>Unit Price</th>
-                <th style={{ textAlign: 'right', padding: '5px' }}>Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td style={{ padding: '5px', borderBottom: '1px solid #eee' }}>Labor ({invoice?.labor_hours || 0} hrs)</td>
-                <td style={{ padding: '5px', borderBottom: '1px solid #eee', textAlign: 'center' }}>-</td>
-                <td style={{ padding: '5px', borderBottom: '1px solid #eee', textAlign: 'right' }}>{formatMoney(invoice?.labor_rate || 0)}</td>
-                <td style={{ padding: '5px', borderBottom: '1px solid #eee', textAlign: 'right' }}>{formatMoney((invoice?.labor_hours || 0) * (invoice?.labor_rate || 0))}</td>
-              </tr>
-              {parts?.map((p, i) => (
-                <tr key={i}>
-                  <td style={{ padding: '5px', borderBottom: '1px solid #eee' }}>{p.part_name}</td>
-                  <td style={{ padding: '5px', borderBottom: '1px solid #eee', textAlign: 'center' }}>{p.quantity}</td>
-                  <td style={{ padding: '5px', borderBottom: '1px solid #eee', textAlign: 'right' }}>{formatMoney(p.price || 0)}</td>
-                  <td style={{ padding: '5px', borderBottom: '1px solid #eee', textAlign: 'right' }}>{formatMoney((p.price || 0) * (p.quantity || 1))}</td>
-                </tr>
-              ))}
-              {invoice?.materials_cost > 0 && (
-                 <tr>
-                  <td style={{ padding: '5px', borderBottom: '1px solid #eee' }}>Consumables / Materials</td>
-                  <td style={{ padding: '5px', borderBottom: '1px solid #eee', textAlign: 'center' }}>1</td>
-                  <td style={{ padding: '5px', borderBottom: '1px solid #eee', textAlign: 'right' }}>{formatMoney(invoice?.materials_cost || 0)}</td>
-                  <td style={{ padding: '5px', borderBottom: '1px solid #eee', textAlign: 'right' }}>{formatMoney(invoice?.materials_cost || 0)}</td>
-                 </tr>
-              )}
-            </tbody>
-          </table>
-
-          <div style={{ float: 'right', width: '250px' }}>
-             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                <span>Subtotal:</span>
-                <span>{formatMoney((invoice?.total_amount || 0) + (invoice?.discount || 0))}</span>
-             </div>
-             {invoice?.discount > 0 && (
-               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px', color: '#166534' }}>
-                  <span>Discount:</span>
-                  <span>-{formatMoney(invoice?.discount)}</span>
-               </div>
-             )}
-             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', borderTop: '2px solid #000', paddingTop: '5px', fontWeight: 'bold', fontSize: '16px' }}>
-                <span>TOTAL:</span>
-                <span>{formatMoney(invoice?.total_amount || 0)}</span>
-             </div>
-             <div style={{ textAlign: 'right', marginTop: '10px', fontStyle: 'italic', fontSize: '12px' }}>
-                Status: {invoice?.status?.toUpperCase() || 'PENDING'}
-             </div>
-          </div>
-        </div>
-
-        {/* PAGE 4: GATEPASS */}
-        {gatepass && (
-          <div className="print-page">
-            <PageHeader title="GATE PASS & RELEASE" pageNum={4} />
-            
-            <div style={{ border: '2px solid #000', padding: '20px', textAlign: 'center', marginBottom: '30px' }}>
-               <div style={{ fontSize: '14px', letterSpacing: '2px' }}>GATE PASS NUMBER</div>
-               <div style={{ fontSize: '32px', fontWeight: 'bold', margin: '10px 0' }}>GP-{String(gatepass.id).padStart(5,'0')}</div>
-               <div style={{ fontSize: '12px' }}>DATE: {formatDate(gatepass.created_at)}</div>
-            </div>
-
-            <ScreenSectionTitle title="Release Verification" />
-            <InfoGrid items={[
-              { label: 'QC Inspection', value: qc_inspection?.overall_status === 'passed' ? 'PASSED' : 'PENDING', bold: true },
-              { label: 'Inspector', value: qc_inspection?.foreman_name || '-' },
-              { label: 'Items Returned', value: handover?.all_items_returned ? 'YES' : 'NO' },
-              { label: 'Released By', value: handover?.technician_name || '-' }
-            ]} />
-            
-            <div style={{ marginTop: '80px', display: 'flex', justifyContent: 'space-between', padding: '0 50px' }}>
-               <div style={{ textAlign: 'center' }}>
-                  <div style={{ borderTop: '1px solid #000', width: '200px', paddingTop: '5px' }}>Security Guard / Releaser</div>
-               </div>
-               <div style={{ textAlign: 'center' }}>
-                  <div style={{ borderTop: '1px solid #000', width: '200px', paddingTop: '5px' }}>Customer Signature</div>
-                  <div style={{ fontSize: '10px' }}>(Received in good condition)</div>
-               </div>
-            </div>
-          </div>
-        )}
-
-      </div>
-
-      <style>{`
-        /* SCREEN STYLES (NO PRINT) */
-        @media screen {
-          .print-container {
-             display: none !important;
-          }
-        }
-
-        /* PRINT STYLES */
-        @media print {
-          @page {
-            margin: 1cm;
-            size: auto; /* Let printer decide (usually A4/Letter) */
-          }
-          
-          /* Hide the screen view entirely */
-          .screen-view, .no-print {
-            display: none !important;
-            height: 0;
-            width: 0;
-            overflow: hidden;
-          }
-
-          /* Reset body for full width usage */
-          body, html, #root {
-            width: 100%;
-            margin: 0;
-            padding: 0;
-            background: #fff;
-            font-size: 12pt;
-            color: #000;
-          }
-
-          /* Show print container */
-          .print-container {
-            display: block !important;
-            width: 100% !important;
-          }
-
-          /* Page Break Rules */
-          .print-page {
-            page-break-after: always;
-            min-height: 90vh;
-            position: relative;
-          }
-          
-          .print-page:last-child {
-            page-break-after: auto;
-          }
-
-          /* Clean Layout for Docs */
-          .print-page * {
-            visibility: visible;
-            font-family: Arial, Helvetica, sans-serif !important; /* Document font, not monospace */
-            color: #000 !important;
-          }
-          
-          /* Remove background colors and shadows for print */
-          * {
-            background: transparent !important;
-            box-shadow: none !important;
-            text-shadow: none !important;
-          }
-        }
-      `}</style>
     </>
   );
 }
