@@ -4837,13 +4837,14 @@ export default {
 
     if (url.pathname === '/api/admin/services' && request.method === 'POST') {
       if (!isAdmin(request)) return fail(request, 401, 'Unauthorized');
+      const adminId = getAdminId(request);
       const data = await readJson<any>(request);
       if (!data) return fail(request, 400, 'Invalid JSON');
       
       try {
         await env.DB.prepare(`
-          INSERT INTO service_catalog (service_name, category, vehicle_type, base_price, labor_hours, description, status)
-          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+          INSERT INTO service_catalog (service_name, category, vehicle_type, base_price, labor_hours, description, status, admin_id)
+          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
         `).bind(
           data.service_name, 
           data.category || 'general', 
@@ -4851,7 +4852,8 @@ export default {
           toFloat(data.base_price, 0), 
           toFloat(data.labor_hours, 1), 
           data.description || '', 
-          data.status || 'active'
+          data.status || 'active',
+          adminId
         ).run();
         return ok(request, { message: 'Service created' });
       } catch (e: any) { return fail(request, 500, e.message); }
