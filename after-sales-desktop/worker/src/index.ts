@@ -2,9 +2,6 @@ type Env = {
   DB: D1Database;
 };
 
-const ADMIN_USERNAME = 'admin';
-const ADMIN_PASSWORD = 'admin123';
-
 const ROLE_ALIASES: Record<string, string> = {
   job_controller: 'controller',
   service_advisor: 'advisor',
@@ -59,9 +56,25 @@ function normalizeRole(role: unknown) {
 }
 
 function isAdmin(request: Request) {
+  const role = request.headers.get('X-User-Role');
+  return role === 'admin';
+}
+
+async function isAdminAuth(request: Request, env: Env): Promise<boolean> {
   const u = request.headers.get('X-Admin-Username');
   const p = request.headers.get('X-Admin-Password');
-  return u === ADMIN_USERNAME && p === ADMIN_PASSWORD;
+  if (!u || !p) return false;
+  const row = await env.DB.prepare(
+    `SELECT id FROM personnel WHERE username = ?1 AND password = ?2 AND role = 'admin' AND status = 'active' LIMIT 1`
+  ).bind(u, p).first();
+  return !!row;
+}
+
+function getAdminId(request: Request): number | null {
+  const raw = request.headers.get('X-Admin-Id');
+  if (!raw) return null;
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) ? n : null;
 }
 
 async function readJson<T>(request: Request): Promise<T | null> {
@@ -702,6 +715,7 @@ export default {
 
     // ==================== SECURITY GATE ====================
     if (url.pathname === '/api/security-gate/logs/entries' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const date = url.searchParams.get('date') ?? todayISODate();
       const day = isIsoDate(date) ? date : todayISODate();
 
@@ -714,16 +728,17 @@ export default {
              gate_operator_id as operator,
              authorized
            FROM security_gate_access_logs
-           WHERE access_type='entry' AND substr(created_at, 1, 10) = ?1
+           WHERE access_type='entry' AND substr(created_at, 1, 10) = ?1 AND admin_id = ?2
            ORDER BY created_at DESC`
         )
-        .bind(day)
+        .bind(day, adminId)
         .all<any>();
 
       return jsonResponse(request, { success: true, data: rs.results ?? [] });
     }
 
     if (url.pathname === '/api/security-gate/logs/exits' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const date = url.searchParams.get('date') ?? todayISODate();
       const day = isIsoDate(date) ? date : todayISODate();
 
@@ -736,47 +751,50 @@ export default {
              gate_operator_id as operator,
              authorized
            FROM security_gate_access_logs
-           WHERE access_type='exit' AND substr(created_at, 1, 10) = ?1
+           WHERE access_type='exit' AND substr(created_at, 1, 10) = ?1 AND admin_id = ?2
            ORDER BY created_at DESC`
         )
-        .bind(day)
+        .bind(day, adminId)
         .all<any>();
 
       return jsonResponse(request, { success: true, data: rs.results ?? [] });
     }
 
     if (url.pathname === '/api/security-gate/badges/active' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const rs = await env.DB
         .prepare(
           `SELECT id, service_order_id, vehicle_plate_no, customer_name, customer_id,
                   issued_at, expiry_at, badge_type, status, scan_count
            FROM security_gate_badges
-           WHERE status='active'
+           WHERE status='active' AND admin_id = ?1
            ORDER BY issued_at DESC`
         )
+        .bind(adminId)
         .all<any>();
 
       return jsonResponse(request, { success: true, data: rs.results ?? [], badges: rs.results ?? [] });
     }
 
     if (url.pathname === '/api/security-gate/summary' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const day = todayISODate();
 
       const entries = await env.DB
         .prepare(
           `SELECT COUNT(*) as n, SUM(CASE WHEN authorized=0 THEN 1 ELSE 0 END) as denied
            FROM security_gate_access_logs
-           WHERE access_type='entry' AND substr(created_at,1,10)=?1`
+           WHERE access_type='entry' AND substr(created_at,1,10)=?1 AND admin_id = ?2`
         )
-        .bind(day)
+        .bind(day, adminId)
         .first<any>();
       const exits = await env.DB
         .prepare(
           `SELECT COUNT(*) as n, SUM(CASE WHEN authorized=0 THEN 1 ELSE 0 END) as denied
            FROM security_gate_access_logs
-           WHERE access_type='exit' AND substr(created_at,1,10)=?1`
+           WHERE access_type='exit' AND substr(created_at,1,10)=?1 AND admin_id = ?2`
         )
-        .bind(day)
+        .bind(day, adminId)
         .first<any>();
 
       const total_entries = Number(entries?.n ?? 0);
@@ -796,6 +814,7 @@ export default {
     }
 
     if (url.pathname === '/api/security-gate/badges/issue' && request.method === 'POST') {
+      const adminId = getAdminId(request);
       const data = await readJson<any>(request);
       if (!data) return fail(request, 400, 'Invalid JSON');
 
@@ -811,10 +830,10 @@ export default {
       const result = await env.DB
         .prepare(
           `INSERT INTO security_gate_badges
-           (service_order_id, vehicle_plate_no, customer_name, customer_id, issued_by, issued_at, expiry_at, badge_type, status, scan_count)
-           VALUES (?1, ?2, ?3, ?4, ?5, CURRENT_TIMESTAMP, datetime('now', ?6), 'vehicle', 'active', 0)`
+           (service_order_id, vehicle_plate_no, customer_name, customer_id, issued_by, issued_at, expiry_at, badge_type, status, scan_count, admin_id)
+           VALUES (?1, ?2, ?3, ?4, ?5, CURRENT_TIMESTAMP, datetime('now', ?6), 'vehicle', 'active', 0, ?7)`
         )
-        .bind(serviceOrderId, vehiclePlate, customerName || null, customerId, issuedBy, `+${expiryDays} day`)
+        .bind(serviceOrderId, vehiclePlate, customerName || null, customerId, issuedBy, `+${expiryDays} day`, adminId)
         .run();
 
       const id = await d1FirstId(result);
@@ -835,6 +854,7 @@ export default {
     }
 
     if (url.pathname === '/api/security-gate/access/log' && request.method === 'POST') {
+      const adminId = getAdminId(request);
       const data = await readJson<any>(request);
       if (!data) return fail(request, 400, 'Invalid JSON');
 
@@ -864,10 +884,10 @@ export default {
       await env.DB
         .prepare(
           `INSERT INTO security_gate_access_logs
-           (service_order_id, vehicle_plate_no, customer_name, access_type, gate_operator_id, authorized, created_at)
-           VALUES (?1, ?2, ?3, ?4, ?5, ?6, CURRENT_TIMESTAMP)`
+           (service_order_id, vehicle_plate_no, customer_name, access_type, gate_operator_id, authorized, created_at, admin_id)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, CURRENT_TIMESTAMP, ?7)`
         )
-        .bind(serviceOrderId, vehiclePlate, customerName || null, accessType, operatorId, authorized)
+        .bind(serviceOrderId, vehiclePlate, customerName || null, accessType, operatorId, authorized, adminId)
         .run();
 
       if (badge) {
@@ -946,21 +966,23 @@ export default {
 
     // ==================== VEHICLE HANDOVER ====================
     if (url.pathname === '/api/vehicle-handover/handovers/pending' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       // Self-healing: Ensure all eligible service orders have a handover record
       try {
         await env.DB.prepare(`
-          INSERT INTO vehicle_handovers (service_order_id, customer_id, job_wrapup_id, technician_id, handover_status, handover_date)
+          INSERT INTO vehicle_handovers (service_order_id, customer_id, job_wrapup_id, technician_id, handover_status, handover_date, admin_id)
           SELECT 
             so.id, 
             so.customer_id, 
             (SELECT id FROM job_wrapups WHERE service_order_id = so.id ORDER BY id DESC LIMIT 1),
             (SELECT technician_id FROM job_wrapups WHERE service_order_id = so.id ORDER BY id DESC LIMIT 1),
             'pending',
-            DATE('now')
+            DATE('now'),
+            ?1
           FROM service_orders so
           WHERE so.status IN ('billed', 'ready-for-billing', 'qc-passed', 'job-completed')
             AND so.id NOT IN (SELECT service_order_id FROM vehicle_handovers WHERE service_order_id IS NOT NULL)
-        `).run();
+        `).bind(adminId).run();
       } catch (e) {
         // Ignore duplicate errors or constraint violations during self-healing
         console.error('Self-healing handover error:', e);
@@ -973,9 +995,10 @@ export default {
            FROM vehicle_handovers vh
            LEFT JOIN service_orders so ON vh.service_order_id = so.id
            LEFT JOIN customers c ON vh.customer_id = c.id
-           WHERE vh.handover_status='pending'
+           WHERE vh.handover_status='pending' AND vh.admin_id = ?1
            ORDER BY vh.handover_date DESC, vh.id DESC`
         )
+        .bind(adminId)
         .all<any>();
       
       const handovers = (rs.results ?? []).map((r: any) => [
@@ -996,6 +1019,7 @@ export default {
 
     // List completed handovers
     if (url.pathname === '/api/vehicle-handover/handovers/completed' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const rs = await env.DB
         .prepare(
           `SELECT vh.id, vh.service_order_id, vh.handover_date, vh.technician_id, vh.customer_id, vh.final_inspection_notes, vh.handover_status,
@@ -1004,10 +1028,11 @@ export default {
            FROM vehicle_handovers vh
            LEFT JOIN service_orders so ON vh.service_order_id = so.id
            LEFT JOIN customers c ON vh.customer_id = c.id
-           WHERE vh.handover_status='completed'
+           WHERE vh.handover_status='completed' AND vh.admin_id = ?1
            ORDER BY vh.updated_at DESC, vh.id DESC
            LIMIT 100`
         )
+        .bind(adminId)
         .all<any>();
       
       const handovers = (rs.results ?? []).map((r: any) => [
@@ -1032,6 +1057,7 @@ export default {
 
     // Search service orders eligible for manual handover creation
     if (url.pathname === '/api/vehicle-handover/eligible-orders' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const rs = await env.DB
         .prepare(
           `SELECT so.id, so.status, so.service_type, so.vehicle_plate_no,
@@ -1040,15 +1066,18 @@ export default {
            LEFT JOIN customers c ON so.customer_id = c.id
            WHERE so.status IN ('billed', 'qc-passed', 'job-completed', 'completed')
              AND so.id NOT IN (SELECT service_order_id FROM vehicle_handovers vh2 WHERE vh2.handover_status='pending')
+             AND so.admin_id = ?1
            ORDER BY so.id DESC
            LIMIT 50`
         )
+        .bind(adminId)
         .all<any>();
       return jsonResponse(request, { success: true, data: rs.results ?? [] });
     }
 
     // Create vehicle handover (typically after job wrapup or when car jockey moves vehicle to release bay)
     if (url.pathname === '/api/vehicle-handover/handovers' && request.method === 'POST') {
+      const adminId = getAdminId(request);
       const data = await readJson<any>(request);
       if (!data) return fail(request, 400, 'Invalid JSON');
       
@@ -1068,8 +1097,8 @@ export default {
       const result = await env.DB
         .prepare(
           `INSERT INTO vehicle_handovers
-           (service_order_id, job_wrapup_id, customer_id, technician_id, handover_date, final_inspection_notes, handover_status)
-           VALUES (?1, ?2, ?3, ?4, COALESCE(?5, DATE('now')), ?6, 'pending')`
+           (service_order_id, job_wrapup_id, customer_id, technician_id, handover_date, final_inspection_notes, handover_status, admin_id)
+           VALUES (?1, ?2, ?3, ?4, COALESCE(?5, DATE('now')), ?6, 'pending', ?7)`
         )
         .bind(
           serviceOrderId,
@@ -1077,7 +1106,8 @@ export default {
           customerId,
           toInt(data.technician_id, null),
           data.handover_date ? String(data.handover_date).trim() : null,
-          String(data.inspection_notes ?? '').trim() || null
+          String(data.inspection_notes ?? '').trim() || null,
+          adminId
         )
         .run();
 
@@ -1167,6 +1197,7 @@ export default {
     {
       const m = url.pathname.match(/^\/api\/vehicle-handover\/handovers\/(\d+)\/items$/);
       if (m && request.method === 'POST') {
+        const adminId = getAdminId(request);
         const handoverId = toInt(m[1], null);
         if (!handoverId) return fail(request, 400, 'Invalid handover id');
         const data = await readJson<any>(request);
@@ -1180,10 +1211,10 @@ export default {
         const result = await env.DB
           .prepare(
             `INSERT INTO handover_items
-             (handover_id, item_type, item_description, quantity, condition_before, item_verified, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, 0, CURRENT_TIMESTAMP)`
+             (handover_id, item_type, item_description, quantity, condition_before, item_verified, created_at, admin_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, 0, CURRENT_TIMESTAMP, ?6)`
           )
-          .bind(handoverId, itemType, itemDesc, qty, conditionBefore || null)
+          .bind(handoverId, itemType, itemDesc, qty, conditionBefore || null, adminId)
           .run();
         const id = await d1FirstId(result);
         return jsonResponse(request, { success: true, item_id: id }, 201);
@@ -1213,6 +1244,7 @@ export default {
     {
       const m = url.pathname.match(/^\/api\/vehicle-handover\/handovers\/(\d+)\/signatures$/);
       if (m && request.method === 'POST') {
+        const adminId = getAdminId(request);
         const handoverId = toInt(m[1], null);
         if (!handoverId) return fail(request, 400, 'Invalid handover id');
         const data = await readJson<any>(request);
@@ -1228,10 +1260,10 @@ export default {
         const result = await env.DB
           .prepare(
             `INSERT INTO handover_signatures
-             (handover_id, signatory_type, signatory_name, signatory_role, printed_name, signature_image, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, CURRENT_TIMESTAMP)`
+             (handover_id, signatory_type, signatory_name, signatory_role, printed_name, signature_image, created_at, admin_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, CURRENT_TIMESTAMP, ?7)`
           )
-          .bind(handoverId, signatoryType, signatoryName, signatoryRole || null, printedName || null, signatureImage)
+          .bind(handoverId, signatoryType, signatoryName, signatoryRole || null, printedName || null, signatureImage, adminId)
           .run();
         const id = await d1FirstId(result);
         return jsonResponse(request, { success: true, signature_id: id }, 201);
@@ -1241,6 +1273,7 @@ export default {
     {
       const m = url.pathname.match(/^\/api\/vehicle-handover\/handovers\/(\d+)\/complete$/);
       if (m && request.method === 'POST') {
+        const adminId = getAdminId(request);
         const handoverId = toInt(m[1], null);
         if (!handoverId) return fail(request, 400, 'Invalid handover id');
         const data = await readJson<any>(request);
@@ -1289,10 +1322,10 @@ export default {
         if (handover.service_order_id && handover.customer_id) {
           await env.DB
             .prepare(
-              `INSERT INTO followups (service_order_id, customer_id, followup_date, contact_method, status, notes)
-               VALUES (?1, ?2, DATE('now', '+3 days'), 'phone', 'pending', 'Auto-generated 3-day post-service follow-up')`
+              `INSERT INTO followups (service_order_id, customer_id, followup_date, contact_method, status, notes, admin_id)
+               VALUES (?1, ?2, DATE('now', '+3 days'), 'phone', 'pending', 'Auto-generated 3-day post-service follow-up', ?3)`
             )
-            .bind(handover.service_order_id, handover.customer_id)
+            .bind(handover.service_order_id, handover.customer_id, adminId)
             .run();
         }
 
@@ -1313,6 +1346,7 @@ export default {
     // ==================== FOREMAN QC ====================
     // Jobs pending QC = technician has clocked out (assignment completed) but no QC inspection yet
     if (url.pathname === '/api/foreman-qc/jobs/pending' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const rs = await env.DB
         .prepare(
           `SELECT DISTINCT so.id as service_order_id,
@@ -1330,9 +1364,11 @@ export default {
              AND jca.clock_out_time IS NOT NULL
              AND so.status != 'completed'
              AND so.id NOT IN (SELECT service_order_id FROM qc_inspections WHERE overall_status = 'passed')
+             AND so.admin_id = ?1
            ORDER BY jca.clock_out_time DESC, so.id DESC
            LIMIT 100`
         )
+        .bind(adminId)
         .all<any>();
 
       // UI expects array rows
@@ -1348,13 +1384,15 @@ export default {
     }
 
     if (url.pathname === '/api/foreman-qc/inspections/active' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const rs = await env.DB
         .prepare(
           `SELECT id, service_order_id, foreman_id, inspection_date, overall_status, failed_items, created_at
            FROM qc_inspections
-           WHERE overall_status IN ('pending','rework-required')
+           WHERE overall_status IN ('pending','rework-required') AND admin_id = ?1
            ORDER BY created_at DESC, id DESC`
         )
+        .bind(adminId)
         .all<any>();
       const rows = (rs.results ?? []).map((r: any) => [
         r.id,
@@ -1369,11 +1407,12 @@ export default {
     }
 
     if (url.pathname === '/api/foreman-qc/summary' && request.method === 'GET') {
-      const total = await env.DB.prepare(`SELECT COUNT(*) as n FROM qc_inspections`).first<any>();
-      const passed = await env.DB.prepare(`SELECT COUNT(*) as n FROM qc_inspections WHERE overall_status='passed'`).first<any>();
-      const failed = await env.DB.prepare(`SELECT COUNT(*) as n FROM qc_inspections WHERE overall_status='failed'`).first<any>();
-      const pending = await env.DB.prepare(`SELECT COUNT(*) as n FROM qc_inspections WHERE overall_status IN ('pending','rework-required')`).first<any>();
-      const rework = await env.DB.prepare(`SELECT COUNT(*) as n FROM qc_inspections WHERE overall_status='rework-required'`).first<any>();
+      const adminId = getAdminId(request);
+      const total = await env.DB.prepare(`SELECT COUNT(*) as n FROM qc_inspections WHERE admin_id = ?1`).bind(adminId).first<any>();
+      const passed = await env.DB.prepare(`SELECT COUNT(*) as n FROM qc_inspections WHERE overall_status='passed' AND admin_id = ?1`).bind(adminId).first<any>();
+      const failed = await env.DB.prepare(`SELECT COUNT(*) as n FROM qc_inspections WHERE overall_status='failed' AND admin_id = ?1`).bind(adminId).first<any>();
+      const pending = await env.DB.prepare(`SELECT COUNT(*) as n FROM qc_inspections WHERE overall_status IN ('pending','rework-required') AND admin_id = ?1`).bind(adminId).first<any>();
+      const rework = await env.DB.prepare(`SELECT COUNT(*) as n FROM qc_inspections WHERE overall_status='rework-required' AND admin_id = ?1`).bind(adminId).first<any>();
       const data = {
         total_inspections: Number(total?.n ?? 0),
         passed_count: Number(passed?.n ?? 0),
@@ -1385,6 +1424,7 @@ export default {
     }
 
     if (url.pathname === '/api/foreman-qc/inspections' && request.method === 'POST') {
+      const adminId = getAdminId(request);
       const data = await readJson<any>(request);
       if (!data) return fail(request, 400, 'Invalid JSON');
       const serviceOrderId = toInt(data.service_order_id, null);
@@ -1396,11 +1436,11 @@ export default {
         const result = await env.DB
           .prepare(
             `INSERT INTO qc_inspections
-             (service_order_id, inspection_date, overall_status, created_at)
+             (service_order_id, inspection_date, overall_status, created_at, admin_id)
              VALUES
-             (?1, ?2, 'pending', CURRENT_TIMESTAMP)`
+             (?1, ?2, 'pending', CURRENT_TIMESTAMP, ?3)`
           )
-          .bind(serviceOrderId, inspectionDate)
+          .bind(serviceOrderId, inspectionDate, adminId)
           .run();
 
         const inspectionId = await d1FirstId(result);
@@ -1480,6 +1520,7 @@ export default {
     }
 
     if (url.pathname === '/api/foreman-qc/road-tests' && request.method === 'POST') {
+      const adminId = getAdminId(request);
       const data = await readJson<any>(request);
       if (!data) return fail(request, 400, 'Invalid JSON');
       const qcInspectionId = toInt(data.qc_inspection_id, null);
@@ -1491,9 +1532,9 @@ export default {
           `INSERT INTO qc_road_tests
            (qc_inspection_id, service_order_id, road_test_date, tested_by, tester_name, test_distance_km, engine_sound,
             acceleration_smooth, braking_effective, steering_responsive, electrical_functions_ok, air_conditioning_ok,
-            overall_performance, road_test_notes, start_time, end_time, route_compliance, authorization_stamp, authorized_by, created_at)
+            overall_performance, road_test_notes, start_time, end_time, route_compliance, authorization_stamp, authorized_by, created_at, admin_id)
            VALUES
-           (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, CURRENT_TIMESTAMP)`
+           (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, CURRENT_TIMESTAMP, ?20)`
         )
         .bind(
           qcInspectionId,
@@ -1514,7 +1555,8 @@ export default {
           String(data.end_time ?? '').trim() || null,
           data.route_compliance ? 1 : 0,
           String(data.authorization_stamp ?? '').trim() || null,
-          String(data.authorized_by ?? '').trim() || null
+          String(data.authorized_by ?? '').trim() || null,
+          adminId
         )
         .run();
 
@@ -1577,6 +1619,7 @@ export default {
 
     // ==================== BILLING ====================
     if (url.pathname === '/api/billing/summary' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const row = await env.DB
         .prepare(
           `SELECT
@@ -1584,8 +1627,10 @@ export default {
              SUM(CASE WHEN status='issued' THEN 1 ELSE 0 END) as issued_count,
              SUM(CASE WHEN status='draft' THEN 1 ELSE 0 END) as draft_count,
              SUM(CASE WHEN status='overdue' THEN 1 ELSE 0 END) as overdue_count
-           FROM billing_invoices`
+           FROM billing_invoices
+           WHERE admin_id = ?1`
         )
+        .bind(adminId)
         .first<any>();
       return ok(request, {
         paid_amount: Number(row?.paid_amount ?? 0),
@@ -1596,6 +1641,7 @@ export default {
     }
 
     async function listInvoicesByStatus(kind: 'pending' | 'paid' | 'overdue') {
+      const adminId = getAdminId(request);
       const now = new Date();
       const statuses =
         kind === 'paid' ? ['paid'] : kind === 'overdue' ? ['overdue'] : ['draft', 'issued'];
@@ -1609,10 +1655,10 @@ export default {
            FROM billing_invoices bi
            LEFT JOIN customers c ON c.id = bi.customer_id
            LEFT JOIN service_orders so ON so.id = bi.service_order_id
-           WHERE bi.status IN (${statuses.map(() => '?').join(',')})
+           WHERE bi.status IN (${statuses.map(() => '?').join(',')}) AND bi.admin_id = ?
            ORDER BY bi.created_at DESC, bi.id DESC`
         )
-        .bind(...statuses)
+        .bind(...statuses, adminId)
         .all<any>();
 
       const invoices = (rs.results ?? []).map((r: any) => {
@@ -1644,6 +1690,7 @@ export default {
 
     // Generic billing invoices endpoint with optional status filter
     if (url.pathname === '/api/billing/invoices' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const statusFilter = url.searchParams.get('status');
       
       let whereClause = '1=1';
@@ -1669,9 +1716,10 @@ export default {
            FROM billing_invoices bi
            LEFT JOIN customers c ON c.id = bi.customer_id
            LEFT JOIN service_orders so ON so.id = bi.service_order_id
-           WHERE ${whereClause}
+           WHERE ${whereClause} AND bi.admin_id = ?1
            ORDER BY bi.created_at DESC, bi.id DESC`
         )
+        .bind(adminId)
         .all<any>();
 
       const invoices = (rs.results ?? []).map((r: any) => {
@@ -1905,6 +1953,7 @@ export default {
     }
 
     if (url.pathname === '/api/billing/invoices' && request.method === 'POST') {
+      const adminId = getAdminId(request);
       const data = await readJson<any>(request);
       if (!data) return fail(request, 400, 'Invalid JSON');
 
@@ -1926,9 +1975,9 @@ export default {
         .prepare(
           `INSERT INTO billing_invoices
            (service_order_id, customer_id, status, labor_hours, labor_rate, materials_cost, parts_cost, parking_cost, discount,
-            total_amount, paid_amount, issued_at, due_date, created_at)
+            total_amount, paid_amount, issued_at, due_date, created_at, admin_id)
            VALUES
-           (?1, ?2, 'draft', ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, NULL, ?10, CURRENT_TIMESTAMP)`
+           (?1, ?2, 'draft', ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, NULL, ?10, CURRENT_TIMESTAMP, ?11)`
         )
         .bind(
           serviceOrderId,
@@ -1940,7 +1989,8 @@ export default {
           parkingCost,
           discount,
           total,
-          dueDate
+          dueDate,
+          adminId
         )
         .run();
 
@@ -2012,6 +2062,7 @@ export default {
     {
       const m = url.pathname.match(/^\/api\/billing\/invoices\/(\d+)\/pay$/);
       if (m && request.method === 'POST') {
+        const adminId = getAdminId(request);
         const invoiceId = toInt(m[1], null);
         if (!invoiceId) return fail(request, 400, 'Invalid invoice id');
         
@@ -2040,10 +2091,10 @@ export default {
           await env.DB
             .prepare(
               `INSERT INTO billing_payments 
-               (invoice_id, payment_amount, payment_method, reference_number, created_at)
-               VALUES (?1, ?2, ?3, ?4, CURRENT_TIMESTAMP)`
+               (invoice_id, payment_amount, payment_method, reference_number, created_at, admin_id)
+               VALUES (?1, ?2, ?3, ?4, CURRENT_TIMESTAMP, ?5)`
             )
-            .bind(invoiceId, total, paymentMethod, refNumber || null)
+            .bind(invoiceId, total, paymentMethod, refNumber || null, adminId)
             .run();
         } catch (e) {
           // payments table might not exist, that's ok
@@ -2057,10 +2108,10 @@ export default {
           try {
             await env.DB
               .prepare(
-                `INSERT INTO vehicle_handovers (service_order_id, customer_id, handover_date, handover_status)
-                 VALUES (?1, ?2, DATE('now'), 'pending')`
+                `INSERT INTO vehicle_handovers (service_order_id, customer_id, handover_date, handover_status, admin_id)
+                 VALUES (?1, ?2, DATE('now'), 'pending', ?3)`
               )
-              .bind(inv.service_order_id, inv.customer_id || null)
+              .bind(inv.service_order_id, inv.customer_id || null, adminId)
               .run();
           } catch (e) {
             // May already exist from self-healing
@@ -2069,8 +2120,8 @@ export default {
           // Auto-create Gatepass
           try {
             await env.DB
-              .prepare(`INSERT INTO gatepasses (service_order_id, customer_id, status, created_at) VALUES (?1, ?2, 'pending', CURRENT_TIMESTAMP)`)
-              .bind(inv.service_order_id, inv.customer_id || null)
+              .prepare(`INSERT INTO gatepasses (service_order_id, customer_id, status, created_at, admin_id) VALUES (?1, ?2, 'pending', CURRENT_TIMESTAMP, ?3)`)
+              .bind(inv.service_order_id, inv.customer_id || null, adminId)
               .run();
           } catch (e) {
             // May already exist
@@ -2087,6 +2138,7 @@ export default {
     {
       const m = url.pathname.match(/^\/api\/billing\/invoices\/(\d+)\/payments$/);
       if (m && request.method === 'POST') {
+        const adminId = getAdminId(request);
         const invoiceId = toInt(m[1], null);
         if (!invoiceId) return fail(request, 400, 'Invalid invoice id');
         const data = await readJson<any>(request);
@@ -2101,10 +2153,10 @@ export default {
         await env.DB
           .prepare(
             `INSERT INTO billing_payments
-             (invoice_id, payment_amount, payment_method, reference_number, created_by, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, CURRENT_TIMESTAMP)`
+             (invoice_id, payment_amount, payment_method, reference_number, created_by, created_at, admin_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, CURRENT_TIMESTAMP, ?6)`
           )
-          .bind(invoiceId, amount, method, ref || null, createdBy)
+          .bind(invoiceId, amount, method, ref || null, createdBy, adminId)
           .run();
 
         // Update invoice totals
@@ -2130,8 +2182,8 @@ export default {
             await env.DB.prepare(`UPDATE service_orders SET status='billed' WHERE id=?1`).bind(inv.service_order_id).run();
             // Create gatepass for vehicle release
             const gatepassResult = await env.DB
-              .prepare(`INSERT INTO gatepasses (service_order_id, customer_id, status, created_at) VALUES (?1, ?2, 'pending', CURRENT_TIMESTAMP)`)
-              .bind(inv.service_order_id, inv.customer_id || null)
+              .prepare(`INSERT INTO gatepasses (service_order_id, customer_id, status, created_at, admin_id) VALUES (?1, ?2, 'pending', CURRENT_TIMESTAMP, ?3)`)
+              .bind(inv.service_order_id, inv.customer_id || null, adminId)
               .run();
             gatepassId = await d1FirstId(gatepassResult);
           }
@@ -2165,20 +2217,22 @@ export default {
     }
 
     if (url.pathname === '/api/cashier/transactions/daily' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const day = todayISODate();
       const rs = await env.DB
         .prepare(
           `SELECT p.id, p.invoice_id, p.payment_amount as amount, p.payment_method, p.reference_number, p.created_at
            FROM billing_payments p
-           WHERE substr(p.created_at,1,10)=?1
+           WHERE substr(p.created_at,1,10)=?1 AND p.admin_id = ?2
            ORDER BY p.created_at DESC, p.id DESC`
         )
-        .bind(day)
+        .bind(day, adminId)
         .all<any>();
       return ok(request, rs.results ?? []);
     }
 
     if (url.pathname === '/api/cashier/summary/daily' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const day = todayISODate();
       const row = await env.DB
         .prepare(
@@ -2189,9 +2243,9 @@ export default {
              SUM(CASE WHEN payment_method='card' THEN payment_amount ELSE 0 END) as card_total,
              SUM(CASE WHEN payment_method='check' THEN payment_amount ELSE 0 END) as check_total
            FROM billing_payments
-           WHERE substr(created_at,1,10)=?1`
+           WHERE substr(created_at,1,10)=?1 AND admin_id = ?2`
         )
-        .bind(day)
+        .bind(day, adminId)
         .first<any>();
       return ok(request, {
         total_transactions: Number(row?.total_transactions ?? 0),
@@ -2220,6 +2274,7 @@ export default {
     }
 
     if (url.pathname === '/api/cashier/drawer/open' && request.method === 'POST') {
+      const adminId = getAdminId(request);
       const data = await readJson<any>(request);
       if (!data) return fail(request, 400, 'Invalid JSON');
       const cashierId = toInt(data.cashier_id, null);
@@ -2232,10 +2287,10 @@ export default {
         .run();
       const result = await env.DB
         .prepare(
-          `INSERT INTO cashier_drawers (cashier_id, opening_balance, opening_time, status)
-           VALUES (?1, ?2, CURRENT_TIMESTAMP, 'open')`
+          `INSERT INTO cashier_drawers (cashier_id, opening_balance, opening_time, status, admin_id)
+           VALUES (?1, ?2, CURRENT_TIMESTAMP, 'open', ?3)`
         )
-        .bind(cashierId, openingBalance)
+        .bind(cashierId, openingBalance, adminId)
         .run();
       const id = await d1FirstId(result);
       return jsonResponse(request, { success: true, drawer_id: id, message: 'Drawer opened' }, 201);
@@ -2262,6 +2317,7 @@ export default {
     }
 
     if (url.pathname === '/api/cashier/payments' && request.method === 'POST') {
+      const adminId = getAdminId(request);
       const data = await readJson<any>(request);
       if (!data) return fail(request, 400, 'Invalid JSON');
       const invoiceId = toInt(data.invoice_id, null);
@@ -2273,10 +2329,10 @@ export default {
 
       await env.DB
         .prepare(
-          `INSERT INTO billing_payments (invoice_id, payment_amount, payment_method, reference_number, created_by, created_at)
-           VALUES (?1, ?2, ?3, ?4, ?5, CURRENT_TIMESTAMP)`
+          `INSERT INTO billing_payments (invoice_id, payment_amount, payment_method, reference_number, created_by, created_at, admin_id)
+           VALUES (?1, ?2, ?3, ?4, ?5, CURRENT_TIMESTAMP, ?6)`
         )
-        .bind(invoiceId, amount, method, ref || null, createdBy)
+        .bind(invoiceId, amount, method, ref || null, createdBy, adminId)
         .run();
 
       await env.DB.prepare(`UPDATE billing_invoices SET paid_amount = paid_amount + ?1 WHERE id=?2`).bind(amount, invoiceId).run();
@@ -2296,18 +2352,18 @@ export default {
           
           // Auto-create Gatepass when payment is complete (per spec: Cashier signs gatepass after payment)
           const gatepassResult = await env.DB
-            .prepare(`INSERT INTO gatepasses (service_order_id, customer_id, status, created_at) VALUES (?1, ?2, 'pending', CURRENT_TIMESTAMP)`)
-            .bind(inv.service_order_id, inv.customer_id || null)
+            .prepare(`INSERT INTO gatepasses (service_order_id, customer_id, status, created_at, admin_id) VALUES (?1, ?2, 'pending', CURRENT_TIMESTAMP, ?3)`)
+            .bind(inv.service_order_id, inv.customer_id || null, adminId)
             .run();
           gatepassId = await d1FirstId(gatepassResult);
 
           // Auto-create Vehicle Handover record (must be completed before security gate can release)
           await env.DB
             .prepare(
-              `INSERT INTO vehicle_handovers (service_order_id, customer_id, handover_date, handover_status)
-               VALUES (?1, ?2, DATE('now'), 'pending')`
+              `INSERT INTO vehicle_handovers (service_order_id, customer_id, handover_date, handover_status, admin_id)
+               VALUES (?1, ?2, DATE('now'), 'pending', ?3)`
             )
-            .bind(inv.service_order_id, inv.customer_id || null)
+            .bind(inv.service_order_id, inv.customer_id || null, adminId)
             .run();
         }
 
@@ -2334,35 +2390,42 @@ export default {
 
     // ==================== FOLLOW-UP ====================
     if (url.pathname === '/api/follow-up/followups/pending' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const rs = await env.DB
         .prepare(
           `SELECT id, service_order_id, customer_id, followup_date, contact_method, status
            FROM followups
-           WHERE status='pending'
+           WHERE status='pending' AND admin_id = ?1
            ORDER BY followup_date ASC, id ASC`
         )
+        .bind(adminId)
         .all<any>();
       return jsonResponse(request, { success: true, data: rs.results ?? [], followups: rs.results ?? [] });
     }
 
     if (url.pathname === '/api/follow-up/issues' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const rs = await env.DB
         .prepare(
           `SELECT id, followup_id, issue_category, issue_description, severity, status, created_at
            FROM followup_issues
-           WHERE status='open'
+           WHERE status='open' AND admin_id = ?1
            ORDER BY created_at DESC, id DESC`
         )
+        .bind(adminId)
         .all<any>();
       return jsonResponse(request, { success: true, data: rs.results ?? [], issues: rs.results ?? [] });
     }
 
     if (url.pathname === '/api/follow-up/summary' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const byStatus = await env.DB
-        .prepare(`SELECT COUNT(*) as n, status FROM followups GROUP BY status`)
+        .prepare(`SELECT COUNT(*) as n, status FROM followups WHERE admin_id = ?1 GROUP BY status`)
+        .bind(adminId)
         .all<any>();
       const issuesByStatus = await env.DB
-        .prepare(`SELECT COUNT(*) as n, status FROM followup_issues GROUP BY status`)
+        .prepare(`SELECT COUNT(*) as n, status FROM followup_issues WHERE admin_id = ?1 GROUP BY status`)
+        .bind(adminId)
         .all<any>();
       const summary = {
         by_status: (byStatus.results ?? []).map((r: any) => [Number(r.n ?? 0), r.status]),
@@ -2395,6 +2458,7 @@ export default {
     }
 
     if (url.pathname === '/api/follow-up/followups' && request.method === 'POST') {
+      const adminId = getAdminId(request);
       const data = await readJson<any>(request);
       if (!data) return fail(request, 400, 'Invalid JSON');
       const serviceOrderId = toInt(data.service_order_id, null);
@@ -2406,10 +2470,10 @@ export default {
       const result = await env.DB
         .prepare(
           `INSERT INTO followups
-           (service_order_id, customer_id, followup_date, contact_method, scheduled_by, status, created_at)
-           VALUES (?1, ?2, ?3, ?4, ?5, 'pending', CURRENT_TIMESTAMP)`
+           (service_order_id, customer_id, followup_date, contact_method, scheduled_by, status, created_at, admin_id)
+           VALUES (?1, ?2, ?3, ?4, ?5, 'pending', CURRENT_TIMESTAMP, ?6)`
         )
-        .bind(serviceOrderId, customerId, followupDate, contactMethod, scheduledBy)
+        .bind(serviceOrderId, customerId, followupDate, contactMethod, scheduledBy, adminId)
         .run();
       const id = await d1FirstId(result);
       return jsonResponse(request, { success: true, followup_id: id }, 201);
@@ -2418,6 +2482,7 @@ export default {
     {
       const m = url.pathname.match(/^\/api\/follow-up\/followups\/(\d+)\/feedback$/);
       if (m && request.method === 'POST') {
+        const adminId = getAdminId(request);
         const followupId = toInt(m[1], null);
         if (!followupId) return fail(request, 400, 'Invalid followup id');
         const data = await readJson<any>(request);
@@ -2425,14 +2490,15 @@ export default {
         await env.DB
           .prepare(
             `INSERT INTO followup_feedback
-             (followup_id, overall_experience, would_recommend, comments, created_at)
-             VALUES (?1, ?2, ?3, ?4, CURRENT_TIMESTAMP)`
+             (followup_id, overall_experience, would_recommend, comments, created_at, admin_id)
+             VALUES (?1, ?2, ?3, ?4, CURRENT_TIMESTAMP, ?5)`
           )
           .bind(
             followupId,
             toInt(data.overall_experience, null),
             String(data.would_recommend ?? '').trim() || null,
-            String(data.comments ?? '').trim() || null
+            String(data.comments ?? '').trim() || null,
+            adminId
           )
           .run();
         return ok(request, null, { message: 'Feedback recorded' });
@@ -2442,6 +2508,7 @@ export default {
     {
       const m = url.pathname.match(/^\/api\/follow-up\/followups\/(\d+)\/issues$/);
       if (m && request.method === 'POST') {
+        const adminId = getAdminId(request);
         const followupId = toInt(m[1], null);
         if (!followupId) return fail(request, 400, 'Invalid followup id');
         const data = await readJson<any>(request);
@@ -2449,14 +2516,15 @@ export default {
         await env.DB
           .prepare(
             `INSERT INTO followup_issues
-             (followup_id, issue_category, issue_description, severity, status, created_at)
-             VALUES (?1, ?2, ?3, ?4, 'open', CURRENT_TIMESTAMP)`
+             (followup_id, issue_category, issue_description, severity, status, created_at, admin_id)
+             VALUES (?1, ?2, ?3, ?4, 'open', CURRENT_TIMESTAMP, ?5)`
           )
           .bind(
             followupId,
             String(data.issue_category ?? '').trim() || null,
             String(data.issue_description ?? '').trim() || null,
-            String(data.severity ?? '').trim() || 'medium'
+            String(data.severity ?? '').trim() || 'medium',
+            adminId
           )
           .run();
         return ok(request, null, { message: 'Issue logged' });
@@ -2510,6 +2578,7 @@ export default {
 
     // ==================== CAR JOCKEY ====================
     if (url.pathname === '/api/car-jockey/movements/active' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const rs = await env.DB
         .prepare(
           `SELECT 
@@ -2524,14 +2593,16 @@ export default {
            FROM car_jockey_movements m
            LEFT JOIN service_orders so ON m.service_order_id = so.id
            LEFT JOIN customers c ON so.customer_id = c.id
-           WHERE m.status='active' 
+           WHERE m.status='active' AND m.admin_id = ?1
            ORDER BY m.started_at DESC, m.id DESC`
         )
+        .bind(adminId)
         .all<any>();
       return ok(request, rs.results ?? []);
     }
 
     if (url.pathname === '/api/car-jockey/parking/active' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const rs = await env.DB
         .prepare(
           `SELECT 
@@ -2547,16 +2618,18 @@ export default {
            FROM car_jockey_parking p
            LEFT JOIN service_orders so ON p.service_order_id = so.id
            LEFT JOIN customers c ON so.customer_id = c.id
-           WHERE p.status='active'
+           WHERE p.status='active' AND p.admin_id = ?1
            ORDER BY p.parked_at DESC, p.id DESC`
         )
+        .bind(adminId)
         .all<any>();
       return ok(request, rs.results ?? []);
     }
 
     if (url.pathname === '/api/car-jockey/summary' && request.method === 'GET') {
-      const activeMovements = await env.DB.prepare(`SELECT COUNT(*) as n FROM car_jockey_movements WHERE status='active'`).first<any>();
-      const parked = await env.DB.prepare(`SELECT COUNT(*) as n FROM car_jockey_parking WHERE status='active'`).first<any>();
+      const adminId = getAdminId(request);
+      const activeMovements = await env.DB.prepare(`SELECT COUNT(*) as n FROM car_jockey_movements WHERE status='active' AND admin_id = ?1`).bind(adminId).first<any>();
+      const parked = await env.DB.prepare(`SELECT COUNT(*) as n FROM car_jockey_parking WHERE status='active' AND admin_id = ?1`).bind(adminId).first<any>();
       return ok(request, {
         active_movements: Number(activeMovements?.n ?? 0),
         parked_vehicles: Number(parked?.n ?? 0)
@@ -2565,6 +2638,7 @@ export default {
 
     if (url.pathname === '/api/car-jockey/vehicles/pending' && request.method === 'GET') {
       // Approximation: service_orders that are completed but have no movement started yet.
+      const adminId = getAdminId(request);
       const rs = await env.DB
         .prepare(
           `SELECT so.id as so_id, c.name as customer_name, COALESCE(so.vehicle_plate_no, c.plate_no) as plate_no,
@@ -2573,14 +2647,17 @@ export default {
            LEFT JOIN customers c ON c.id = so.customer_id
            WHERE so.status='completed'
              AND so.id NOT IN (SELECT service_order_id FROM car_jockey_movements)
+             AND so.admin_id = ?1
            ORDER BY so.created_at DESC, so.id DESC
            LIMIT 100`
         )
+        .bind(adminId)
         .all<any>();
       return ok(request, rs.results ?? []);
     }
 
     if (url.pathname === '/api/car-jockey/movements' && request.method === 'POST') {
+      const adminId = getAdminId(request);
       const data = await readJson<any>(request);
       if (!data) return fail(request, 400, 'Invalid JSON');
       const serviceOrderId = toInt(data.service_order_id, null);
@@ -2589,8 +2666,8 @@ export default {
         .prepare(
           `INSERT INTO car_jockey_movements
            (service_order_id, jockey_id, movement_type, from_location, to_location, reason, vehicle_condition_start,
-            fuel_start, mileage_start, started_at, status)
-           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, CURRENT_TIMESTAMP, 'active')`
+            fuel_start, mileage_start, started_at, status, admin_id)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, CURRENT_TIMESTAMP, 'active', ?10)`
         )
         .bind(
           serviceOrderId,
@@ -2601,7 +2678,8 @@ export default {
           String(data.reason ?? '').trim() || null,
           String(data.vehicle_condition ?? '').trim() || null,
           toFloat(data.fuel_level, null),
-          toFloat(data.mileage, null)
+          toFloat(data.mileage, null),
+          adminId
         )
         .run();
       const id = await d1FirstId(result);
@@ -2633,6 +2711,7 @@ export default {
     }
 
     if (url.pathname === '/api/car-jockey/parking' && request.method === 'POST') {
+      const adminId = getAdminId(request);
       const data = await readJson<any>(request);
       if (!data) return fail(request, 400, 'Invalid JSON');
       const serviceOrderId = toInt(data.service_order_id, null);
@@ -2640,8 +2719,8 @@ export default {
       const result = await env.DB
         .prepare(
           `INSERT INTO car_jockey_parking
-           (service_order_id, vehicle_movement_id, parking_slot, parking_zone, parking_level, ground_condition, parking_fee, parked_at, status)
-           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, CURRENT_TIMESTAMP, 'active')`
+           (service_order_id, vehicle_movement_id, parking_slot, parking_zone, parking_level, ground_condition, parking_fee, parked_at, status, admin_id)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, CURRENT_TIMESTAMP, 'active', ?8)`
         )
         .bind(
           serviceOrderId,
@@ -2650,7 +2729,8 @@ export default {
           String(data.parking_zone ?? '').trim() || null,
           toInt(data.parking_level, null),
           String(data.ground_condition ?? '').trim() || null,
-          toFloat(data.parking_fee, null)
+          toFloat(data.parking_fee, null),
+          adminId
         )
         .run();
       const id = await d1FirstId(result);
@@ -2671,6 +2751,7 @@ export default {
     }
 
     if (url.pathname === '/api/car-jockey/parts-requests' && request.method === 'POST') {
+      const adminId = getAdminId(request);
       const data = await readJson<any>(request);
       if (!data) return fail(request, 400, 'Invalid JSON');
       const serviceOrderId = toInt(data.service_order_id, null);
@@ -2678,10 +2759,10 @@ export default {
       const result = await env.DB
         .prepare(
           `INSERT INTO car_jockey_parts_requests
-           (service_order_id, requested_by, document_data, status, created_at)
-           VALUES (?1, ?2, ?3, 'pending', CURRENT_TIMESTAMP)`
+           (service_order_id, requested_by, document_data, status, created_at, admin_id)
+           VALUES (?1, ?2, ?3, 'pending', CURRENT_TIMESTAMP, ?4)`
         )
-        .bind(serviceOrderId, toInt(data.requested_by, null), JSON.stringify(data.items ?? []))
+        .bind(serviceOrderId, toInt(data.requested_by, null), JSON.stringify(data.items ?? []), adminId)
         .run();
       const id = await d1FirstId(result);
       return jsonResponse(request, { success: true, request_id: id }, 201);
@@ -2689,6 +2770,7 @@ export default {
 
     // ==================== JOB CONTROLLER ====================
     if (url.pathname === '/api/job-controller/service-orders/pending' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const rs = await env.DB
         .prepare(
           `SELECT so.id,
@@ -2702,9 +2784,10 @@ export default {
                   0 as assigned_count
            FROM service_orders so
            LEFT JOIN customers c ON c.id = so.customer_id
-           WHERE so.status='pending'
+           WHERE so.status='pending' AND so.admin_id = ?1
            ORDER BY so.created_at DESC, so.id DESC`
         )
+        .bind(adminId)
         .all<any>();
       const rows = (rs.results ?? []).map((r: any) => [
         r.id,
@@ -2722,6 +2805,7 @@ export default {
     }
 
     if (url.pathname === '/api/job-controller/service-orders/active' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const rs = await env.DB
         .prepare(
           `SELECT so.id,
@@ -2740,9 +2824,10 @@ export default {
            LEFT JOIN customers c ON c.id = so.customer_id
            LEFT JOIN job_controller_assignments ta ON ta.service_order_id = so.id
            LEFT JOIN technicians t ON t.id = ta.technician_id
-           WHERE so.status='in-progress'
+           WHERE so.status='in-progress' AND so.admin_id = ?1
            ORDER BY so.created_at DESC, so.id DESC`
         )
+        .bind(adminId)
         .all<any>();
       const rows = (rs.results ?? []).map((r: any) => [
         r.id,
@@ -2762,21 +2847,24 @@ export default {
     }
 
     if (url.pathname === '/api/job-controller/technicians/available' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const rs = await env.DB
         .prepare(
           `SELECT t.id, t.name, t.employee_id, t.status, t.specialization,
                   (SELECT COUNT(*) FROM job_controller_assignments jca
                    WHERE jca.technician_id = t.id AND jca.status IN ('assigned','in-progress')) AS active_jobs
            FROM technicians t
-           WHERE t.status='active'
+           WHERE t.status='active' AND t.admin_id = ?1
            ORDER BY t.name ASC`
         )
+        .bind(adminId)
         .all<any>();
       const rows = (rs.results ?? []).map((r: any) => [r.id, r.name, r.employee_id, r.status, r.active_jobs ?? 0, r.specialization ?? '']);
       return ok(request, rows);
     }
 
     if (url.pathname === '/api/job-controller/assign' && request.method === 'POST') {
+      const adminId = getAdminId(request);
       const data = await readJson<any>(request);
       if (!data) return fail(request, 400, 'Invalid JSON');
       const serviceOrderId = toInt(data.service_order_id, null);
@@ -2786,10 +2874,10 @@ export default {
       const result = await env.DB
         .prepare(
           `INSERT INTO job_controller_assignments
-           (service_order_id, technician_id, assigned_by, assigned_at, status)
-           VALUES (?1, ?2, ?3, CURRENT_TIMESTAMP, 'assigned')`
+           (service_order_id, technician_id, assigned_by, assigned_at, status, admin_id)
+           VALUES (?1, ?2, ?3, CURRENT_TIMESTAMP, 'assigned', ?4)`
         )
-        .bind(serviceOrderId, technicianId, assignedBy || null)
+        .bind(serviceOrderId, technicianId, assignedBy || null, adminId)
         .run();
       await env.DB.prepare(`UPDATE service_orders SET status='in-progress' WHERE id=?1`).bind(serviceOrderId).run();
       const id = await d1FirstId(result);
@@ -2859,6 +2947,7 @@ export default {
 
     // ==================== PARTS REQUESTS (JOB CONTROLLER) ====================
     if (url.pathname === '/api/job-controller/parts-requests/pending' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const rs = await env.DB
         .prepare(`
           SELECT
@@ -2875,9 +2964,10 @@ export default {
           LEFT JOIN technicians t ON pr.requested_by = t.id
           LEFT JOIN service_orders so ON pr.service_order_id = so.id
           LEFT JOIN customers c ON so.customer_id = c.id
-          WHERE pr.status IN ('pending', 'sent-to-warehouse')
+          WHERE pr.status IN ('pending', 'sent-to-warehouse') AND pr.admin_id = ?1
           ORDER BY pr.created_at ASC
         `)
+        .bind(adminId)
         .all<any>();
 
       // Fetch items for each request
@@ -2914,6 +3004,7 @@ export default {
 
     // Get completed/delivered parts requests history (for Job Controller)
     if (url.pathname === '/api/job-controller/parts-requests/completed' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const limit = Math.min(toInt(url.searchParams.get('limit'), 20) ?? 20, 100);
       const rs = await env.DB
         .prepare(`
@@ -2932,11 +3023,11 @@ export default {
           LEFT JOIN technicians t ON pr.requested_by = t.id
           LEFT JOIN service_orders so ON pr.service_order_id = so.id
           LEFT JOIN customers c ON so.customer_id = c.id
-          WHERE pr.status IN ('completed', 'cancelled')
+          WHERE pr.status IN ('completed', 'cancelled') AND pr.admin_id = ?1
           ORDER BY pr.updated_at DESC
-          LIMIT ?1
+          LIMIT ?2
         `)
-        .bind(limit)
+        .bind(adminId, limit)
         .all<any>();
 
       // Fetch items for each request
@@ -2972,6 +3063,7 @@ export default {
     }
 
     if (url.pathname === '/api/job-controller/products/search' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const q = url.searchParams.get('q') || '';
       if (!q || q.length < 2) {
          return ok(request, []);
@@ -2980,9 +3072,9 @@ export default {
         const results = await env.DB.prepare(`
           SELECT id, product_name, product_code, quantity_in_stock, unit_price
           FROM warehouse_products
-          WHERE product_name LIKE ? OR product_code LIKE ?
+          WHERE (product_name LIKE ? OR product_code LIKE ?) AND admin_id = ?
           LIMIT 50
-        `).bind(`%${q}%`, `%${q}%`).all();
+        `).bind(`%${q}%`, `%${q}%`, adminId).all();
         return ok(request, results.results || []);
       } catch (e: any) {
         return fail(request, 500, `Search error: ${e.message}`);
@@ -2991,6 +3083,7 @@ export default {
 
     if (url.pathname === '/api/job-controller/parts-requests' && request.method === 'POST') {
       try {
+        const adminId = getAdminId(request);
         const body = await readJson<any>(request);
         if (!body || !body.service_order_id || !body.items || !Array.isArray(body.items)) {
           return fail(request, 400, 'service_order_id and items array required');
@@ -2998,10 +3091,10 @@ export default {
 
         // 1. Create Request
         const res1 = await env.DB.prepare(`
-            INSERT INTO parts_requests (service_order_id, requested_by, requested_by_role, status, notes)
-            VALUES (?, ?, 'job_controller', 'sent-to-warehouse', ?)
+            INSERT INTO parts_requests (service_order_id, requested_by, requested_by_role, status, notes, admin_id)
+            VALUES (?, ?, 'job_controller', 'sent-to-warehouse', ?, ?)
           `)
-          .bind(body.service_order_id, body.technician_id || null, body.notes || '')
+          .bind(body.service_order_id, body.technician_id || null, body.notes || '', adminId)
           .run();
 
         if (!res1.success) return fail(request, 500, 'Failed to create request');
@@ -3010,9 +3103,9 @@ export default {
         // 2. Insert items
         const stmts = body.items.map((p: any) =>
           env.DB.prepare(`
-                INSERT INTO parts_request_items (parts_request_id, product_id, quantity_requested, status)
-                VALUES (?, ?, ?, 'pending')
-            `).bind(requestId, p.product_id, p.quantity)
+                INSERT INTO parts_request_items (parts_request_id, product_id, quantity_requested, status, admin_id)
+                VALUES (?, ?, ?, 'pending', ?)
+            `).bind(requestId, p.product_id, p.quantity, adminId)
         );
 
         await env.DB.batch(stmts);
@@ -3093,6 +3186,7 @@ export default {
     // ==================== JOB WRAP-UP ====================
     if (url.pathname === '/api/job-wrapup/jobs/ready' && request.method === 'GET') {
       // QC-passed jobs ready for Job Controller wrap-up
+      const adminId = getAdminId(request);
       const rs = await env.DB
         .prepare(
           `SELECT so.id as service_order_id,
@@ -3110,9 +3204,11 @@ export default {
            LEFT JOIN technicians t ON t.id = jca.technician_id
            WHERE so.status='qc-passed'
              AND so.id NOT IN (SELECT service_order_id FROM job_wrapups WHERE service_order_id IS NOT NULL)
+             AND so.admin_id = ?1
            ORDER BY so.created_at DESC, so.id DESC
            LIMIT 100`
         )
+        .bind(adminId)
         .all<any>();
       const rows = (rs.results ?? []).map((r: any) => [        r.service_order_id,
         r.job_order_no,
@@ -3129,6 +3225,7 @@ export default {
 
     // Wrapups with status='stopped' ready to be returned to SA
     if (url.pathname === '/api/job-wrapup/wrapups/active' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const rs = await env.DB
         .prepare(
           `SELECT jw.id, jw.service_order_id, jw.technician_id, jw.final_status, jw.total_labor_hours, jw.created_at,
@@ -3139,19 +3236,21 @@ export default {
            LEFT JOIN service_orders so ON so.id = jw.service_order_id
            LEFT JOIN customers c ON c.id = so.customer_id
            LEFT JOIN technicians t ON t.id = jw.technician_id
-           WHERE jw.final_status='stopped'
+           WHERE jw.final_status='stopped' AND jw.admin_id = ?1
            ORDER BY jw.created_at DESC, jw.id DESC`
         )
+        .bind(adminId)
         .all<any>();
       return ok(request, rs.results ?? []);
     }
 
     if (url.pathname === '/api/job-wrapup/summary' && request.method === 'GET') {
-      const total = await env.DB.prepare(`SELECT COUNT(*) as n FROM job_wrapups`).first<any>();
-      const stopped = await env.DB.prepare(`SELECT COUNT(*) as n FROM job_wrapups WHERE final_status='stopped'`).first<any>();
-      const returned = await env.DB.prepare(`SELECT COUNT(*) as n FROM job_wrapups WHERE final_status='returned'`).first<any>();
-      const qcPassed = await env.DB.prepare(`SELECT COUNT(*) as n FROM service_orders WHERE status='qc-passed' AND id NOT IN (SELECT service_order_id FROM job_wrapups WHERE service_order_id IS NOT NULL)`).first<any>();
-      const avg = await env.DB.prepare(`SELECT AVG(COALESCE(total_labor_hours,0)) as n FROM job_wrapups`).first<any>();
+      const adminId = getAdminId(request);
+      const total = await env.DB.prepare(`SELECT COUNT(*) as n FROM job_wrapups WHERE admin_id = ?1`).bind(adminId).first<any>();
+      const stopped = await env.DB.prepare(`SELECT COUNT(*) as n FROM job_wrapups WHERE final_status='stopped' AND admin_id = ?1`).bind(adminId).first<any>();
+      const returned = await env.DB.prepare(`SELECT COUNT(*) as n FROM job_wrapups WHERE final_status='returned' AND admin_id = ?1`).bind(adminId).first<any>();
+      const qcPassed = await env.DB.prepare(`SELECT COUNT(*) as n FROM service_orders WHERE status='qc-passed' AND id NOT IN (SELECT service_order_id FROM job_wrapups WHERE service_order_id IS NOT NULL) AND admin_id = ?1`).bind(adminId).first<any>();
+      const avg = await env.DB.prepare(`SELECT AVG(COALESCE(total_labor_hours,0)) as n FROM job_wrapups WHERE admin_id = ?1`).bind(adminId).first<any>();
       return ok(request, {
         total_wrapups: Number(total?.n ?? 0),
         qc_passed_count: Number(qcPassed?.n ?? 0),  // Ready for Stop Clock
@@ -3273,6 +3372,7 @@ export default {
     
     // Ready for Billing - jobs returned from Job Controller
     if (url.pathname === '/api/service-advisor/orders/ready-for-billing' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const rs = await env.DB
         .prepare(
           `SELECT so.id,
@@ -3290,15 +3390,17 @@ export default {
            LEFT JOIN customers c ON c.id = so.customer_id
            LEFT JOIN job_wrapups jw ON jw.service_order_id = so.id
            LEFT JOIN technicians t ON t.id = jw.technician_id
-           WHERE so.status = 'ready-for-billing'
+           WHERE so.status = 'ready-for-billing' AND so.admin_id = ?1
            ORDER BY jw.returned_to_sa_at DESC, so.id DESC
            LIMIT 100`
         )
+        .bind(adminId)
         .all<any>();
       return ok(request, rs.results ?? []);
     }
     
     if (url.pathname === '/api/service-advisor/appointments/pending' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const rs = await env.DB
         .prepare(
           `SELECT so.id,
@@ -3319,9 +3421,10 @@ export default {
            LEFT JOIN customers c ON c.id = so.customer_id
            LEFT JOIN service_bays sb ON sb.id = so.bay_id
            LEFT JOIN technicians t ON t.id = so.technician_id
-           WHERE so.status IN ('scheduled','confirmed')
+           WHERE so.status IN ('scheduled','confirmed') AND so.admin_id = ?1
            ORDER BY so.scheduled_date ASC, so.scheduled_time ASC`
         )
+        .bind(adminId)
         .all<any>();
       const rows = (rs.results ?? []).map((r: any) => [
         r.id,
@@ -3343,6 +3446,7 @@ export default {
     }
 
     if (url.pathname === '/api/service-advisor/service-orders/pending' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const rs = await env.DB
         .prepare(
           `SELECT so.id, 
@@ -3355,9 +3459,10 @@ export default {
                   so.created_at
            FROM service_orders so
            LEFT JOIN customers c ON c.id = so.customer_id
-           WHERE so.status='pending'
+           WHERE so.status='pending' AND so.admin_id = ?1
            ORDER BY so.created_at DESC, so.id DESC`
         )
+        .bind(adminId)
         .all<any>();
       const rows = (rs.results ?? []).map((r: any) => [
           r.id, 
@@ -3374,6 +3479,7 @@ export default {
 
     if (url.pathname === '/api/service-advisor/check-in' && request.method === 'POST') {
       try {
+        const adminId = getAdminId(request);
         const data = await readJson<any>(request);
         if (!data) return fail(request, 400, 'Invalid JSON');
         const schedulingOrderId = toInt(data.scheduling_order_id, null);
@@ -3414,15 +3520,16 @@ export default {
         const result = await env.DB
           .prepare(
             `INSERT INTO service_orders
-             (scheduling_order_id, customer_id, vehicle_plate_no, service_type, check_in_time, status, advisor_id, created_at)
-             VALUES (?1, ?2, ?3, ?4, CURRENT_TIMESTAMP, 'pending', ?5, CURRENT_TIMESTAMP)`
+             (scheduling_order_id, customer_id, vehicle_plate_no, service_type, check_in_time, status, advisor_id, created_at, admin_id)
+             VALUES (?1, ?2, ?3, ?4, CURRENT_TIMESTAMP, 'pending', ?5, CURRENT_TIMESTAMP, ?6)`
           )
           .bind(
                schedulingOrderId, 
                sched.customer_id, 
                sched.plate_no || null, 
                sched.service_type || null, 
-               validAdvisorId
+               validAdvisorId,
+               adminId
           )
           .run();
           
@@ -3462,6 +3569,7 @@ export default {
     }
 
     if (url.pathname === '/api/service-advisor/cis' && request.method === 'POST') {
+      const adminId = getAdminId(request);
       const data = await readJson<any>(request);
       if (!data) return fail(request, 400, 'Invalid JSON');
       const customerId = toInt(data.customer_id, null);
@@ -3471,9 +3579,9 @@ export default {
         .prepare(
           `INSERT INTO customer_info_sheets
            (customer_id, service_order_id, name, contact_no, email, address, vehicle_plate_no, vehicle_model, vehicle_year,
-            engine_no, chassis_no, mileage_in, service_type, notes, created_at, created_by)
+            engine_no, chassis_no, mileage_in, service_type, notes, created_at, created_by, admin_id)
            VALUES
-           (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, CURRENT_TIMESTAMP, ?15)`
+           (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, CURRENT_TIMESTAMP, ?15, ?16)`
         )
         .bind(
           customerId,
@@ -3490,7 +3598,8 @@ export default {
           toInt(data.mileage_in, null),
           String(data.service_type ?? '').trim() || null,
           String(data.notes ?? '').trim() || null,
-          String(data.created_by ?? '').trim() || null
+          String(data.created_by ?? '').trim() || null,
+          adminId
         )
         .run();
       return ok(request, null, { message: 'CIS saved' });
@@ -3498,6 +3607,7 @@ export default {
 
     if (url.pathname === '/api/service-advisor/vrc' && request.method === 'POST') {
       try {
+        const adminId = getAdminId(request);
         const data = await readJson<any>(request);
         if (!data) return fail(request, 400, 'Invalid JSON');
         
@@ -3519,9 +3629,9 @@ export default {
              (service_order_id, customer_id, mileage_in, mileage_out, exterior_condition, interior_condition,
               checklist_1_engine, checklist_2_fluids, checklist_3_brakes, checklist_4_suspension, checklist_5_battery,
               checklist_6_tires, checklist_7_lights, checklist_8_body, checklist_9_wipers, checklist_10_handbrake,
-              additional_findings, settings_restored, diagnosis_completed_by, diagnosis_date, created_at)
+              additional_findings, settings_restored, diagnosis_completed_by, diagnosis_date, created_at, admin_id)
              VALUES
-             (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+             (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?20)`
           )
           .bind(
             serviceOrderId,
@@ -3542,7 +3652,8 @@ export default {
             String(data.checklist_10_handbrake ?? 'na'),
             String(data.notes || data.additional_findings || '').trim() || null,
             data.settings_restored ? 1 : 0,
-            String(data.diagnosis_completed_by || 'Service Advisor').trim()
+            String(data.diagnosis_completed_by || 'Service Advisor').trim(),
+            adminId
           )
           .run();
         return ok(request, null, { message: 'VRC saved' });
@@ -3582,6 +3693,7 @@ export default {
     }
 
     if (url.pathname === '/api/service-advisor/orders' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const rs = await env.DB
         .prepare(
           `SELECT 
@@ -3596,10 +3708,11 @@ export default {
              so.check_in_time
            FROM service_orders so
            LEFT JOIN customers c ON c.id = so.customer_id
-           WHERE so.status IN ('pending', 'in-progress', 'completed')
+           WHERE so.status IN ('pending', 'in-progress', 'completed') AND so.admin_id = ?1
            ORDER BY so.created_at DESC, so.id DESC
            LIMIT 50`
         )
+        .bind(adminId)
         .all<any>();
         
       // Map to array format expected by frontend: [id, name, contact, model, plate, service_type, status, time]
@@ -3618,6 +3731,7 @@ export default {
     
     if (url.pathname === '/api/scheduler/check-availability' && request.method === 'GET') {
        // Using this as "Get Appointments" for now
+       const adminId = getAdminId(request);
        const rs = await env.DB
         .prepare(
           `SELECT so.id,
@@ -3632,10 +3746,11 @@ export default {
                   so.id as appointment_id
            FROM scheduling_orders so
            LEFT JOIN customers c ON c.id = so.customer_id
-           WHERE so.status IN ('scheduled', 'confirmed') AND so.scheduled_date >= date('now')
+           WHERE so.status IN ('scheduled', 'confirmed') AND so.scheduled_date >= date('now') AND so.admin_id = ?1
            ORDER BY so.scheduled_date ASC, so.scheduled_time ASC
            LIMIT 20`
         )
+        .bind(adminId)
         .all<any>();
         
        return ok(request, { 
@@ -3663,6 +3778,7 @@ export default {
 
     // ==================== GATEPASS ====================
     if (url.pathname === '/api/gatepass/pending' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const rs = await env.DB
         .prepare(
           `SELECT g.id, g.service_order_id, g.customer_id, g.status, g.created_at,
@@ -3676,14 +3792,16 @@ export default {
            LEFT JOIN service_orders so ON g.service_order_id = so.id
            LEFT JOIN customers c ON g.customer_id = c.id
            LEFT JOIN vehicle_handovers vh ON vh.service_order_id = g.service_order_id
-           WHERE g.status='pending'
+           WHERE g.status='pending' AND g.admin_id = ?1
            ORDER BY g.created_at DESC, g.id DESC`
         )
+        .bind(adminId)
         .all<any>();
       return ok(request, rs.results ?? []);
     }
 
     if (url.pathname === '/api/gatepass/sign' && request.method === 'POST') {
+      const adminId = getAdminId(request);
       const data = await readJson<any>(request);
       if (!data) return fail(request, 400, 'Invalid JSON');
       const gatepassId = toInt(data.gatepass_id, null);
@@ -3709,8 +3827,8 @@ export default {
       }
 
       await env.DB
-        .prepare(`INSERT INTO gatepass_signatures (gatepass_id, signature_type, signed_by, signed_at) VALUES (?1, ?2, ?3, CURRENT_TIMESTAMP)`)
-        .bind(gatepassId, signatureType, signedBy)
+        .prepare(`INSERT INTO gatepass_signatures (gatepass_id, signature_type, signed_by, signed_at, admin_id) VALUES (?1, ?2, ?3, CURRENT_TIMESTAMP, ?4)`)
+        .bind(gatepassId, signatureType, signedBy, adminId)
         .run();
       await env.DB.prepare(`UPDATE gatepasses SET status='approved' WHERE id=?1`).bind(gatepassId).run();
       return ok(request, null, { message: 'Gatepass signed' });
@@ -3726,32 +3844,22 @@ export default {
         return jsonResponse(request, { success: false, error: 'Username and password required' }, 400);
       }
 
-      if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-        return jsonResponse(request, {
-          success: true,
-          user: {
-            id: 0,
-            username,
-            name: 'Admin',
-            role: 'admin',
-            email: 'admin@rapide.local'
-          }
-        });
-      }
-
       const row = await env.DB
         .prepare(
-          `SELECT id, username, name, role, email
+          `SELECT id, username, name, role, email, location, admin_id
            FROM personnel
            WHERE username = ?1 AND password = ?2 AND status = 'active'
            LIMIT 1`
         )
         .bind(username, password)
-        .first<{ id: number; username: string; name: string; role: string; email: string | null }>();
+        .first<{ id: number; username: string; name: string; role: string; email: string | null; location: string | null; admin_id: number | null }>();
 
       if (!row) {
         return jsonResponse(request, { success: false, error: 'Invalid credentials' }, 401);
       }
+
+      // For admin users, admin_id is their own id. For staff, it's the admin who created them.
+      const effectiveAdminId = row.role === 'admin' ? row.id : (row.admin_id ?? null);
 
       return jsonResponse(request, {
         success: true,
@@ -3760,9 +3868,49 @@ export default {
           username: row.username,
           name: row.name,
           role: row.role,
-          email: row.email ?? ''
+          email: row.email ?? '',
+          location: row.location ?? '',
+          admin_id: effectiveAdminId
         }
       });
+    }
+
+    // ==================== REGISTER ADMIN ====================
+    if (url.pathname === '/api/auth/register-admin' && request.method === 'POST') {
+      const data = await readJson<{ username?: string; password?: string; name?: string; location?: string; email?: string }>(request);
+      const username = String(data?.username ?? '').trim();
+      const password = String(data?.password ?? '').trim();
+      const name = String(data?.name ?? '').trim();
+      const location = String(data?.location ?? '').trim();
+      const email = String(data?.email ?? '').trim();
+
+      if (!username || !password || !name || !location) {
+        return jsonResponse(request, { success: false, error: 'username, password, name, and location are required' }, 400);
+      }
+
+      try {
+        const result = await env.DB
+          .prepare(
+            `INSERT INTO personnel (username, password, name, role, email, location, status)
+             VALUES (?1, ?2, ?3, 'admin', ?4, ?5, 'active')`
+          )
+          .bind(username, password, name, email, location)
+          .run();
+
+        const lastId = (result as any)?.meta?.last_row_id ?? (result as any)?.meta?.lastRowId ?? null;
+
+        return jsonResponse(request, {
+          success: true,
+          admin_id: lastId,
+          message: `Admin account "${name}" created for ${location}`
+        }, 201);
+      } catch (e: any) {
+        const msg = String(e?.message ?? e ?? 'Failed to register admin');
+        if (msg.includes('UNIQUE')) {
+          return fail(request, 400, 'Username already exists');
+        }
+        return fail(request, 400, `DB Error: ${msg}`);
+      }
     }
 
     // ==================== CUSTOMER (CRO) ====================
@@ -3790,6 +3938,7 @@ export default {
 
     // ==================== CUSTOMER INTERACTIONS (CALL LOGS) ====================
     if (url.pathname === '/api/customer/interaction' && request.method === 'POST') {
+      const adminId = getAdminId(request);
       const data = await readJson<{ 
         customer_id: number; 
         outcome: string; 
@@ -3807,10 +3956,10 @@ export default {
       const user = request.headers.get('X-Auth-User') || 'system'; 
 
       const res = await env.DB.prepare(
-        `INSERT INTO customer_interactions (customer_id, interaction_type, outcome, notes, created_by)
-         VALUES (?1, ?2, ?3, ?4, ?5)`
+        `INSERT INTO customer_interactions (customer_id, interaction_type, outcome, notes, created_by, admin_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`
       )
-      .bind(data.customer_id, type, data.outcome, data.notes || '', user)
+      .bind(data.customer_id, type, data.outcome, data.notes || '', user, adminId)
       .run();
 
       if (!res.success) return fail(request, 500, 'Failed to log interaction');
@@ -3837,19 +3986,22 @@ export default {
     }
 
     if (url.pathname === '/api/customer/interactions-recent' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       // Get recent interactions for dashboard stats (last 24 hours or just today)
       // SQLite doesn't have robust date diff, using string comparison for today (UTC)
       // For simplicity, just get last 100 items and filter in frontend or backend
       const rs = await env.DB.prepare(
         `SELECT * FROM customer_interactions 
+         WHERE admin_id = ?1
          ORDER BY created_at DESC 
          LIMIT 100`
-      ).all();
+      ).bind(adminId).all();
 
       return ok(request, rs.results || []);
     }
 
     if (url.pathname === '/api/customer/search' && request.method === 'POST') {
+      const adminId = getAdminId(request);
       const data = await readJson<{ search_type?: string; search_value?: string }>(request);
       const searchType = String(data?.search_type ?? '').trim();
       const rawValue = String(data?.search_value ?? '').trim();
@@ -3883,17 +4035,18 @@ export default {
              CAST((julianday('now') - julianday(COALESCE(c.last_service_date, date('now')))) AS INTEGER) as days_since_service,
              (SELECT MAX(scheduled_date) FROM scheduling_orders WHERE customer_id = c.id) as last_appointment
            FROM customers c
-           WHERE ${where}
+           WHERE ${where} AND c.admin_id = ?2
            ORDER BY c.registration_date DESC
            LIMIT 50`
         )
-        .bind(param)
+        .bind(param, adminId)
         .all();
 
       return ok(request, rs.results ?? []);
     }
 
     if (url.pathname === '/api/customer/register' && request.method === 'POST') {
+      const adminId = getAdminId(request);
       const data = await readJson<any>(request);
       if (!data) return fail(request, 400, 'Invalid JSON');
 
@@ -3928,8 +4081,8 @@ export default {
         const result = await env.DB
           .prepare(
             `INSERT INTO customers
-             (name, contact_no, plate_no, vehicle_model, vehicle_year, email, engine_no, chassis_no, address, city, customer_type, status)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'walk-in', 'active')`
+             (name, contact_no, plate_no, vehicle_model, vehicle_year, email, engine_no, chassis_no, address, city, customer_type, status, admin_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'walk-in', 'active', ?11)`
           )
           .bind(
             name,
@@ -3941,7 +4094,8 @@ export default {
             String(data.engine_no ?? '').trim() || null,
             String(data.chassis_no ?? '').trim() || null,
             String(data.address ?? '').trim() || null,
-            String(data.city ?? '').trim() || null
+            String(data.city ?? '').trim() || null,
+            adminId
           )
           .run();
 
@@ -3954,6 +4108,7 @@ export default {
 
     // ==================== SCHEDULER (CRO) ====================
     if (url.pathname === '/api/scheduler/check-availability' && request.method === 'POST') {
+      const adminId = getAdminId(request);
       const data = await readJson<{ date?: string; time?: string }>(request);
       const date = String(data?.date ?? '').trim();
       const time = String(data?.time ?? '').trim();
@@ -3964,9 +4119,9 @@ export default {
           `SELECT bay_id, technician_id, advisor_id
            FROM scheduling_orders
            WHERE scheduled_date = ?1 AND scheduled_time = ?2
-             AND status IN ('scheduled','confirmed','in-progress')`
+             AND status IN ('scheduled','confirmed','in-progress') AND admin_id = ?3`
         )
-        .bind(date, time)
+        .bind(date, time, adminId)
         .all<{ bay_id: number | null; technician_id: number | null; advisor_id: number | null }>();
 
       const busyBay = new Set((busy.results ?? []).map((r) => r.bay_id).filter(Boolean) as number[]);
@@ -3974,13 +4129,16 @@ export default {
       const busyAdvisor = new Set((busy.results ?? []).map((r) => r.advisor_id).filter(Boolean) as number[]);
 
       const bays = await env.DB
-        .prepare(`SELECT id, bay_name, capacity, bay_type, status FROM service_bays WHERE status = 'active' ORDER BY bay_name ASC`)
+        .prepare(`SELECT id, bay_name, capacity, bay_type, status FROM service_bays WHERE status = 'active' AND admin_id = ?1 ORDER BY bay_name ASC`)
+        .bind(adminId)
         .all<any>();
       const techs = await env.DB
-        .prepare(`SELECT id, name, specialization, status FROM technicians WHERE status = 'active' ORDER BY name ASC`)
+        .prepare(`SELECT id, name, specialization, status FROM technicians WHERE status = 'active' AND admin_id = ?1 ORDER BY name ASC`)
+        .bind(adminId)
         .all<any>();
       const advisors = await env.DB
-        .prepare(`SELECT id, name, status FROM service_advisors WHERE status = 'active' ORDER BY name ASC`)
+        .prepare(`SELECT id, name, status FROM service_advisors WHERE status = 'active' AND admin_id = ?1 ORDER BY name ASC`)
+        .bind(adminId)
         .all<any>();
 
       return ok(request, {
@@ -3991,6 +4149,7 @@ export default {
     }
 
     if (url.pathname === '/api/scheduler/create-order' && request.method === 'POST') {
+      const adminId = getAdminId(request);
       const data = await readJson<any>(request);
       if (!data) return fail(request, 400, 'Invalid JSON');
 
@@ -4011,10 +4170,10 @@ export default {
         const result = await env.DB
           .prepare(
             `INSERT INTO scheduling_orders
-             (customer_id, scheduled_date, scheduled_time, bay_id, technician_id, advisor_id, service_type, status, priority, created_by)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'scheduled', 'normal', ?8)`
+             (customer_id, scheduled_date, scheduled_time, bay_id, technician_id, advisor_id, service_type, status, priority, created_by, admin_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'scheduled', 'normal', ?8, ?9)`
           )
-          .bind(customerId, date, time, bayId || null, techId || null, advisorId, serviceType, createdBy)
+          .bind(customerId, date, time, bayId || null, techId || null, advisorId, serviceType, createdBy, adminId)
           .run();
 
         const id = await d1FirstId(result);
@@ -4027,6 +4186,7 @@ export default {
     }
 
     if (url.pathname === '/api/scheduler/log-contact-attempt' && request.method === 'POST') {
+      const adminId = getAdminId(request);
       const data = await readJson<any>(request);
       if (!data) return fail(request, 400, 'Invalid JSON');
 
@@ -4043,10 +4203,10 @@ export default {
       try {
         const result = await env.DB
           .prepare(
-            `INSERT INTO contact_attempts (customer_id, contact_type, attempt_date, status, notes, created_by)
-             VALUES (?1, ?2, CURRENT_TIMESTAMP, ?3, ?4, ?5)`
+            `INSERT INTO contact_attempts (customer_id, contact_type, attempt_date, status, notes, created_by, admin_id)
+             VALUES (?1, ?2, CURRENT_TIMESTAMP, ?3, ?4, ?5, ?6)`
           )
-          .bind(customerId, contactType, status, notes, createdBy)
+          .bind(customerId, contactType, status, notes, createdBy, adminId)
           .run();
 
         const id = await d1FirstId(result);
@@ -4058,6 +4218,7 @@ export default {
 
     // ==================== SMS (CRO) ====================
     if (url.pathname === '/api/sms/queue-pms-batch' && request.method === 'POST') {
+      const adminId = getAdminId(request);
       const data = await readJson<{ customer_ids?: unknown[]; created_by?: string }>(request);
       const customerIds = (data?.customer_ids ?? []).map((x) => toInt(x, null)).filter((x): x is number => !!x);
       const createdBy = String(data?.created_by ?? 'SYSTEM').trim() || 'SYSTEM';
@@ -4077,10 +4238,10 @@ export default {
 
         const result = await env.DB
           .prepare(
-            `INSERT INTO sms_outbox (customer_id, scheduling_order_id, purpose, phone, message, scheduled_at, status, provider)
-             VALUES (?1, NULL, 'PMS_OUTREACH', ?2, ?3, datetime('now'), 'queued', 'mock')`
+            `INSERT INTO sms_outbox (customer_id, scheduling_order_id, purpose, phone, message, scheduled_at, status, provider, admin_id)
+             VALUES (?1, NULL, 'PMS_OUTREACH', ?2, ?3, datetime('now'), 'queued', 'mock', ?4)`
           )
-          .bind(customerId, customer.contact_no, message)
+          .bind(customerId, customer.contact_no, message, adminId)
           .run();
 
         const id = await d1FirstId(result);
@@ -4092,12 +4253,15 @@ export default {
 
     // ==================== WAREHOUSE ====================
     if (url.pathname === '/api/warehouse/products' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const rs = await env.DB
         .prepare(
           `SELECT id, product_code, product_name, category, unit_price, quantity_in_stock, reorder_level, supplier, description, status
            FROM warehouse_products
+           WHERE admin_id = ?1
            ORDER BY id DESC`
         )
+        .bind(adminId)
         .all<any>();
 
       const tuples = (rs.results ?? []).map((r: any) => [
@@ -4117,6 +4281,7 @@ export default {
     }
 
     if (url.pathname === '/api/warehouse/products' && request.method === 'POST') {
+      const adminId = getAdminId(request);
       const data = await readJson<any>(request);
       if (!data) return fail(request, 400, 'Invalid JSON');
 
@@ -4138,10 +4303,10 @@ export default {
         const result = await env.DB
           .prepare(
             `INSERT INTO warehouse_products
-             (product_code, product_name, category, unit_price, quantity_in_stock, reorder_level, supplier, description, status, created_by)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'active', ?9)`
+             (product_code, product_name, category, unit_price, quantity_in_stock, reorder_level, supplier, description, status, created_by, admin_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'active', ?9, ?10)`
           )
-          .bind(code, name, category, unitPrice, qty, reorder, supplier, description, createdBy)
+          .bind(code, name, category, unitPrice, qty, reorder, supplier, description, createdBy, adminId)
           .run();
 
         const id = await d1FirstId(result);
@@ -4193,6 +4358,7 @@ export default {
     }
 
     if (url.pathname === '/api/warehouse/summary' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const row = await env.DB
         .prepare(
           `SELECT
@@ -4201,8 +4367,9 @@ export default {
              COALESCE(SUM(quantity_in_stock * unit_price), 0) as total_value,
              SUM(CASE WHEN quantity_in_stock <= reorder_level THEN 1 ELSE 0 END) as low_stock_count
            FROM warehouse_products
-           WHERE status = 'active'`
+           WHERE status = 'active' AND admin_id = ?1`
         )
+        .bind(adminId)
         .first<any>();
 
       return ok(request, {
@@ -4214,6 +4381,7 @@ export default {
     }
 
     if (url.pathname === '/api/warehouse/inventory/history' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const limit = Math.min(Math.max(toInt(url.searchParams.get('limit'), 50) ?? 50, 1), 200);
       const rs = await env.DB
         .prepare(
@@ -4232,10 +4400,11 @@ export default {
              h.created_at
            FROM warehouse_inventory_history h
            JOIN warehouse_products p ON p.id = h.product_id
+           WHERE h.admin_id = ?1
            ORDER BY h.created_at DESC
-           LIMIT ?1`
+           LIMIT ?2`
         )
-        .bind(limit)
+        .bind(adminId, limit)
         .all<any>();
 
       const tuples = (rs.results ?? []).map((r: any) => [
@@ -4257,6 +4426,7 @@ export default {
     }
 
     async function warehouseAdjustStock(transactionType: 'in' | 'out') {
+      const adminId = getAdminId(request);
       const data = await readJson<any>(request);
       if (!data) return fail(request, 400, 'Invalid JSON');
 
@@ -4290,10 +4460,10 @@ export default {
       await env.DB
         .prepare(
           `INSERT INTO warehouse_inventory_history
-           (product_id, transaction_type, quantity, previous_quantity, new_quantity, reference_no, reference_type, notes, created_by)
-           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`
+           (product_id, transaction_type, quantity, previous_quantity, new_quantity, reference_no, reference_type, notes, created_by, admin_id)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)`
         )
-        .bind(productId, transactionType, qty, prevQty, newQty, referenceNo, referenceType, notes, createdBy)
+        .bind(productId, transactionType, qty, prevQty, newQty, referenceNo, referenceType, notes, createdBy, adminId)
         .run();
 
       return ok(request, { product_id: productId, previous_quantity: prevQty, new_quantity: newQty });
@@ -4320,6 +4490,7 @@ export default {
 
     // ==================== TECHNICIAN ====================
     if (url.pathname === '/api/technician/resolve' && request.method === 'POST') {
+      const adminId = getAdminId(request);
       const data = await readJson<{ username?: string; name?: string }>(request);
       const username = String(data?.username ?? '').trim();
       const name = String(data?.name ?? username).trim();
@@ -4332,8 +4503,8 @@ export default {
 
       if (!technician) {
         const result = await env.DB
-          .prepare(`INSERT INTO technicians (name, employee_id, status) VALUES (?1, ?2, 'active')`)
-          .bind(name || username, username)
+          .prepare(`INSERT INTO technicians (name, employee_id, status, admin_id) VALUES (?1, ?2, 'active', ?3)`)
+          .bind(name || username, username, adminId)
           .run();
         const id = await d1FirstId(result);
         technician = { id: Number(id), name: name || username, employee_id: username };
@@ -4343,6 +4514,7 @@ export default {
     }
 
     if (url.pathname === '/api/technician/jobs' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const technicianId = toInt(url.searchParams.get('technician_id'), null);
       if (!technicianId) return fail(request, 400, 'technician_id is required');
 
@@ -4360,10 +4532,10 @@ export default {
            FROM technician_assignments ta
            JOIN service_orders so ON so.id = ta.service_order_id
            LEFT JOIN customers c ON c.id = so.customer_id
-           WHERE ta.technician_id = ?1
+           WHERE ta.technician_id = ?1 AND so.admin_id = ?2
            ORDER BY ta.assigned_at DESC, ta.id DESC`
         )
-        .bind(technicianId)
+        .bind(technicianId, adminId)
         .all<any>();
 
       return ok(request, rs.results ?? []);
@@ -4471,16 +4643,19 @@ export default {
 
     // ==================== ADMIN ====================
     if (url.pathname === '/api/auth/admin/personnel-list' && request.method === 'GET') {
-      if (!isAdmin(request)) {
+      if (!(await isAdminAuth(request, env))) {
         return jsonResponse(request, { success: false, error: 'Admin verification failed' }, 401);
       }
 
+      const adminId = getAdminId(request);
       const rs = await env.DB
         .prepare(
-          `SELECT id, username, name, role, email, status, created_at
+          `SELECT id, username, name, role, email, status, created_at, location
            FROM personnel
+           WHERE (admin_id = ?1 OR id = ?1)
            ORDER BY created_at DESC`
         )
+        .bind(adminId)
         .all<{
           id: number;
           username: string;
@@ -4489,6 +4664,7 @@ export default {
           email: string | null;
           status: string;
           created_at: string;
+          location: string | null;
         }>();
 
       const personnel = (rs.results ?? []).map((r) => [
@@ -4498,17 +4674,19 @@ export default {
         r.role,
         r.email ?? '',
         r.status,
-        r.created_at
+        r.created_at,
+        r.location ?? ''
       ]);
 
       return jsonResponse(request, { success: true, personnel, count: personnel.length });
     }
 
     if (url.pathname === '/api/auth/admin/register-personnel' && request.method === 'POST') {
-      if (!isAdmin(request)) {
+      if (!(await isAdminAuth(request, env))) {
         return jsonResponse(request, { success: false, error: 'Admin verification failed' }, 401);
       }
 
+      const adminId = getAdminId(request);
       const data = await readJson<{ username?: string; password?: string; name?: string; role?: string; email?: string }>(request);
       const username = String(data?.username ?? '').trim();
       const password = String(data?.password ?? '').trim();
@@ -4527,10 +4705,10 @@ export default {
       try {
         const result = await env.DB
           .prepare(
-            `INSERT INTO personnel (username, password, name, role, email, status)
-             VALUES (?1, ?2, ?3, ?4, ?5, 'active')`
+            `INSERT INTO personnel (username, password, name, role, email, status, admin_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, 'active', ?6)`
           )
-          .bind(username, password, name, role, email)
+          .bind(username, password, name, role, email, adminId)
           .run();
 
         const lastId = (result as any)?.meta?.last_row_id ?? (result as any)?.meta?.lastRowId ?? null;
@@ -4538,20 +4716,20 @@ export default {
         if (role === 'technician') {
           await env.DB
             .prepare(
-              `INSERT OR IGNORE INTO technicians (name, employee_id, email, status, hire_date, created_at)
-               VALUES (?1, ?2, ?3, 'active', NULL, CURRENT_TIMESTAMP)`
+              `INSERT OR IGNORE INTO technicians (name, employee_id, email, status, hire_date, created_at, admin_id)
+               VALUES (?1, ?2, ?3, 'active', NULL, CURRENT_TIMESTAMP, ?4)`
             )
-            .bind(name || username, username, email)
+            .bind(name || username, username, email, adminId)
             .run();
         }
 
         if (role === 'advisor') {
           await env.DB
             .prepare(
-              `INSERT OR IGNORE INTO service_advisors (name, employee_id, contact_no, email, status, hire_date, created_at)
-               VALUES (?1, ?2, NULL, ?3, 'active', NULL, CURRENT_TIMESTAMP)`
+              `INSERT OR IGNORE INTO service_advisors (name, employee_id, contact_no, email, status, hire_date, created_at, admin_id)
+               VALUES (?1, ?2, NULL, ?3, 'active', NULL, CURRENT_TIMESTAMP, ?4)`
             )
-            .bind(name || username, username, email)
+            .bind(name || username, username, email, adminId)
             .run();
         }
 
@@ -4565,7 +4743,6 @@ export default {
           201
         );
       } catch (e: any) {
-        // RETURN RAW ERROR FOR DEBUGGING
         const msg = String(e?.message ?? e ?? 'Failed to register personnel');
         return fail(request, 400, `DB Error: ${msg}`);
       }
@@ -4573,15 +4750,16 @@ export default {
 
     // DELETE /api/auth/admin/delete-personnel?id=123
     if (url.pathname === '/api/auth/admin/delete-personnel' && request.method === 'DELETE') {
-      if (!isAdmin(request)) {
+      if (!(await isAdminAuth(request, env))) {
         return jsonResponse(request, { success: false, error: 'Admin verification failed' }, 401);
       }
 
+      const adminId = getAdminId(request);
       const id = toInt(url.searchParams.get('id'));
       if (!id) return fail(request, 400, 'id is required');
 
       try {
-        await env.DB.prepare('DELETE FROM personnel WHERE id = ?').bind(id).run();
+        await env.DB.prepare('DELETE FROM personnel WHERE id = ? AND admin_id = ?').bind(id, adminId).run();
         return ok(request, { message: 'Deleted successfully' });
       } catch(e: any) {
         return fail(request, 500, e.message);
@@ -4613,21 +4791,22 @@ export default {
     // GET /api/admin/dashboard-stats - Get overview stats for admin dashboard
     if (url.pathname === '/api/admin/dashboard-stats' && request.method === 'GET') {
       if (!isAdmin(request)) return fail(request, 401, 'Unauthorized');
+      const adminId = getAdminId(request);
       
       try {
         // Active Jobs (Not completed or cancelled)
         const jobsResult = await env.DB.prepare(
           `SELECT COUNT(*) as count FROM service_orders 
-           WHERE status NOT IN ('completed', 'cancelled')`
-        ).first();
+           WHERE status NOT IN ('completed', 'cancelled') AND admin_id = ?1`
+        ).bind(adminId).first();
         const activeJobs = jobsResult ? (jobsResult.count as number) : 0;
 
         // Today's Revenue
         const today = todayISODate();
         const revenueResult = await env.DB.prepare(
           `SELECT SUM(payment_amount) as total FROM invoice_payments 
-           WHERE date(payment_date) = ?1`
-        ).bind(today).first();
+           WHERE date(payment_date) = ?1 AND admin_id = ?2`
+        ).bind(today, adminId).first();
         const dailyRevenue = revenueResult ? (revenueResult.total as number) : 0;
 
         return ok(request, { 
@@ -4643,14 +4822,16 @@ export default {
     
     // --- SERVICE CATALOG (public read for all roles) ---
     if (url.pathname === '/api/services/catalog' && request.method === 'GET') {
-      const rs = await env.DB.prepare('SELECT * FROM service_catalog WHERE status=\'active\' ORDER BY category, service_name').all();
+      const adminId = getAdminId(request);
+      const rs = await env.DB.prepare('SELECT * FROM service_catalog WHERE status=\'active\' AND admin_id = ?1 ORDER BY category, service_name').bind(adminId).all();
       return ok(request, rs.results ?? []);
     }
 
     // --- SERVICE CATALOG (admin CRUD) ---
     if (url.pathname === '/api/admin/services' && request.method === 'GET') {
       if (!isAdmin(request)) return fail(request, 401, 'Unauthorized');
-      const rs = await env.DB.prepare('SELECT * FROM service_catalog ORDER BY category, service_name').all();
+      const adminId = getAdminId(request);
+      const rs = await env.DB.prepare('SELECT * FROM service_catalog WHERE admin_id = ?1 ORDER BY category, service_name').bind(adminId).all();
       return ok(request, rs.results ?? []);
     }
 
@@ -4713,7 +4894,8 @@ export default {
     // --- TECHNICIANS (ADMIN VIEW) ---
     if (url.pathname === '/api/admin/technicians' && request.method === 'GET') {
        if (!isAdmin(request)) return fail(request, 401, 'Unauthorized');
-       const rs = await env.DB.prepare('SELECT * FROM technicians ORDER BY name').all();
+       const adminId = getAdminId(request);
+       const rs = await env.DB.prepare('SELECT * FROM technicians WHERE admin_id = ?1 ORDER BY name').bind(adminId).all();
        return ok(request, rs.results ?? []);
     }
     
@@ -4743,7 +4925,8 @@ export default {
     // --- BAYS (ADMIN VIEW) ---
     if (url.pathname === '/api/admin/bays' && request.method === 'GET') {
        if (!isAdmin(request)) return fail(request, 401, 'Unauthorized');
-       const rs = await env.DB.prepare('SELECT * FROM service_bays ORDER BY bay_name').all();
+       const adminId = getAdminId(request);
+       const rs = await env.DB.prepare('SELECT * FROM service_bays WHERE admin_id = ?1 ORDER BY bay_name').bind(adminId).all();
        return ok(request, rs.results ?? []);
     }
     
@@ -4820,6 +5003,7 @@ export default {
     // ==================== RECORDS MODULE ====================
     // GET /api/records/service-orders - List all service orders for history view
     if (url.pathname === '/api/records/service-orders' && request.method === 'GET') {
+      const adminId = getAdminId(request);
       const rs = await env.DB
         .prepare(
           `SELECT 
@@ -4853,9 +5037,11 @@ export default {
            LEFT JOIN customers c ON c.id = so.customer_id
            LEFT JOIN billing_invoices bi ON bi.service_order_id = so.id
            LEFT JOIN vehicle_report_cards vrc ON vrc.service_order_id = so.id
+           WHERE so.admin_id = ?1
            ORDER BY so.created_at DESC
            LIMIT 500`
         )
+        .bind(adminId)
         .all<any>();
 
       return ok(request, { orders: rs.results || [] });

@@ -10,12 +10,27 @@ import {
 } from '../components/EnterpriseComponents';
 
 const Login = ({ onLogin }) => {
+  const [mode, setMode] = useState('login'); // 'login' or 'register'
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [location, setLocation] = useState('');
+  const [email, setEmail] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const clearForm = () => {
+    setUsername('');
+    setPassword('');
+    setName('');
+    setLocation('');
+    setEmail('');
+    setError('');
+    setSuccess('');
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -51,6 +66,65 @@ const Login = ({ onLogin }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRegisterAdmin = async (e) => {
+    e.preventDefault();
+
+    if (!username.trim() || !password.trim() || !name.trim() || !location.trim()) {
+      setError('All fields are required (username, password, name, location)');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const data = await fetchJson('/api/auth/register-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, name, location, email })
+      });
+
+      if (data.success) {
+        setSuccess(data.message || 'Admin account created! You can now sign in.');
+        setTimeout(() => {
+          setMode('login');
+          setSuccess('');
+          setPassword('');
+        }, 2000);
+      } else {
+        setError(data.error || 'Registration failed');
+      }
+    } catch (err) {
+      setError('Connection error: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const inputStyle = {
+    width: '100%',
+    padding: '12px 16px',
+    background: '#f8fafc',
+    border: '1px solid #e2e8f0',
+    borderRadius: '4px',
+    outline: 'none',
+    fontSize: '14px',
+    color: '#0f172a',
+    fontWeight: '500',
+    boxSizing: 'border-box'
+  };
+
+  const labelStyle = {
+    display: 'block',
+    fontSize: '12px',
+    fontWeight: '700',
+    marginBottom: '6px',
+    color: '#475569',
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px'
   };
 
   return (
@@ -100,25 +174,30 @@ const Login = ({ onLogin }) => {
            </div>
         </div>
 
-        {/* RIGHT PANEL - LOGIN FORM (White) */}
+        {/* RIGHT PANEL - LOGIN/REGISTER FORM (White) */}
         <div style={{
           flex: '1.2',
-          padding: '60px 80px',
+          padding: '40px 60px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
-          backgroundColor: '#ffffff'
+          backgroundColor: '#ffffff',
+          overflowY: 'auto'
         }}>
           
-          <div style={{ marginBottom: '32px' }}>
-            <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#111', margin: '0 0 8px 0' }}>Sign In</h2>
-            <p style={{ color: '#64748b', fontSize: '14px', margin: 0 }}>Access your admin dashboard.</p>
+          <div style={{ marginBottom: '24px' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#111', margin: '0 0 8px 0' }}>
+              {mode === 'login' ? 'Sign In' : 'Create Admin Account'}
+            </h2>
+            <p style={{ color: '#64748b', fontSize: '14px', margin: 0 }}>
+              {mode === 'login' ? 'Access your dashboard.' : 'Set up a new branch admin.'}
+            </p>
           </div>
 
-          <form onSubmit={handleLogin} style={{ width: '100%' }}>
+          <form onSubmit={mode === 'login' ? handleLogin : handleRegisterAdmin} style={{ width: '100%' }}>
             {error && (
               <div style={{ 
-                marginBottom: '20px', 
+                marginBottom: '16px', 
                 padding: '12px', 
                 background: '#FEF2F2', 
                 borderLeft: '3px solid #EF4444', 
@@ -129,60 +208,79 @@ const Login = ({ onLogin }) => {
                 {error}
               </div>
             )}
+            {success && (
+              <div style={{ 
+                marginBottom: '16px', 
+                padding: '12px', 
+                background: '#F0FDF4', 
+                borderLeft: '3px solid #22C55E', 
+                color: '#166534', 
+                fontSize: '13px',
+                fontWeight: '500'
+              }}>
+                {success}
+              </div>
+            )}
 
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '6px', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Username</label>
+            {mode === 'register' && (
+              <div style={{ marginBottom: '16px' }}>
+                <label style={labelStyle}>Full Name</label>
+                <input 
+                  type="text" 
+                  value={name}
+                  onChange={(e) => { setName(e.target.value); setError(''); }}
+                  style={inputStyle}
+                  placeholder="e.g. Juan Dela Cruz"
+                />
+              </div>
+            )}
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={labelStyle}>Username</label>
               <input 
                 type="text" 
                 value={username}
                 onChange={(e) => { setUsername(e.target.value); setError(''); }}
-                style={{
-                  width: '100%',
-                  padding: '12px 16px',
-                  background: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '4px',
-                  outline: 'none',
-                  fontSize: '14px',
-                  color: '#0f172a',
-                  fontWeight: '500',
-                  boxSizing: 'border-box'
-                }}
-                onFocus={(e) => { e.target.style.background = '#fff'; e.target.style.borderColor = '#000'; }}
-                onBlur={(e) => { e.target.style.background = '#f8fafc'; e.target.style.borderColor = '#e2e8f0'; }}
+                style={inputStyle}
                 placeholder="Enter ID"
               />
             </div>
             
-             <div style={{ marginBottom: '32px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Password</label>
-                <a href="#" style={{ fontSize: '12px', color: '#64748b', textDecoration: 'none' }} onClick={(e) => e.preventDefault()}>Forgot?</a>
-              </div>
-              <div style={{ position: 'relative' }}>
-                <input 
-                  type={showPassword ? "text" : "password"} 
-                  value={password}
-                   onChange={(e) => { setPassword(e.target.value); setError(''); }}
-                  style={{
-                    width: '100%',
-                    padding: '12px 16px',
-                    background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '4px',
-                    outline: 'none',
-                    fontSize: '14px',
-                    color: '#0f172a',
-                    fontWeight: '500',
-                    boxSizing: 'border-box'
-                  }}
-                  onFocus={(e) => { e.target.style.background = '#fff'; e.target.style.borderColor = '#000'; }}
-                  onBlur={(e) => { e.target.style.background = '#f8fafc'; e.target.style.borderColor = '#e2e8f0'; }}
-                  placeholder="••••••••"
-                />
-                 {/* No button inside input for cleanness, rely on browser toggles or keep simple */}
-              </div>
+            <div style={{ marginBottom: mode === 'register' ? '16px' : '24px' }}>
+              <label style={labelStyle}>Password</label>
+              <input 
+                type={showPassword ? "text" : "password"} 
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                style={inputStyle}
+                placeholder="••••••••"
+              />
             </div>
+
+            {mode === 'register' && (
+              <>
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={labelStyle}>Location / City</label>
+                  <input 
+                    type="text" 
+                    value={location}
+                    onChange={(e) => { setLocation(e.target.value); setError(''); }}
+                    style={inputStyle}
+                    placeholder="e.g. Butuan City"
+                  />
+                </div>
+                <div style={{ marginBottom: '24px' }}>
+                  <label style={labelStyle}>Email (optional)</label>
+                  <input 
+                    type="email" 
+                    value={email}
+                    onChange={(e) => { setEmail(e.target.value); setError(''); }}
+                    style={inputStyle}
+                    placeholder="admin@example.com"
+                  />
+                </div>
+              </>
+            )}
 
             <button type="submit" style={{
               width: '100%',
@@ -199,15 +297,26 @@ const Login = ({ onLogin }) => {
               transition: 'background 0.2s',
               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
             }}>
-               {loading ? 'Processing...' : 'Sign In Dashboard'}
+               {loading ? 'Processing...' : (mode === 'login' ? 'Sign In Dashboard' : 'Create Admin Account')}
             </button>
           </form> 
           
-          <div style={{ marginTop: '32px', textAlign: 'center' }}>
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#64748b', cursor: 'pointer' }}>
-              <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} style={{ accentColor: '#000' }} />
-              Remember this device
-            </label>
+          <div style={{ marginTop: '24px', textAlign: 'center' }}>
+            {mode === 'login' ? (
+              <button
+                onClick={() => { setMode('register'); clearForm(); }}
+                style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '13px', cursor: 'pointer', textDecoration: 'underline' }}
+              >
+                Create new Admin Account
+              </button>
+            ) : (
+              <button
+                onClick={() => { setMode('login'); clearForm(); }}
+                style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '13px', cursor: 'pointer', textDecoration: 'underline' }}
+              >
+                ← Back to Sign In
+              </button>
+            )}
           </div>
         </div>
       </div>

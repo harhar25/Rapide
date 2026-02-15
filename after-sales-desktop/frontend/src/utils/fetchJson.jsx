@@ -8,7 +8,27 @@ function resolveUrl(url) {
 }
 
 export async function fetchJson(url, options) {
-  const response = await fetch(resolveUrl(url), options);
+  // Auto-inject auth headers from localStorage
+  const mergedOptions = { ...options };
+  const existingHeaders = mergedOptions.headers || {};
+  const autoHeaders = {};
+  
+  try {
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+      const user = JSON.parse(savedUser);
+      if (user.admin_id != null) {
+        autoHeaders['X-Admin-Id'] = String(user.admin_id);
+      }
+      if (user.role) {
+        autoHeaders['X-User-Role'] = user.role;
+      }
+    }
+  } catch {}
+
+  mergedOptions.headers = { ...autoHeaders, ...existingHeaders };
+
+  const response = await fetch(resolveUrl(url), mergedOptions);
   const text = await response.text();
 
   let data;
@@ -35,4 +55,18 @@ export async function fetchJson(url, options) {
   }
 
   return data;
+}
+
+// Helper to get auth headers for direct fetch() calls
+export function getAuthHeaders() {
+  const headers = {};
+  try {
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+      const user = JSON.parse(savedUser);
+      if (user.admin_id != null) headers['X-Admin-Id'] = String(user.admin_id);
+      if (user.role) headers['X-User-Role'] = user.role;
+    }
+  } catch {}
+  return headers;
 }

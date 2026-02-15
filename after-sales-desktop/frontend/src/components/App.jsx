@@ -97,7 +97,9 @@ export default function App() {
       username: userData.username,
       name: userData.name,
       role: userData.role,
-      email: userData.email
+      email: userData.email,
+      location: userData.location || '',
+      admin_id: userData.admin_id ?? null
     };
     localStorage.setItem('user', JSON.stringify(user));
     // Store admin password temporarily if admin login

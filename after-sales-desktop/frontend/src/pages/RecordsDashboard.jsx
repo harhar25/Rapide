@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getAuthHeaders } from '../utils/fetchJson';
 import '../styles/enterprise-ui.css';
 import { useAutoRefresh } from '../hooks/useRealtimeUpdates';
 import ServiceDocumentBundle from '../components/ServiceDocumentBundle';
@@ -27,7 +28,7 @@ export default function RecordsDashboard({ user, onLogout }) {
 
   const fetchRecords = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/records/service-orders`);
+      const res = await fetch(`${API_BASE}/api/records/service-orders`, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         setRecords((data.data?.orders || []).sort((a, b) => b.id - a.id));

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAutoRefresh } from '../hooks/useRealtimeUpdates';
+import { getAuthHeaders } from '../utils/fetchJson';
 
 const API_BASE = 'https://rapide-api.rapideph.workers.dev';
 
@@ -249,7 +250,7 @@ export default function CashierDashboard({ user, onLogout }) {
   const fetchPaymentQueue = async () => {
     try {
       // Fetch approved/issued invoices (sent to cashier by billing)
-      const res = await fetch(`${API_BASE}/api/billing/invoices?status=approved`);
+      const res = await fetch(`${API_BASE}/api/billing/invoices?status=approved`, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         const list = data?.data?.invoices || data?.invoices || [];
@@ -264,7 +265,7 @@ export default function CashierDashboard({ user, onLogout }) {
 
   const fetchCompletedToday = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/billing/invoices?status=paid`);
+      const res = await fetch(`${API_BASE}/api/billing/invoices?status=paid`, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         const list = data?.data?.invoices || data?.invoices || [];
@@ -284,7 +285,7 @@ export default function CashierDashboard({ user, onLogout }) {
   const fetchAllPayments = async () => {
     setHistoryLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/billing/invoices?status=paid`);
+      const res = await fetch(`${API_BASE}/api/billing/invoices?status=paid`, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         const list = data?.data?.invoices || data?.invoices || [];
@@ -370,7 +371,7 @@ export default function CashierDashboard({ user, onLogout }) {
     try {
       const res = await fetch(`${API_BASE}/api/billing/invoices/${selectedOrder.id}/pay`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           payment_method: paymentMethod,
           amount_paid: selectedOrder.total_amount,
@@ -387,7 +388,7 @@ export default function CashierDashboard({ user, onLogout }) {
         let partsData = [];
         if (selectedOrder.service_order_id) {
           try {
-            const detailsRes = await fetch(`${API_BASE}/api/billing/service-order/${selectedOrder.service_order_id}/details`);
+            const detailsRes = await fetch(`${API_BASE}/api/billing/service-order/${selectedOrder.service_order_id}/details`, { headers: getAuthHeaders() });
             if (detailsRes.ok) {
               const detailsJson = await detailsRes.json();
               const details = detailsJson?.data || detailsJson;
@@ -464,7 +465,7 @@ export default function CashierDashboard({ user, onLogout }) {
     let partsData = [];
     if (payment.service_order_id) {
       try {
-        const res = await fetch(`${API_BASE}/api/billing/service-order/${payment.service_order_id}/details`);
+        const res = await fetch(`${API_BASE}/api/billing/service-order/${payment.service_order_id}/details`, { headers: getAuthHeaders() });
         if (res.ok) {
           const data = await res.json();
           const details = data?.data || data;

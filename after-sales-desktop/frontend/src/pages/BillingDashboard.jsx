@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAutoRefresh } from '../hooks/useRealtimeUpdates';
+import { getAuthHeaders } from '../utils/fetchJson';
 
 const API_BASE = 'https://rapide-api.rapideph.workers.dev';
 
@@ -220,7 +221,7 @@ function InvoiceDetailModal({ invoice, onClose, onPrint, onApprove, formatCurren
   useEffect(() => {
     if (invoice?.service_order_id) {
       setLoadingParts(true);
-      fetch(`${apiBase}/api/billing/service-order/${invoice.service_order_id}/details`)
+      fetch(`${apiBase}/api/billing/service-order/${invoice.service_order_id}/details`, { headers: getAuthHeaders() })
         .then(res => res.ok ? res.json() : null)
         .then(data => {
           if (data) {
@@ -427,7 +428,7 @@ export default function BillingDashboard() {
     }
     setLoadingDetails(true);
     try {
-      const res = await fetch(`${API_BASE}/api/billing/service-order/${serviceOrderId}/details`);
+      const res = await fetch(`${API_BASE}/api/billing/service-order/${serviceOrderId}/details`, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         const details = data?.data || data;
@@ -458,7 +459,7 @@ export default function BillingDashboard() {
 
   const fetchInvoices = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/billing/invoices`);
+      const res = await fetch(`${API_BASE}/api/billing/invoices`, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         const invoiceList = data?.data?.invoices || data?.invoices || [];
@@ -473,7 +474,7 @@ export default function BillingDashboard() {
 
   const fetchServiceOrders = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/service-advisor/orders/ready-for-billing`);
+      const res = await fetch(`${API_BASE}/api/service-advisor/orders/ready-for-billing`, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         setServiceOrders(data.data || []);
@@ -507,7 +508,7 @@ export default function BillingDashboard() {
     let enrichedInvoice = { ...invoice };
     if (invoice.service_order_id) {
       try {
-        const res = await fetch(`${API_BASE}/api/billing/service-order/${invoice.service_order_id}/details`);
+        const res = await fetch(`${API_BASE}/api/billing/service-order/${invoice.service_order_id}/details`, { headers: getAuthHeaders() });
         if (res.ok) {
           const data = await res.json();
           const details = data?.data || data;
@@ -602,7 +603,8 @@ export default function BillingDashboard() {
   const handleApprove = async (invoice) => {
     try {
       const res = await fetch(`${API_BASE}/api/billing/invoices/${invoice.id}/approve`, {
-        method: 'POST'
+        method: 'POST',
+        headers: getAuthHeaders()
       });
       if (res.ok) {
         showToast('Invoice approved! Sent to Cashier for payment.');
@@ -641,7 +643,7 @@ export default function BillingDashboard() {
 
       const res = await fetch(`${API_BASE}/api/billing/invoices`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           service_order_id: parseInt(newInvoice.service_order_id),
           customer_id: customerId,

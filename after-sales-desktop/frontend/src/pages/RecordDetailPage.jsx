@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { getAuthHeaders } from '../utils/fetchJson';
 import '../styles/enterprise-ui.css';
 import { LoadingSpinner } from '../components/EnterpriseComponents';
 import ServiceDocumentBundle from '../components/ServiceDocumentBundle';
@@ -20,7 +21,7 @@ export default function RecordDetailPage({ user, onLogout }) {
   const fetchRecordDetails = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/records/service-orders/${id}/details`);
+      const res = await fetch(`${API_BASE}/api/records/service-orders/${id}/details`, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         setRecord(data.data);
